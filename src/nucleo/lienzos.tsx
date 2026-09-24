@@ -293,6 +293,9 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
       window.removeEventListener('keydown', tecla)
       e.destruir()
       escena.current = null
+      // una construcción diferida que no llegó a correr no puede dejar el lienzo nuevo bloqueado
+      construyendo.current = false
+      sucio.current = true
     }
   }, [vista])
 

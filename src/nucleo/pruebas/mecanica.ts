@@ -1,7 +1,8 @@
 /** Bloque 2: mecánica. */
-import { analizarLagrangiano, estadoEn, integrar, numerico, periodo } from '../../lib/mecanica'
+import { analizarLagrangiano, cruces, estadoEn, integrar, numerico, periodo } from '../../lib/mecanica'
+import { estadoPeonza, invariantesEuler, leerPiezas, numericoPeonza, periodoEuler, precesionUniforme, retornos, rotacionEuler, rotacionLibre, tensor, type Peonza, type V3 } from '../../lib/solido'
 import { compilarE } from '../../lib/cas/compilar'
-import { elipticaK } from '../../lib/especiales'
+import { elipticaK, gauss20 } from '../../lib/especiales'
 import { resolverLineal } from '../../lib/matrices'
 import lagrangiano, { PRESETS, calcular, type EstadoLagrangiano } from '../../modulos/mecanica/lagrangiano'
 import orbitas, { areaBarrida, campoCentral, elementos, estadoInicial, hohmann, invariantes, periapsides, trayectoria, type EstadoOrbitas } from '../../modulos/mecanica/orbitas'
@@ -174,5 +175,140 @@ export function pruebasMecanica() {
       cerca(`forzado ${nombre}: solución exacta = numérica en t = 9,1`, forzadoExacto(m, k, cc, F0, W, 9.1), yf[0], 1e-8)
       cerca(`forzado ${nombre}: parte de x(0) = 0`, forzadoExacto(m, k, cc, F0, W, 0), 0, 1e-13)
     }
+  }
+
+  seccion('Mecánica · sólido rígido')
+  {
+    // cada fórmula de tabla frente a la integral de volumen hecha a mano (Gauss–Legendre anidado)
+    const g3 = (f: (x: number, y: number, z: number) => number, [x0, x1]: number[], [y0, y1]: number[], [z0, z1]: number[]) =>
+      gauss20((x) => gauss20((y) => gauss20((z) => f(x, y, z), z0, z1), y0, y1), x0, x1)
+    const tensorIntegrado = (dens: number, dom: number[][]) => {
+      const I = [0, 1, 2].map(() => [0, 0, 0])
+      for (let i = 0; i < 3; i++)
+        for (let j = 0; j < 3; j++)
+          I[i][j] = dens * g3((x, y, z) => {
+            const r = [x, y, z]
+            return (i === j ? x * x + y * y + z * z : 0) - r[i] * r[j]
+          }, dom[0], dom[1], dom[2])
+      return I
+    }
+    const igualM = (nombre: string, A: number[][], B: number[][], tol: number) =>
+      cierto(nombre, A.every((f, i) => f.every((v, j) => Math.abs(v - B[i][j]) < tol)), JSON.stringify(A.map((f, i) => f.map((v, j) => +(v - B[i][j]).toExponential(2)))))
+    // caja fuera del origen: Steiner con productos de inercia
+    const m = 2.1
+    const [a, b, c] = [1.3, 0.7, 0.4]
+    const d: V3 = [0.3, -0.5, 0.8]
+    const caja = tensor(leerPiezas(`caja m=${m} a=${a} b=${b} c=${c} en (${d.join(', ')})`))
+    igualM('caja desplazada: I respecto al origen = integral directa (Steiner)', caja.IO, tensorIntegrado(m / (a * b * c), [[d[0] - a / 2, d[0] + a / 2], [d[1] - b / 2, d[1] + b / 2], [d[2] - c / 2, d[2] + c / 2]]), 1e-12)
+    cerca('caja: I_xx en su centro = m(b² + c²)/12', caja.Icm[0][0], (m * (b * b + c * c)) / 12, 1e-13)
+    // cilindro, cono, esfera y cáscara en coordenadas cilíndricas o esféricas
+    const cil = (dens: number, r: (u: number) => number, u0: number, u1: number, f: (u: number, s: number, a: number) => number) =>
+      dens * gauss20((u) => gauss20((ang) => gauss20((s) => s * f(u, s, ang), 0, r(u)), 0, 2 * Math.PI, 2), u0, u1)
+    {
+      const [r, h, mm] = [0.6, 1.1, 1.7]
+      const dens = mm / (Math.PI * r * r * h)
+      const t = tensor(leerPiezas(`cilindro m=${mm} r=${r} h=${h} eje=x`))
+      cerca('cilindro eje x: I_xx = mr²/2 (integral)', t.Icm[0][0], cil(dens, () => r, -h / 2, h / 2, (_u, s) => s * s), 1e-12)
+      cerca('cilindro eje x: I_yy = m(3r² + h²)/12 (integral)', t.Icm[1][1], cil(dens, () => r, -h / 2, h / 2, (u, s, ang) => u * u + (s * Math.sin(ang)) ** 2), 1e-12)
+    }
+    {
+      const [r, h, mm] = [0.5, 1.4, 0.9]
+      const dens = mm / ((Math.PI * r * r * h) / 3)
+      const rad = (u: number) => (r * (0.75 * h - u)) / h
+      cerca('cono: el centro de masas está a h/4 de la base', cil(dens, rad, -h / 4, (3 * h) / 4, (u) => u), 0, 1e-12)
+      cerca('cono: masa integrada', cil(dens, rad, -h / 4, (3 * h) / 4, () => 1), mm, 1e-12)
+      const t = tensor(leerPiezas(`cono m=${mm} r=${r} h=${h} eje=y`))
+      cerca('cono eje y: I_yy = 3mr²/10 (integral)', t.Icm[1][1], cil(dens, rad, -h / 4, (3 * h) / 4, (_u, s) => s * s), 1e-12)
+      cerca('cono eje y: I_xx = 3mr²/20 + 3mh²/80 (integral)', t.Icm[0][0], cil(dens, rad, -h / 4, (3 * h) / 4, (u, s, ang) => u * u + (s * Math.cos(ang)) ** 2), 1e-12)
+    }
+    {
+      const [r, mm] = [0.8, 1.3]
+      const esf = mm / ((4 / 3) * Math.PI * r ** 3)
+      // I_zz = ∫ ρ (r sin θ)² r² sin θ dr dθ dφ
+      const Iz = esf * 2 * Math.PI * gauss20((rr) => gauss20((th) => rr ** 4 * Math.sin(th) ** 3, 0, Math.PI), 0, r)
+      cerca('esfera maciza: 2mr²/5 (integral)', tensor(leerPiezas(`esfera m=${mm} r=${r}`)).Icm[2][2], Iz, 1e-12)
+      const Ic = (mm / (4 * Math.PI * r * r)) * 2 * Math.PI * gauss20((th) => r ** 4 * Math.sin(th) ** 3, 0, Math.PI)
+      cerca('cáscara esférica: 2mr²/3 (integral)', tensor(leerPiezas(`cascara m=${mm} r=${r}`)).Icm[0][0], Ic, 1e-12)
+      cerca('varilla: ml²/12 (integral)', tensor(leerPiezas('varilla m=0.7 l=1.9 eje=y')).Icm[0][0], (0.7 / 1.9) * gauss20((x) => x * x, -0.95, 0.95), 1e-13)
+    }
+    // compuesto en L: suma de integrales directas, centro de masas y ejes principales
+    {
+      const src = 'caja m=1.5 a=1.2 b=0.3 c=0.2 en (0.6, 0.15, 0.1); caja m=0.8 a=0.3 b=0.9 c=0.2 en (0.15, 0.75, 0.1); punto m=0.4 en (1.1, 0.2, -0.3)'
+      const t = tensor(leerPiezas(src))
+      const I1 = tensorIntegrado(1.5 / (1.2 * 0.3 * 0.2), [[0, 1.2], [0, 0.3], [0, 0.2]])
+      const I2 = tensorIntegrado(0.8 / (0.3 * 0.9 * 0.2), [[0, 0.3], [0.3, 1.2], [0, 0.2]])
+      const q = [1.1, 0.2, -0.3]
+      const Ip = [0, 1, 2].map((i) => [0, 1, 2].map((j) => 0.4 * ((i === j ? q[0] ** 2 + q[1] ** 2 + q[2] ** 2 : 0) - q[i] * q[j])))
+      igualM('pieza en L: I_O = suma de integrales directas', t.IO, I1.map((f, i) => f.map((v, j) => v + I2[i][j] + Ip[i][j])), 1e-12)
+      cerca('pieza en L: centro de masas x', t.cm[0], (1.5 * 0.6 + 0.8 * 0.15 + 0.4 * 1.1) / 2.7, 1e-14)
+      cierto('pieza en L: hay productos de inercia', Math.abs(t.Icm[0][1]) > 1e-3)
+      for (let k = 0; k < 3; k++) {
+        const v = t.ejes.map((f) => f[k])
+        cierto(`eje principal ${k + 1}: I v = λ v`, t.Icm.every((f, i) => Math.abs(f.reduce((acc, x, j) => acc + x * v[j], 0) - t.principales[k] * v[i]) < 1e-12))
+      }
+      cerca('traza invariante = Σ momentos principales', t.principales.reduce((x, y) => x + y, 0), t.Icm[0][0] + t.Icm[1][1] + t.Icm[2][2], 1e-13)
+    }
+  }
+  {
+    // simétrico: ω⊥ gira en el cuerpo con Ω = (I₃ − I₁)ω₃/I₁ (solución exacta)
+    const I: V3 = [1.3, 1.3, 2.2]
+    const w0: V3 = [0.4, -0.7, 3.1]
+    const tr = rotacionLibre(I, w0, 7.3)
+    const yf = tr.y[tr.y.length - 1]
+    const W = ((I[2] - I[0]) * w0[2]) / I[0]
+    cerca('Euler simétrico: ω₁(t) = ω₁cos Ωt − ω₂ sin Ωt', yf[0], w0[0] * Math.cos(W * 7.3) - w0[1] * Math.sin(W * 7.3), 1e-9)
+    cerca('Euler simétrico: ω₂(t) = ω₁ sin Ωt + ω₂ cos Ωt', yf[1], w0[0] * Math.sin(W * 7.3) + w0[1] * Math.cos(W * 7.3), 1e-9)
+    cerca('Euler simétrico: ω₃ constante', yf[2], w0[2], 1e-10)
+    // asimétrico: conservación, ortogonalidad y periodo de Jacobi 4K(k)/λ en los dos regímenes
+    const J: V3 = [1.1, 1.9, 2.7]
+    for (const w of [[0.2, 1.5, 0.35], [0.9, 0.6, 0.1]] as V3[]) {
+      const inv0 = invariantesEuler(J, [...w, 1, 0, 0, 0, 1, 0, 0, 0, 1])
+      const T = periodoEuler(J, w)
+      cierto(`ω₀ = (${w.join(', ')}): hay periodo de Jacobi`, T !== null)
+      const tr2 = rotacionLibre(J, w, 3.2 * (T ?? 1))
+      cierto(`ω₀ = (${w.join(', ')}): E y L (vector en el espacio) conservados`, tr2.y.every((y) => {
+        const v = invariantesEuler(J, y)
+        return Math.abs(v.E - inv0.E) < 1e-9 && v.L.every((x, i) => Math.abs(x - inv0.L[i]) < 1e-9)
+      }))
+      const R = tr2.y[tr2.y.length - 1].slice(3)
+      cierto(`ω₀ = (${w.join(', ')}): R sigue siendo ortogonal`, [0, 1, 2].every((i) => [0, 1, 2].every((j) => Math.abs(R[3 * i] * R[3 * j] + R[3 * i + 1] * R[3 * j + 1] + R[3 * i + 2] * R[3 * j + 2] - (i === j ? 1 : 0)) < 1e-9)))
+      const cs = cruces(tr2, (y) => y[1])
+      parecido(`ω₀ = (${w.join(', ')}): periodo medido = 4K(k)/λ`, (cs[cs.length - 1] - cs[0]) / (cs.length - 1), T ?? NaN, 1e-8)
+    }
+    // teorema de la raqueta: estable en torno a los ejes mayor y menor, vuelco en torno al intermedio
+    const K: V3 = [1, 2, 3]
+    const desvio = (w: V3, k: number) => Math.max(...rotacionLibre(K, w, 30).y.map((y) => Math.hypot(...[0, 1, 2].filter((i) => i !== k).map((i) => y[i]))))
+    cierto('raqueta: girando en torno al eje menor sigue ahí', desvio([3, 0.01, 0.01], 0) < 0.05)
+    cierto('raqueta: girando en torno al eje mayor sigue ahí', desvio([0.01, 0.01, 3], 2) < 0.05)
+    cierto('raqueta: en torno al intermedio da la vuelta (ω₂ cambia de signo)', Math.min(...rotacionLibre(K, [0.01, 3, 0.01], 30).y.map((y) => y[1])) < -2.9)
+  }
+  {
+    // peonza pesada: ecuación de θ frente a la de libro, precesión uniforme y puntos de retorno
+    const p: Peonza = { ia: 1.4, ic: 0.6, mgl: 2.3, theta0: 0.7, phid0: 0.3, thetad0: 0.4, w3: 9 }
+    const num = numericoPeonza(p)
+    const y = [0.83, 0.2, -1.1, 0.35, 0.9, 7.2]
+    const [th, , , thd, phd, psd] = y
+    const w3 = psd + phd * Math.cos(th)
+    const acc = num.aceleraciones(y)
+    cerca('peonza: θ̈ = (I₁φ̇² sin θ cos θ − I₃ω₃φ̇ sin θ + mgl sin θ)/I₁', acc[0], (p.ia * phd ** 2 * Math.sin(th) * Math.cos(th) - p.ic * w3 * phd * Math.sin(th) + p.mgl * Math.sin(th)) / p.ia, 1e-12)
+    cerca('peonza: φ̈ de p_φ constante', acc[1], (-2 * p.ia * thd * phd * Math.sin(th) * Math.cos(th) + p.ic * w3 * thd * Math.sin(th)) / (p.ia * Math.sin(th) ** 2), 1e-11)
+    const tr = integrar(num, estadoPeonza(p), 12)
+    const E0 = num.energia(tr.y[0])
+    cierto('peonza: energía y ω₃ conservados', tr.y.every((q) => Math.abs(num.energia(q) - E0) < 1e-9 && Math.abs(q[5] + q[4] * Math.cos(q[0]) - p.w3) < 1e-9))
+    const rt = retornos(p)
+    cierto('peonza: la cúbica da dos puntos de retorno', rt !== null)
+    const minimos = cruces(tr, (q) => q[3]).map((t) => estadoEn(tr, t)[0])
+    const maximos = cruces(tr, (q) => -q[3]).map((t) => estadoEn(tr, t)[0])
+    cierto('peonza: cabecea varias veces', minimos.length >= 3 && maximos.length >= 3)
+    for (const x of minimos) cerca('nutación: θ mínimo = raíz de la cúbica', x, rt![0], 1e-8)
+    for (const x of maximos) cerca('nutación: θ máximo = raíz de la cúbica', x, rt![1], 1e-8)
+    const phid = precesionUniforme(p)!
+    const pu = { ...p, phid0: phid, thetad0: 0 }
+    const tu = integrar(numericoPeonza(pu), estadoPeonza(pu), 20)
+    cierto('precesión uniforme: θ no se mueve', tu.y.every((q) => Math.abs(q[0] - p.theta0) < 1e-8))
+    cerca('precesión uniforme: φ̇ constante', tu.y[tu.y.length - 1][4], phid, 1e-8)
+    parecido('trompo rápido: precesión lenta ≈ mgl/(I₃ω₃)', precesionUniforme({ ...p, w3: 400 })!, p.mgl / (p.ic * 400), 1e-4)
+    const R = rotacionEuler(0.7, 1.2, -0.4)
+    cierto('rotación z-x-z: tercera columna = (sin θ sin φ, −sin θ cos φ, cos θ)', Math.abs(R[0][2] - Math.sin(0.7) * Math.sin(1.2)) < 1e-15 && Math.abs(R[1][2] + Math.sin(0.7) * Math.cos(1.2)) < 1e-15 && Math.abs(R[2][2] - Math.cos(0.7)) < 1e-15)
   }
 }
