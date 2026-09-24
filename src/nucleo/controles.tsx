@@ -12,8 +12,8 @@ export function Grupo({ titulo, children }: { titulo?: string; children: ReactNo
 
 /**
  * Elegir una opción entre varias. La forma la decide el número de opciones:
- * hasta tres van en fila, cuatro en dos por dos, y de cinco en adelante se
- * sueltan como texto, porque una rejilla con la última fila coja queda fea.
+ * hasta tres van en fila, cuatro en dos por dos, y de cinco en adelante van en
+ * un desplegable, como los ejemplos de `Atajos`.
  */
 export function Segmentado<T extends string | number>({
   valor,
@@ -28,14 +28,15 @@ export function Segmentado<T extends string | number>({
 }) {
   const n = opciones.length
   if (n >= 5) {
+    const i = opciones.findIndex((o) => o.v === valor)
     return (
-      <div className="atajos">
-        {opciones.map((o) => (
-          <button key={String(o.v)} type="button" aria-pressed={o.v === valor} onClick={() => onChange(o.v)}>
+      <select className="desplegable" value={i} onChange={(e) => onChange(opciones[+e.target.value].v)}>
+        {opciones.map((o, j) => (
+          <option key={String(o.v)} value={j}>
             {o.t}
-          </button>
+          </option>
         ))}
-      </div>
+      </select>
     )
   }
   const clase = n === 4 ? 'seg envuelve' : columnas === 3 && n === 3 ? 'seg tres' : 'seg'
@@ -435,19 +436,48 @@ export function Expresion({
   )
 }
 
-/** Atajos en fila: presets que no compiten con los controles de verdad. */
+/**
+ * Ejemplos y presets: con dos o más, un desplegable; muestra el que está puesto
+ * o, si no coincide ninguno, «Personalizado». Una sola opción es una acción y va
+ * como tal. Si ninguna opción dice si está activa (ejemplos que se añaden, no que
+ * se ponen), el desplegable vuelve a «Ejemplos…» tras elegir.
+ */
 export function Atajos({
   opciones,
+  marcador,
 }: {
   opciones: Array<{ t: string; activo?: boolean; onClick: () => void }>
+  /** Texto cuando no hay ninguna activa. */
+  marcador?: string
 }) {
+  if (opciones.length === 0) return null
+  if (opciones.length === 1) {
+    const o = opciones[0]
+    return (
+      <button type="button" className="accion" onClick={o.onClick}>
+        {o.t}
+      </button>
+    )
+  }
+  const conEstado = opciones.some((o) => o.activo !== undefined)
+  const i = opciones.findIndex((o) => o.activo)
   return (
-    <div className="atajos">
-      {opciones.map((o) => (
-        <button key={o.t} type="button" aria-pressed={!!o.activo} onClick={o.onClick}>
+    <select
+      className="desplegable"
+      value={i}
+      onChange={(e) => {
+        const j = +e.target.value
+        if (j >= 0) opciones[j].onClick()
+      }}
+    >
+      <option value={-1} disabled hidden>
+        {marcador ?? (conEstado ? 'Personalizado' : 'Ejemplos…')}
+      </option>
+      {opciones.map((o, j) => (
+        <option key={o.t} value={j}>
           {o.t}
-        </button>
+        </option>
       ))}
-    </div>
+    </select>
   )
 }

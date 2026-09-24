@@ -371,30 +371,33 @@ function Panel({ s, set }: PropsPanel<S>) {
   return (
     <>
       <Grupo titulo="Herramientas">
-        <div className="atajos grupos-geo">
-          {GRUPOS.map((g) => (
-            <button
-              key={g}
-              type="button"
-              aria-pressed={g === s.grupo}
-              onClick={() => {
-                const primera = Object.entries(HERRAMIENTAS).find(([, x]) => x.grupo === g)![0]
-                set({ grupo: g, herramienta: primera, pendientes: [] })
-              }}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
-        {herramientas.length > 1 && (
-          <div className="atajos herramientas-geo">
-            {herramientas.map(([k, x]) => (
-              <button key={k} type="button" aria-pressed={k === s.herramienta} onClick={() => elegir(k)}>
-                {x.nombre}
-              </button>
+        <div className="dos-desplegables">
+          <select
+            className="desplegable"
+            aria-label="Grupo de herramientas"
+            value={s.grupo}
+            onChange={(e) => {
+              const g = e.target.value
+              const primera = Object.entries(HERRAMIENTAS).find(([, x]) => x.grupo === g)![0]
+              set({ grupo: g, herramienta: primera, pendientes: [] })
+            }}
+          >
+            {GRUPOS.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
             ))}
-          </div>
-        )}
+          </select>
+          {herramientas.length > 1 && (
+            <select className="desplegable" aria-label="Herramienta" value={s.herramienta} onChange={(e) => elegir(e.target.value)}>
+              {herramientas.map(([k, x]) => (
+                <option key={k} value={k}>
+                  {x.nombre}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
         {h.param && (
           <Rango
             etiqueta={h.param.nombre}

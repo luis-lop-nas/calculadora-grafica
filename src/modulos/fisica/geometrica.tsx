@@ -1,5 +1,5 @@
 import { definir, type PropsPanel, type Vista } from '../../nucleo/tipos'
-import { Atajos, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
+import { Atajos, Boton, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { cauchy, corteEje, desviacionMinima, desviacionPrisma, focales, imagen, matrizLentes, reflejoEsferico, trazar, type Lente } from '../../lib/rayos'
 import { colorLongitud } from '../../lib/optica'
 import type { Pintor2D } from '../../render/pintor2d'
@@ -43,12 +43,10 @@ function Panel({ s, set }: PropsPanel<EstadoGeometrica>) {
           {s.lentes.map((l, i) => (
             <Rango key={i} etiqueta={`f${'₁₂₃'[i]}`} valor={l.f} min={-40} max={40} paso={0.5} onChange={(f) => set({ lentes: s.lentes.map((m, j) => (j === i ? { ...m, f: Math.abs(f) < 0.5 ? 0.5 * Math.sign(f || 1) : f } : m)) })} />
           ))}
-          <Atajos
-            opciones={[
-              ...(s.lentes.length < 3 ? [{ t: 'Añadir lente', onClick: () => set({ lentes: [...s.lentes, { z: Math.max(...s.lentes.map((l) => l.z)) + 15, f: 10 }] }) }] : []),
-              ...(s.lentes.length > 1 ? [{ t: 'Quitar la última', onClick: () => set({ lentes: s.lentes.slice(0, -1) }) }] : []),
-            ]}
-          />
+          <div style={{ display: 'flex', gap: 16 }}>
+            {s.lentes.length < 3 && <Boton onClick={() => set({ lentes: [...s.lentes, { z: Math.max(...s.lentes.map((l) => l.z)) + 15, f: 10 }] })}>Añadir lente</Boton>}
+            {s.lentes.length > 1 && <Boton onClick={() => set({ lentes: s.lentes.slice(0, -1) })}>Quitar la última</Boton>}
+          </div>
           <Rango etiqueta="altura del objeto" valor={s.h} min={-8} max={8} paso={0.1} onChange={(h) => set({ h })} />
         </Grupo>
       )}

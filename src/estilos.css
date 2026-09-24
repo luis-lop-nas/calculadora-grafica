@@ -300,12 +300,8 @@ aside .tog:hover{color:var(--ink)}
   border:1px solid var(--line);border-radius:6px;padding:3px 7px;cursor:pointer;line-height:1.35}
 .piezas button:hover{border-color:var(--accent);color:var(--accent)}
 
-/* atajos: presets como texto, no como botones gordos */
-.atajos{display:flex;flex-wrap:wrap;gap:2px;margin-top:1px}
-.atajos button{font:inherit;font-size:12px;font-weight:600;color:var(--ink-soft);background:transparent;border:0;
-  padding:4px 8px;border-radius:7px;cursor:pointer}
-.atajos button:hover{background:var(--chip);color:var(--ink)}
-.atajos button[aria-pressed="true"]{background:var(--chip);color:var(--ink);font-weight:600}
+/* desplegable de ejemplos y de opciones largas: el mismo en todos los módulos */
+.desplegable{font-size:12.5px;font-weight:600;cursor:pointer}
 .vector:has(.quitar-fila){grid-template-columns:minmax(34px,auto) 1fr 20px}
 .quitar-fila{border:0;background:transparent;color:var(--ink-soft);font-size:16px;line-height:1;cursor:pointer;padding:2px;border-radius:5px}
 .quitar-fila:hover{color:var(--ink);background:var(--line)}
@@ -346,8 +342,7 @@ aside .tog:hover{color:var(--ink)}
 .cas-error{font:12px var(--mono);color:var(--pos)!important;margin:6px 0 0!important}
 
 /* Geometría: paleta de herramientas y vista algebraica */
-.grupos-geo button[aria-pressed="true"]{color:var(--accent)}
-.herramientas-geo{margin-top:-4px;padding-top:8px;border-top:.5px solid var(--line)}
+.dos-desplegables{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px}
 .pista-geo{font-size:12px;color:var(--ink-soft);margin:2px 0 0;line-height:1.45}
 .lista-geo{max-height:340px;overflow-y:auto}
 .lista-geo .marca b{color:var(--ink);font-family:var(--serif);font-style:italic;font-size:14px;font-weight:400}
