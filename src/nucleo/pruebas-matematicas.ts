@@ -9,6 +9,7 @@ import {
   auto2, autovalores3, clasificar, det, gramSchmidt, nucleo, producto, proyectar, raicesCubica, rango,
 } from '../lib/matrices'
 import * as K from '../lib/complejo'
+import { compilarC as compilarCExpr } from '../lib/expresion'
 import { contorno, equilibrios, jacobiano } from '../lib/contorno'
 import { abeliano, centro, diedral, inverso, orden, simetrico, subgrupos, zn } from '../lib/grupos'
 
@@ -188,6 +189,31 @@ seccion('Álgebra lineal')
 /* ═══════════ complejos ═══════════ */
 seccion('Aritmética compleja')
 {
+  // ceros, polos, residuos y teorema de los residuos
+  {
+    const C = (e: string) => {
+      const g = compilarCExpr(e, ['z'])
+      return (z: K.C) => g(z)
+    }
+    const busca = (e: string) => K.cerosYPolos(C(e), [-3, 3, -3, 3])
+    const tipos = (e: string) => busca(e).map((p) => `${p.tipo}${p.orden ?? ''}@${p.z.map((v) => +v.toFixed(6) || 0).join(',')}`).join(' ')
+    cierto('(z − 1)/(z + 1): polo simple en −1 y cero en 1', tipos('(z-1)/(z+1)') === 'polo1@-1,0 cero1@1,0', tipos('(z-1)/(z+1)'))
+    cierto('z/(z − 1)²: cero en 0 y polo doble en 1', tipos('z/(z-1)^2') === 'cero1@0,0 polo2@1,0', tipos('z/(z-1)^2'))
+    cierto('sin z / z⁴: polo de orden 3 en 0', tipos('sin(z)/z^4') === 'polo3@0,0', tipos('sin(z)/z^4'))
+    cierto('e^(1/z): singularidad esencial, no un polo ni un cero', tipos('exp(1/z)') === 'singularidad esencial@0,0', tipos('exp(1/z)'))
+    cierto('ln z: punto de ramificación en 0 (y el cero en 1)', tipos('ln(z)') === 'corte de rama@0,0 cero1@1,0', tipos('ln(z)'))
+    const res = (e: string, k = 0) => busca(e).filter((p) => p.residuo)[k].residuo!
+    cerca('Res(1/(z² + 1), −i) = i/2', res('1/(z^2+1)', 0)[1], 0.5, 1e-10)
+    cerca('Res(sin z / z⁴, 0) = −1/6', res('sin(z)/z^4')[0], -1 / 6, 1e-10)
+    cerca('Res(e^(1/z), 0) = 1', res('exp(1/z)')[0], 1, 1e-10)
+    cerca('Res(z/(z − 1)², 1) = 1', res('z/(z-1)^2')[0], 1, 1e-10)
+    const I = K.integralContorno(C('1/(z^2+1)'), [0, 1], 1)!
+    cerca('∮ dz/(z² + 1) sobre |z − i| = 1 = 2πi·(1/2i) = π', I[0], Math.PI, 1e-12)
+    cerca('∮ dz/(z² + 1) sobre |z| = 2 = 0 (los dos residuos se anulan)', Math.hypot(...K.integralContorno(C('1/(z^2+1)'), [0, 0], 2)!), 0, 1e-12)
+    cierto('principio del argumento: z³ − 1 da 3 vueltas en |z| = 2', K.vueltas(C('z^3-1'), [0, 0], 2) === 3)
+    cierto('principio del argumento: z/(z − 1)² da −1 vuelta en |z| = 2', K.vueltas(C('z/(z-1)^2'), [0, 0], 2) === -1)
+    cierto('ln z sobre |z| = 1: no hay vueltas que contar (corte)', K.vueltas(C('ln(z)'), [0, 0], 1) === null)
+  }
   cerca('e^{iπ} = −1 (parte real)', K.exp([0, Math.PI])[0], -1, 1e-12)
   cerca('e^{iπ} = −1 (parte imaginaria)', K.exp([0, Math.PI])[1], 0, 1e-12)
   const s = K.sqrt([0, 1])

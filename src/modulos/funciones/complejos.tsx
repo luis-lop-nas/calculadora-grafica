@@ -13,6 +13,30 @@ interface S {
   bandas: boolean
   sonda: number[][]
   fuente: number
+  verSingulares: boolean
+  contorno: boolean
+  rho: number
+}
+
+/** Ceros y polos en [−3, 3]², guardados por expresión: la malla y los Newton no se repiten a cada fotograma. */
+const cacheSingulares = new Map<string, K.Singular[]>()
+function singulares(expr: string, f: (z: K.C) => K.C): K.Singular[] {
+  let r = cacheSingulares.get(expr)
+  if (!r) {
+    r = K.cerosYPolos(f, [-3, 3, -3, 3])
+    if (cacheSingulares.size > 30) cacheSingulares.clear()
+    cacheSingulares.set(expr, r)
+  }
+  return r
+}
+
+const texC = (c: K.C, d = 4) => {
+  const re = Math.abs(c[0]) < 5 * 10 ** -(d + 1) ? 0 : c[0]
+  const im = Math.abs(c[1]) < 5 * 10 ** -(d + 1) ? 0 : c[1]
+  if (!im) return (+re.toFixed(d)).toString().replace('-', '−')
+  const ims = `${Math.abs(+im.toFixed(d)) === 1 ? '' : Math.abs(+im.toFixed(d))}i`
+  if (!re) return `${im < 0 ? '−' : ''}${ims}`
+  return `${(+re.toFixed(d)).toString().replace('-', '−')} ${im < 0 ? '−' : '+'} ${ims}`
 }
 
 const EJEMPLOS = [
@@ -25,6 +49,10 @@ const EJEMPLOS = [
   { t: 'log z', e: 'ln(z)' },
   { t: 'z + 1/z', e: 'z+1/z' },
   { t: 'Esencial', e: 'exp(1/z)' },
+  { t: 'Dos polos simples', e: '1/(z^2+1)' },
+  { t: 'Polo doble', e: 'z/(z-1)^2' },
+  { t: 'Polo de orden 3', e: 'sin(z)/z^4' },
+  { t: 'No holomorfa: conj z', e: 'conj(z)' },
 ]
 
 /** HSL → RGB, en [0, 255]. */
@@ -110,8 +138,53 @@ function Panel({ s, set }: PropsPanel<S>) {
         <Matriz A={s.sonda} onChange={(sonda: number[][]) => set({ sonda })} paso={0.05} filas={[{ nombre: 'z', color: 'var(--ink)' }]} />
         <Nota>Las dos casillas son la parte real y la imaginaria. También puedes pulsar en el lienzo.</Nota>
       </Grupo>
+
+      <Grupo titulo="Ceros, polos y residuos">
+        <Interruptor activo={s.verSingulares} onChange={(verSingulares) => set({ verSingulares })}>
+          Ceros y polos (con su orden)
+        </Interruptor>
+        <Interruptor activo={s.contorno} onChange={(contorno) => set({ contorno })}>
+          Integral de contorno |z − z₀| = ρ
+        </Interruptor>
+        {s.contorno && <Rango etiqueta="radio ρ" valor={s.rho} min={0.05} max={4} paso={0.01} onChange={(rho) => set({ rho })} />}
+        <Nota>
+          ∮ f dz se calcula sobre la circunferencia (trapecios, exacta para funciones analíticas cerca) y se contrasta con 2πi por la
+          suma de los residuos de dentro. El número de vueltas de f(z) alrededor de 0 da ceros − polos (principio del argumento).
+          Arrastra el asa del borde para cambiar ρ.
+        </Nota>
+      </Grupo>
     </>
   )
+}
+
+function lecturasSingulares(s: S, f: (z: K.C) => K.C): Array<[string, string]> {
+  const ps = singulares(s.expr, f)
+  const filas: Array<[string, string]> = []
+  if (s.verSingulares) {
+    if (!ps.length) filas.push(['Ceros y polos en [−3, 3]²', 'ninguno'])
+    for (const p of ps.slice(0, 8)) {
+      const donde = `z = ${texC(p.z, 4)}`
+      if (p.tipo === 'cero') filas.push([`Cero${p.orden && p.orden > 1 ? ` de orden ${p.orden}` : ''}`, donde])
+      else if (p.tipo === 'polo') filas.push([`Polo${p.orden && p.orden > 1 ? ` de orden ${p.orden}` : ' simple'} en ${donde}`, `Res = ${p.residuo ? texC(p.residuo, 5) : '—'}`])
+      else if (p.tipo === 'singularidad esencial') filas.push([`Singularidad esencial en ${donde}`, `Res = ${p.residuo ? texC(p.residuo, 5) : '—'}`])
+      else filas.push([`Punto de ramificación en ${donde}`, 'con corte: no es aislada'])
+    }
+  }
+  if (s.contorno) {
+    const z0: K.C = [s.sonda[0][0], s.sonda[0][1]]
+    const I = K.integralContorno(f, z0, s.rho)
+    const dentro = ps.filter((p) => Math.hypot(p.z[0] - z0[0], p.z[1] - z0[1]) < s.rho)
+    const cortes = dentro.some((p) => p.tipo === 'corte de rama')
+    filas.push(['∮ f dz sobre |z − z₀| = ρ', I ? texC(I, 6) : 'f no está definida sobre la circunferencia'])
+    if (cortes) filas.push(['Teorema de los residuos', 'no aplica: hay un corte de rama dentro'])
+    else {
+      const suma = dentro.filter((p) => p.residuo).reduce<K.C>((acc, p) => K.suma(acc, p.residuo!), [0, 0])
+      filas.push(['2πi · Σ Res dentro', texC(K.mul([0, 2 * Math.PI], suma), 6)])
+      const v = K.vueltas(f, z0, s.rho)
+      filas.push(['Vueltas de f alrededor de 0 (ceros − polos)', v === null ? '—' : String(v)])
+    }
+  }
+  return filas
 }
 
 export default definir<S>({
@@ -123,7 +196,7 @@ export default definir<S>({
   entradilla: 'Una función de C en C no cabe en una gráfica: se pinta el plano con la fase y el módulo.',
   inicial: {
     expr: '(z-1)/(z+1)', modo: 'dominio', resolucion: 380, bandas: true,
-    sonda: [[0.6, 0.5]], fuente: 2,
+    sonda: [[0.6, 0.5]], fuente: 2, verSingulares: true, contorno: false, rho: 1.5,
   },
   Panel,
   comparaciones: [{ t: 'Dominio ↔ imagen', a: { modo: 'dominio' }, b: { modo: 'rejilla' } }],
@@ -131,6 +204,8 @@ export default definir<S>({
   formula: () => [
     String.raw`f(z)=u(x,y)+i\,v(x,y),\qquad z=x+iy`,
     String.raw`u_x=v_y,\qquad u_y=-v_x \quad (\text{Cauchy-Riemann})`,
+    String.raw`\oint_{\gamma} f\,dz = 2\pi i\sum \operatorname{Res}(f, z_k)`,
+    String.raw`\frac{1}{2\pi i}\oint_{\gamma}\frac{f'}{f}\,dz = Z - P`,
   ],
   lecturas: (s) => {
     const { f, error } = compilarCSuave(s.expr, ['z'])
@@ -159,6 +234,7 @@ export default definir<S>({
           ] as Array<[string, string]>)),
       ['Desvío entre direcciones', desvio.toExponential(2)],
       ['¿Holomorfa aquí?', holo ? 'sí, cumple Cauchy-Riemann' : 'no'],
+      ...(s.verSingulares || s.contorno ? lecturasSingulares(s, f) : []),
     ]
   },
   leyenda: (s) =>
@@ -189,8 +265,17 @@ export default definir<S>({
     alPulsar: (p) => ({ sonda: [[Math.round(p.x * 1000) / 1000, Math.round(p.y * 1000) / 1000]] }),
     interaccion: {
       // en «rejilla» el lienzo es el plano imagen: ahí la sonda no se arrastra
-      asas: (s) => (s.modo === 'rejilla' ? [] : [{ id: 'z0', p: s.sonda[0], color: '--ink', nombre: 'z₀' }]),
-      mover: (_id, t) => ({ sonda: [[Math.round(t.p[0] * 1000) / 1000, Math.round(t.p[1] * 1000) / 1000]] }),
+      asas: (s) =>
+        s.modo === 'rejilla'
+          ? []
+          : [
+              { id: 'z0', p: s.sonda[0], color: '--ink', nombre: 'z₀' },
+              ...(s.contorno ? [{ id: 'rho', p: [s.sonda[0][0] + s.rho, s.sonda[0][1]], color: '--ink', nombre: 'ρ' }] : []),
+            ],
+      mover: (id, t, s) =>
+        id === 'rho'
+          ? { rho: Math.max(0.05, Math.round(Math.hypot(t.p[0] - s.sonda[0][0], t.p[1] - s.sonda[0][1]) * 1000) / 1000) }
+          : { sonda: [[Math.round(t.p[0] * 1000) / 1000, Math.round(t.p[1] * 1000) / 1000]] },
     },
     dibujar(g, s) {
       const { f } = compilarCSuave(s.expr, ['z'])
@@ -205,13 +290,44 @@ export default definir<S>({
       if (s.modo === 'polya') campoPolya(g, s, f)
 
       const z = s.sonda[0]
+      if (s.modo !== 'rejilla') {
+        if (s.verSingulares) for (const p of singulares(s.expr, f)) marcaSingular(g, p)
+        if (s.contorno) {
+          const pts: Array<[number, number]> = []
+          for (let k = 0; k <= 200; k++) pts.push([z[0] + s.rho * Math.cos((2 * Math.PI * k) / 200), z[1] + s.rho * Math.sin((2 * Math.PI * k) / 200)])
+          g.curva(pts, g.color('--ink'), 2)
+          // sentido positivo
+          g.flecha(z[0], z[1] + s.rho, -0.001, 0, g.color('--ink'), 2, 11)
+        }
+      }
       g.punto(z[0], z[1], g.color('--ink'), 5)
       g.texto('z₀', z[0], z[1], g.color('--ink'), { dx: 8, dy: -9 })
-      const w = f([z[0], z[1]])
-      void w
     },
   },
 })
+
+/** Cero: aro; polo: aspa; esencial: rombo; corte de rama: raya. */
+function marcaSingular(g: Pintor2D, p: K.Singular) {
+  const [x, y] = p.z
+  const tinta = g.color('--ink')
+  const fondo = g.color('--stage')
+  const r = 7 / g.escalaX
+  if (p.tipo === 'cero') {
+    g.punto(x, y, fondo, 6)
+    g.punto(x, y, tinta, 4)
+    g.punto(x, y, fondo, 2.2)
+  } else if (p.tipo === 'polo') {
+    g.curva([[x - r, y - r], [x + r, y + r]], fondo, 4.5)
+    g.curva([[x - r, y + r], [x + r, y - r]], fondo, 4.5)
+    g.curva([[x - r, y - r], [x + r, y + r]], tinta, 2.2)
+    g.curva([[x - r, y + r], [x + r, y - r]], tinta, 2.2)
+  } else if (p.tipo === 'singularidad esencial') {
+    g.rellenar([[x - r, y], [x, y + r], [x + r, y], [x, y - r]], tinta, 1)
+  } else {
+    g.curva([[x - 1.4 * r, y], [x + 1.4 * r, y]], tinta, 2.2, true)
+  }
+  if (p.orden && p.orden > 1) g.texto(String(p.orden), x, y, tinta, { dx: 9, dy: -9 })
+}
 
 function colorearDominio(g: Pintor2D, s: S, f: (z: K.C) => K.C) {
   const [xa, xb] = g.ventana.x
