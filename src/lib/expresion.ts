@@ -212,10 +212,12 @@ function partir(nombre: string, conocidas: Set<string>): string[] {
   return trozos
 }
 
-const hoja = (v: string): Nodo => (v in CONSTANTES ? { t: 'cte', v } : { t: 'var', v })
+// una variable declarada gana a la constante del mismo nombre: con φ como coordenada,
+// cos(θ − φ) no puede leerse como cos(θ − 1,618…)
+const hoja = (v: string, conocidas: Set<string>): Nodo => (v in CONSTANTES && !conocidas.has(v) ? { t: 'cte', v } : { t: 'var', v })
 
-const producto = (trozos: string[]): Nodo =>
-  trozos.map(hoja).reduce((a, b) => ({ t: 'op', v: '*', a, b, imp: true }))
+const producto = (trozos: string[], conocidas: Set<string>): Nodo =>
+  trozos.map((t) => hoja(t, conocidas)).reduce((a, b) => ({ t: 'op', v: '*', a, b, imp: true }))
 
 /* ---------- análisis sintáctico ---------- */
 
@@ -418,7 +420,7 @@ export function analizar(src: string, ctx: Contexto = {}): Nodo {
       for (let k = 1; k < nombre.length; k++) {
         const cola = nombre.slice(k)
         if (esFuncion(cola) || usuario.has(cola)) {
-          const cabeza = producto(partir(nombre.slice(0, k), conocidas))
+          const cabeza = producto(partir(nombre.slice(0, k), conocidas), conocidas)
           const cuerpo = usuario.has(cola) ? funcionUsuario(cola)! : llamada(cola)
           return { t: 'op', v: '*', a: cabeza, b: cuerpo, imp: true }
         }
@@ -427,7 +429,7 @@ export function analizar(src: string, ctx: Contexto = {}): Nodo {
       const algunoConocido = trozos.some((t) => conocidas.has(t) || t in CONSTANTES || GRIEGAS.includes(t))
       if (nombre.length > 1 && !algunoConocido) throw new Error(`función desconocida: ${nombre}`)
       // x(x+1): no es una llamada, es un producto; lo resuelve el bucle de term
-      return producto(trozos)
+      return producto(trozos, conocidas)
     }
 
     // sin x, sinx: función sin paréntesis, aplicada a lo que sigue
@@ -438,11 +440,11 @@ export function analizar(src: string, ctx: Contexto = {}): Nodo {
     for (const fn of Object.keys(UNARIAS).sort((a, b) => b.length - a.length)) {
       if (nombre.length > fn.length && nombre.startsWith(fn) && !conocidas.has(nombre)) {
         const resto = partir(nombre.slice(fn.length), conocidas)
-        if (resto.every((r) => conocidas.has(r) || r in CONSTANTES)) return { t: 'fn', v: fn, args: [producto(resto)] }
+        if (resto.every((r) => conocidas.has(r) || r in CONSTANTES)) return { t: 'fn', v: fn, args: [producto(resto, conocidas)] }
       }
     }
     if (esFuncion(nombre)) throw new Error(`${nombre} necesita paréntesis`)
-    return producto(partir(nombre, conocidas))
+    return producto(partir(nombre, conocidas), conocidas)
   }
 
   if (!fs.length) throw new Error('expresión vacía')

@@ -32,6 +32,9 @@ const casos: Array<[string, string[], number[], number]> = [
   ['|x-3|', ['x'], [1], 2],
   ['2|x|', ['x'], [-4], 8],
   ['5!', [], [], 120],
+  // una variable declarada gana a la constante: φ coordenada ≠ número áureo
+  ['cos(theta-phi)', ['theta', 'phi'], [1, 0.4], Math.cos(0.6)],
+  ['phi', [], [], (1 + Math.sqrt(5)) / 2],
   ['heaviside(0)', [], [], 0.5],
   ['escalon(t-2)', ['t'], [3], 1],
   ['heaviside(-1e-9)', [], [], 0],
