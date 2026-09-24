@@ -2,9 +2,9 @@ import * as THREE from 'three'
 import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
 import { Atajos, Boton, Grupo, Interruptor, Matriz, Muestra, Nota, Rango, Segmentado } from '../../nucleo/controles'
 import { aplicar, autovalores3, autovector, det, nucleo, raicesPolinomio, rango, traza } from '../../lib/matrices'
-import { divergente } from '../../render/tema'
+import { FIGURAS, lineasDe, type Figura } from '../../lib/figuras3d'
 
-type Objeto = 'cubo' | 'esfera' | 'rejilla'
+type Objeto = Figura
 
 interface S {
   A: number[][]
@@ -28,8 +28,6 @@ const PRESETS: Array<{ t: string; A: number[][] }> = [
   { t: 'Estira z', A: [[0.6, 0, 0], [0, 0.6, 0], [0, 0, 2]] },
 ]
 
-const NU = 64
-const NV = 64
 
 /** Interpola entre la identidad y A, para ver la deformación como movimiento. */
 function mezcla(A: number[][], t: number): number[][] {
@@ -75,34 +73,9 @@ function mover(id: string, p: number[], s: S): Partial<S> | void {
   if (x) return { X: s.X.map((v, i) => (i === k ? redondo(x) : v)) }
 }
 
-function dibujarObjeto(e: any, M: number[][], objeto: Objeto, color: THREE.Color) {
-  const T = (v: number[]) => aplicar(M, v) as [number, number, number]
-  if (objeto === 'cubo') {
-    const V: number[][] = []
-    for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) V.push([x, y, z])
-    for (let i = 0; i < 8; i++)
-      for (let j = i + 1; j < 8; j++) {
-        const d = V[i].reduce((acc, c, k) => acc + Math.abs(c - V[j][k]), 0)
-        if (Math.abs(d - 2) < 1e-9) e.linea([T(V[i]), T(V[j])], color, 0.8)
-      }
-  } else if (objeto === 'esfera') {
-    const sup = e.superficie(NU, NV, {})
-    sup.actualizar((i: number, j: number) => {
-      const u = (i / (NU - 1)) * Math.PI
-      const v = (j / (NV - 1)) * 2 * Math.PI
-      const q = T([Math.sin(u) * Math.cos(v), Math.sin(u) * Math.sin(v), Math.cos(u)])
-      return [q[0], q[1], q[2], [color.r, color.g, color.b]]
-    })
-    ;(sup.malla.material as any).opacity = 0.42
-    ;(sup.malla.material as any).transparent = true
-  } else {
-    const n = 9
-    for (let k = 0; k < n; k++) {
-      const a = -1 + (2 * k) / (n - 1)
-      e.linea([T([-1, a, 0]), T([1, a, 0])], color, 0.7)
-      e.linea([T([a, -1, 0]), T([a, 1, 0])], color, 0.7)
-    }
-  }
+/** La figura en alambre, con cada punto pasado por M: así se ven todas como el cubo. */
+function dibujarObjeto(e: any, M: number[][], objeto: Objeto, color: THREE.Color, opacidad = 1) {
+  for (const l of lineasDe(objeto)) e.linea(l.map((v) => aplicar(M, v) as [number, number, number]), color, opacidad)
 }
 
 function Panel({ s, set }: PropsPanel<S>) {
@@ -142,13 +115,8 @@ function Panel({ s, set }: PropsPanel<S>) {
 
       <Grupo titulo="Qué se deforma">
         <Segmentado
-          columnas={3}
           valor={s.objeto}
-          opciones={[
-            { v: 'cubo', t: 'Cubo' },
-            { v: 'esfera', t: 'Esfera' },
-            { v: 'rejilla', t: 'Rejilla' },
-          ]}
+          opciones={(Object.keys(FIGURAS) as Figura[]).map((v) => ({ v, t: FIGURAS[v].t }))}
           onChange={(objeto) => set({ objeto })}
         />
         <Rango
@@ -262,37 +230,7 @@ export default definir<S>({
       const T = (v: number[]) => aplicar(M, v) as [number, number, number]
       const acento = e.color('--accent')
 
-      if (s.objeto === 'cubo') {
-        const V: number[][] = []
-        for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) V.push([x, y, z])
-        const aristas: Array<[number, number]> = []
-        for (let i = 0; i < 8; i++)
-          for (let j = i + 1; j < 8; j++) {
-            const d = V[i].reduce((acc, c, k) => acc + Math.abs(c - V[j][k]), 0)
-            if (Math.abs(d - 2) < 1e-9) aristas.push([i, j])
-          }
-        for (const [i, j] of aristas) e.linea([T(V[i]), T(V[j])], acento)
-      } else if (s.objeto === 'esfera') {
-        const sup = e.superficie(NU, NV, {})
-        sup.actualizar((i, j) => {
-          const u = (i / (NU - 1)) * Math.PI
-          const v = (j / (NV - 1)) * 2 * Math.PI
-          const p = [Math.sin(u) * Math.cos(v), Math.sin(u) * Math.sin(v), Math.cos(u)]
-          const q = T(p)
-          const estira = Math.hypot(...q) - 1
-          return [q[0], q[1], q[2], divergente(Math.max(-1, Math.min(1, estira)))]
-        })
-      } else {
-        const n = 9
-        for (let k = 0; k < n; k++) {
-          const a = -1 + (2 * k) / (n - 1)
-          for (const [p1, p2] of [
-            [[-1, a, 0], [1, a, 0]],
-            [[a, -1, 0], [a, 1, 0]],
-          ])
-            e.linea([T(p1), T(p2)], acento, 0.85)
-        }
-      }
+      dibujarObjeto(e, M, s.objeto, acento)
 
       if (s.verComparacion) dibujarObjeto(e, mezcla(s.B, s.t), s.objeto, e.color('--neg'))
 
