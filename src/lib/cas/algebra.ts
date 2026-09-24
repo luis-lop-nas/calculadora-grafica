@@ -133,7 +133,17 @@ export function simplificar(x: E): E {
     const rac = racional(base, v)
     if (rac) {
       const [n, d] = rac
-      candidatos.push(grado(d) <= 0 ? aExpr(n, v) : prod(aExpr(n, v), pot(factorizar(aExpr(d, v)), MENOS)))
+      const reducida = grado(d) <= 0 ? aExpr(n, v) : prod(aExpr(n, v), pot(factorizar(aExpr(d, v)), MENOS))
+      // si al reducir se ha ido un factor común del denominador, esa es la simplificación aunque ocupe más
+      const fs = base.t === '*' ? base.a : [base]
+      let gradoAbajo = 0
+      for (const f of fs) {
+        if (f.t !== '^' || !esEntero(f.e) || f.e.n >= 0n) continue
+        const b = racional(f.b, v)
+        if (b) gradoAbajo += grado(b[0]) * Number(-f.e.n)
+      }
+      if (gradoAbajo > 0 && grado(d) < gradoAbajo) return reducida
+      candidatos.push(reducida)
     }
   }
   return candidatos.reduce((a, b) => (tamano(b) < tamano(a) ? b : a))

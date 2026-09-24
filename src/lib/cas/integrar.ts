@@ -92,6 +92,28 @@ function integrarEspeciales(f: Extract<E, { t: '^' }>, x: string): E | null {
       const signo = b.v === 'sin' ? MENOS : UNO
       return suma(prod(MEDIO, s(x)), prod(signo, q(1, 4), fn('sin', [prod(DOS, u)]), inv))
     }
+    const n = valor(e)
+    if (!Number.isInteger(n)) return null
+    const [sn, cs] = [fn('sin', [u]), fn('cos', [u])]
+    // sec u y csc u
+    if (b.v === 'cos' && n === -1) return prod(inv, fn('ln', [fn('abs', [suma(pot(cs, MENOS), fn('tan', [u]))])]))
+    if (b.v === 'sin' && n === -1) return prod(inv, fn('ln', [fn('abs', [fn('tan', [prod(MEDIO, u)])])]))
+    // tan² u = sec² u − 1
+    if (b.v === 'tan' && n === 2) return suma(prod(inv, fn('tan', [u])), prod(MENOS, s(x)))
+    // reducción: ∫sinⁿ = −sinⁿ⁻¹cos/n + (n−1)/n ∫sinⁿ⁻², ∫cosⁿ = cosⁿ⁻¹sin/n + (n−1)/n ∫cosⁿ⁻²
+    if ((b.v === 'sin' || b.v === 'cos') && n >= 3 && n <= 12) {
+      const resto = primitiva(pot(b, q(n - 2)), x, 0)
+      if (!resto) return null
+      const cabeza = b.v === 'sin' ? prod(MENOS, pot(sn, q(n - 1)), cs) : prod(pot(cs, q(n - 1)), sn)
+      return suma(prod(q(1, n), inv, cabeza), prod(q(n - 1, n), resto))
+    }
+    // ∫secⁿ = secⁿ⁻² tan/(n−1) + (n−2)/(n−1) ∫secⁿ⁻²
+    if (b.v === 'cos' && n <= -3 && n >= -12) {
+      const m = -n
+      const resto = primitiva(pot(cs, q(2 - m)), x, 0)
+      if (!resto) return null
+      return suma(prod(q(1, m - 1), inv, pot(cs, q(2 - m)), fn('tan', [u])), prod(q(m - 2, m - 1), resto))
+    }
     return null
   }
   // b = p + r·u² con u lineal
@@ -117,7 +139,66 @@ function integrarEspeciales(f: Extract<E, { t: '^' }>, x: string): E | null {
     const rr = prod(MENOS, r)
     return prod(fn('asin', [prod(u, pot(prod(rr, pot(constante, MENOS)), MEDIO))]), pot(rr, q(-1, 2)), inv)
   }
+  // 1/√(p + r u²) con r > 0: ln|√r·u + √(p + r u²)|/√r
+  const raiz = pot(b, MEDIO)
+  if (valor(e) === -0.5 && rv > 0) return prod(pot(r, q(-1, 2)), inv, fn('ln', [fn('abs', [suma(prod(pot(r, MEDIO), u), raiz)])]))
+  if (valor(e) === 0.5) {
+    // √(p − k u²): u/2·√ + p/(2√k)·asin(u√(k/p))
+    if (p > 0 && rv < 0) {
+      const k = prod(MENOS, r)
+      return prod(inv, suma(prod(MEDIO, u, raiz), prod(MEDIO, constante, pot(k, q(-1, 2)), fn('asin', [prod(u, pot(prod(k, pot(constante, MENOS)), MEDIO))]))))
+    }
+    // √(p + r u²), r > 0: u/2·√ + p/(2√r)·ln|√r·u + √|
+    if (rv > 0) return prod(inv, suma(prod(MEDIO, u, raiz), prod(MEDIO, constante, pot(r, q(-1, 2)), fn('ln', [fn('abs', [suma(prod(pot(r, MEDIO), u), raiz)])]))))
+  }
   return null
+}
+
+/**
+ * sinᵐu·cosⁿu con u lineal. Con un exponente impar se separa un factor y el resto
+ * pasa a la otra función con sin² = 1 − cos²; con los dos pares, ángulo doble.
+ */
+function potenciasTrig(f: E, x: string, profundidad: number): E | null {
+  const fs = f.t === '*' ? f.a : [f]
+  let u: E | null = null
+  let m = 0
+  let n = 0
+  for (const g of fs) {
+    const [base, k] = g.t === '^' && esNum(g.e) ? [g.b, valor(g.e)] : [g, 1]
+    if (base.t !== 'fn' || !['sin', 'cos', 'tan'].includes(base.v) || !Number.isInteger(k)) return null
+    if (u && clave(u) !== clave(base.a[0])) return null
+    u = base.a[0]
+    if (base.v === 'sin') m += k
+    else if (base.v === 'cos') n += k
+    else {
+      // tan = sin/cos
+      m += k
+      n -= k
+    }
+  }
+  if (!u || (m < 1 && n < 1) || Math.abs(m) + Math.abs(n) > 16) return null
+  const a = lineal(u, x)
+  if (!a) return null
+  const T = s('τ')
+  const uno_t2 = suma(UNO, prod(MENOS, pot(T, DOS)))
+  let G: E | null = null
+  let atras: E | null = null
+  // con exponentes negativos queda una función racional en t: la integran las fracciones simples
+  const expande = (y: E) => (m < 0 || n < 0 ? simplificar(y) : desarrollar(y))
+  if (Math.abs(m) % 2 === 1) {
+    // t = cos u: sinᵐ cosⁿ du = −(1 − t²)^((m−1)/2) tⁿ dt
+    G = primitiva(expande(prod(MENOS, pot(uno_t2, q((m - 1) / 2)), pot(T, q(n)))), 'τ', MAX_PROFUNDIDAD - 1)
+    atras = fn('cos', [u])
+  } else if (Math.abs(n) % 2 === 1) {
+    G = primitiva(expande(prod(pot(uno_t2, q((n - 1) / 2)), pot(T, q(m)))), 'τ', MAX_PROFUNDIDAD - 1)
+    atras = fn('sin', [u])
+  } else {
+    if (m < 0 || n < 0) return null
+    const c2 = fn('cos', [prod(DOS, u)])
+    const d = desarrollar(prod(pot(prod(MEDIO, suma(UNO, prod(MENOS, c2))), q(m / 2)), pot(prod(MEDIO, suma(UNO, c2)), q(n / 2))))
+    return primitiva(d, x, profundidad + 1)
+  }
+  return G && atras ? prod(pot(a, MENOS), sustituir(G, T, atras)) : null
 }
 
 const MAX_PROFUNDIDAD = 3
@@ -151,7 +232,7 @@ function primitiva(f: E, x: string, profundidad = 0): E | null {
       /* demasiado grande para desarrollar */
     }
   }
-  return fraccionesSimples(f, x) ?? cambioDeVariable(f, x, profundidad) ?? partes(f, x, profundidad)
+  return fraccionesSimples(f, x) ?? potenciasTrig(f, x, profundidad) ?? cambioDeVariable(f, x, profundidad) ?? partes(f, x, profundidad)
 }
 
 /* ---------- fracciones simples ---------- */

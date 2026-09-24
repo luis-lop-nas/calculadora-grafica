@@ -6,7 +6,8 @@ import { desarrollar, factorizar, simplificar } from './algebra'
 import { resolver, resolverSistema, type Solucion } from './resolver'
 import { limite, taylor, type Punto } from './limites'
 import { laplace, laplaceInversa } from './laplace'
-import { integralNumerica, integrar } from './integrar'
+import { integrar } from './integrar'
+import { definida } from './definida'
 
 /**
  * La vista CAS: cada fila es una orden (derivar, integrar, resolver…), una
@@ -129,15 +130,11 @@ const ORDENES: Record<string, Orden> = {
       if (!F) throw new Error('no encuentro primitiva elemental (ni con partes, cambio de variable ni fracciones simples)')
       return { entrada: `\\int ${integrando}\\,d${x}`, salida: `${tex(F)} + C` }
     }
-    const [lo, hi] = [ctx.expr(a[2]), ctx.expr(a[3])]
-    const entrada = `\\int_{${tex(lo)}}^{${tex(hi)}} ${integrando}\\,d${x}`
-    if (F) {
-      const v = simplificar(suma(sustituir(F, s(x), hi), prod(MENOS, sustituir(F, s(x), lo))))
-      if (!esIndef(v) && (simbolos(v).size || Number.isFinite(evaluar(v)))) return { entrada, salida: conDecimal(v), nota: 'regla de Barrow' }
-    }
-    const num = integralNumerica((t) => evaluar(f, { [x]: t }), evaluar(lo), evaluar(hi))
-    if (!Number.isFinite(num)) throw new Error('la integral no converge o el integrando no está definido en el intervalo')
-    return { entrada, salida: tex(flo(num)), nota: 'numérica (Simpson adaptativo): sin primitiva elemental' }
+    const [lo, hi] = [punto(a[2], ctx), punto(a[3], ctx)]
+    const entrada = `\\int_{${texPunto(lo)}}^{${texPunto(hi)}} ${integrando}\\,d${x}`
+    const r = definida(f, x, lo, hi)
+    if (r.tipo === 'diverge') return { entrada, salida: '\\text{diverge}', nota: r.nota }
+    return { entrada, salida: conDecimal(r.v), nota: r.nota }
   },
   simplificar(a, ctx) {
     return { entrada: `\\operatorname{simplificar}\\left(${texNodo(ctx.nodo(a[0]))}\\right)`, salida: conDecimal(simplificar(ctx.expr(a[0]))) }

@@ -395,9 +395,43 @@ export function fn(v: string, a: E[]): E {
       if (u.t === 's' && u.v === 'e') return UNO
       if (u.t === '^' && u.b.t === 's' && u.b.v === 'e') return u.e
       if (esCero(u)) return INDEF
+      // ln 8 = 3 ln 2: así ln 8 / ln 2 se simplifica solo
+      if (u.t === 'q' && u.d === 1n && u.n > 3n && u.n < 1n << 53n) {
+        const n = Number(u.n)
+        for (let b = 2; b * b <= n; b++) {
+          let k = 0
+          let m = n
+          while (m % b === 0) {
+            m /= b
+            k++
+          }
+          if (m === 1 && k > 1) return prod(q(k), fn('ln', [q(b)]))
+          if (k) break
+        }
+      }
     }
     if (v === 'abs' && esNum(u)) return u.t === 'q' ? q(absB(u.n), u.d) : flo(Math.abs(u.v))
     if (v === 'sign' && esNum(u)) return q(Math.sign(valor(u)))
+    // |e|, |π|, |e^g|: positivos seguro
+    if (v === 'abs' && ((u.t === 's' && (u.v === 'e' || u.v === 'pi')) || (u.t === '^' && u.b.t === 's' && u.b.v === 'e'))) return u
+    // n! y Γ(n) exactos con enteros
+    if ((v === 'fact' || v === 'gamma') && u.t === 'q' && u.d === 1n) {
+      const n = v === 'fact' ? u.n : u.n - 1n
+      if (n >= 0n && n <= 300n) {
+        let r = 1n
+        for (let i = 2n; i <= n; i++) r *= i
+        return q(r)
+      }
+    }
+  }
+  if (a.length === 2 && (v === 'ncr' || v === 'binomial') && a.every((y) => y.t === 'q' && y.d === 1n)) {
+    const [n, k] = a.map((y) => (y as Extract<E, { t: 'q' }>).n)
+    if (n >= 0n && k >= 0n && k <= n && n <= 1000n) {
+      let r = 1n
+      for (let i = 0n; i < k; i++) r = (r * (n - i)) / (i + 1n)
+      return q(r)
+    }
+    if (n >= 0n && (k < 0n || k > n)) return CERO
   }
   return { t: 'fn', v, a }
 }

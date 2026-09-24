@@ -97,14 +97,14 @@ function cociente(e: E): [E, E] | null {
   return esUno(d) ? null : [n, d]
 }
 
-type Lado = number | 'inf' | '-inf' | 'nodef' | null
+export type Lado = number | 'inf' | '-inf' | 'nodef' | null
 
 /**
  * Estimación numérica por un lado. Se acerca con h = 10⁻², …, 10⁻⁵ (o x = 10², …,
  * 10⁵ hacia ∞) y extrapola con Richardson suponiendo error a·h + b·h²: más cerca
  * la cancelación (1 − cos h con h = 10⁻⁸ da 0 exacto) estropea más de lo que gana.
  */
-function lado(f: (t: number) => number, a: number | 'inf' | '-inf', signo: 1 | -1): Lado {
+export function lado(f: (t: number) => number, a: number | 'inf' | '-inf', signo: 1 | -1): Lado {
   const hs = [1e-2, 1e-3, 1e-4, 1e-5]
   const puntos = a === 'inf' ? hs.map((h) => 1 / h) : a === '-inf' ? hs.map((h) => -1 / h) : hs.map((h) => a + signo * h)
   const vs = puntos.map(f)
@@ -181,9 +181,30 @@ export function limite(e0: E, x: string, a: Punto, pasos = 0): Limite {
       const resto = prod(...e.a.filter((f) => !ceros.includes(f)))
       const cero = prod(...ceros)
       // según cuál quede abajo, L'Hôpital acaba o da vueltas: se prueban las dos
-      const l = lhopital(cero, pot(resto, MENOS), x, a, pasos) ?? lhopital(resto, pot(cero, MENOS), x, a, pasos)
-      if (l) return l
+      const l1 = lhopital(cero, pot(resto, MENOS), x, a, pasos)
+      if (l1 && l1.tipo !== 'no existe') return l1
+      const l2 = lhopital(resto, pot(cero, MENOS), x, a, pasos)
+      if (l2 && l2.tipo !== 'no existe') return l2
+      if (l1 ?? l2) return (l1 ?? l2)!
     }
+  }
+
+  // composición con lo que ya se sabe: 1/g, g^p, ln g, e^g, atan g cuando g → ±∞ o g → 0
+  if (!otras.length && pasos < 8) {
+    const r = componer(e, x, a, pasos)
+    if (r) return r
+  }
+
+  // una suma: término a término si ninguno choca con otro (∞ − ∞ no se toca)
+  if (e.t === '+' && pasos < 8 && !otras.length) {
+    const ls = e.a.map((t) => limite(t, x, a, pasos))
+    if (ls.every((l) => l.tipo === 'valor')) {
+      const vs = ls as Array<Extract<Limite, { tipo: 'valor' }>>
+      const v = simplificar(suma(...vs.map((l) => l.v)))
+      if (finito(v)) return { tipo: 'valor', v, numerico: vs.some((l) => l.numerico) }
+    }
+    const infs = ls.filter((l) => l.tipo === 'infinito') as Array<Extract<Limite, { tipo: 'infinito' }>>
+    if (infs.length && infs.every((l) => l.signo === infs[0].signo) && ls.every((l) => l.tipo !== 'no existe')) return infs[0]
   }
 
   // 0/0 o ∞/∞
@@ -217,6 +238,84 @@ export function limite(e0: E, x: string, a: Punto, pasos = 0): Limite {
   const iguales = typeof der === 'number' && typeof izq === 'number' ? Math.abs(der - izq) < 1e-5 * Math.max(1, Math.abs(der)) : der === izq
   if (!iguales) return { tipo: 'no existe', izquierda: texto(izq), derecha: texto(der) }
   return resultado(typeof der === 'number' && typeof izq === 'number' ? (der + izq) / 2 : der)
+}
+
+/**
+ * Límites que salen de otro límite más sencillo: 1/g → 0 si g → ±∞, gᵖ con p
+ * constante, ln g, eᵍ y atan g. Evita depender de la estimación numérica, que
+ * con 1/√x o 1/ln x se acerca demasiado despacio para fiarse.
+ */
+function componer(e: E, x: string, a: Punto, pasos: number): Limite | null {
+  const valorDe = (l: Limite) => (l.tipo === 'valor' ? evaluar(l.v) : NaN)
+  if (e.t === '^' && !contiene(e.e, x) && contiene(e.b, x) && esNum(e.e)) {
+    const p = valor(e.e)
+    const lb = limite(e.b, x, a, pasos)
+    if (lb.tipo === 'infinito') {
+      if (p < 0) return { tipo: 'valor', v: q(0), numerico: false }
+      if (p > 0) {
+        // (−∞)^p: solo con p entero se sabe el signo
+        const signo = lb.signo > 0 ? 1 : Number.isInteger(p) ? (p % 2 ? -1 : 1) : 0
+        return signo ? { tipo: 'infinito', signo: signo as 1 | -1 } : null
+      }
+    }
+    if (lb.tipo === 'valor' && p < 0 && Math.abs(valorDe(lb)) < 1e-300) {
+      // 1/g con g → 0: infinito solo si g no cambia de signo alrededor (se mira numéricamente)
+      if (a === 'inf' || a === '-inf') {
+        const g = (t: number) => evaluar(e.b, { [x]: t })
+        const v = g(a === 'inf' ? 1e6 : -1e6)
+        if (Number.isFinite(v) && v !== 0) return { tipo: 'infinito', signo: v > 0 || Number.isInteger(p) && p % 2 === 0 ? 1 : -1 }
+      }
+    }
+    return null
+  }
+  // b^g con b constante > 1 (eˣ, 2ˣ)
+  if (e.t === '^' && !contiene(e.b, x) && contiene(e.e, x)) {
+    const b = evaluar(e.b)
+    const lg = limite(e.e, x, a, pasos)
+    if (!(b > 1) || lg.tipo !== 'infinito') return null
+    return lg.signo > 0 ? { tipo: 'infinito', signo: 1 } : { tipo: 'valor', v: q(0), numerico: false }
+  }
+  // producto: los límites de los factores, si no hay 0·∞
+  if (e.t === '*') {
+    const ls = e.a.map((f) => (contiene(f, x) ? limite(f, x, a, pasos) : ({ tipo: 'valor', v: f, numerico: false } as Limite)))
+    if (ls.some((l) => l.tipo === 'no existe')) {
+      // acotada por algo que tiende a 0 (sin x / x en ∞, x·cos(1/x) en 0): el producto tiende a 0
+      const acotada = (f: E) => f.t === 'fn' && ['sin', 'cos', 'atan', 'tanh'].includes(f.v)
+      const malos = e.a.filter((_, i) => ls[i].tipo === 'no existe')
+      if (!malos.every(acotada)) return null
+      const resto = e.a.filter((_, i) => ls[i].tipo !== 'no existe')
+      if (!resto.length) return null
+      const lr = limite(prod(...resto), x, a, pasos)
+      return lr.tipo === 'valor' && Math.abs(evaluar(lr.v)) < 1e-300 ? { tipo: 'valor', v: q(0), numerico: false } : null
+    }
+    const infs = ls.filter((l) => l.tipo === 'infinito') as Array<Extract<Limite, { tipo: 'infinito' }>>
+    const vals = ls.filter((l) => l.tipo === 'valor') as Array<Extract<Limite, { tipo: 'valor' }>>
+    if (!infs.length) {
+      const v = simplificar(prod(...vals.map((l) => l.v)))
+      return finito(v) ? { tipo: 'valor', v, numerico: vals.some((l) => l.numerico) } : null
+    }
+    const nums = vals.map((l) => evaluar(l.v))
+    if (nums.some((n) => !Number.isFinite(n) || n === 0)) return null
+    const signo = infs.reduce((acc, l) => acc * l.signo, 1) * nums.reduce((acc, n) => acc * Math.sign(n), 1)
+    return { tipo: 'infinito', signo: signo > 0 ? 1 : -1 }
+  }
+  if (e.t === 'fn' && e.a.length === 1 && contiene(e.a[0], x)) {
+    const lg = limite(e.a[0], x, a, pasos)
+    if (lg.tipo !== 'infinito') return null
+    switch (e.v) {
+      case 'ln':
+        return lg.signo > 0 ? { tipo: 'infinito', signo: 1 } : null
+      case 'atan':
+        return { tipo: 'valor', v: prod(q(lg.signo, 2), PI), numerico: false }
+      case 'sqrt':
+        return lg.signo > 0 ? { tipo: 'infinito', signo: 1 } : null
+      case 'tanh':
+        return { tipo: 'valor', v: q(lg.signo), numerico: false }
+      default:
+        return null
+    }
+  }
+  return null
 }
 
 function contieneIndef(x: E): boolean {

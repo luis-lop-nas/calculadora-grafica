@@ -41,6 +41,8 @@ export interface SolEdo {
   singulares: E[]
   /** Si la particular no sale, al menos la homogénea (con C1…Cn). */
   homogenea: E | null
+  /** Todas las ramas explícitas cuando el despeje da varias (±√…); `explicita` es la primera. */
+  ramas?: E[]
   verificada: boolean
 }
 
@@ -552,19 +554,31 @@ function separar(G: E): { X: E; Y: E } | null {
   return null
 }
 
-/** Intenta despejar y de Φ(x, y) = C1; devuelve la rama que cumple la ecuación. */
-function despejarY(phi: E, F: E): E | null {
+/**
+ * Despeja y de Φ(x, y) = C1 y devuelve todas las ramas que cumplen la ecuación: con
+ * y² = 2C − x² salen y = ±√(2C − x²), y es la condición inicial la que elige.
+ */
+function despejarY(phi: E, F: E): E[] {
+  const ramas: E[] = []
+  const vista = new Set<string>()
+  const anota = (y: E) => {
+    const k = clave(y)
+    if (!vista.has(k)) {
+      vista.add(k)
+      ramas.push(y)
+    }
+  }
   try {
     const sol = resolver(suma(phi, prod(MENOS, Cn(1))), 'y')
     for (const c of sol.exactas) {
       const y = simplificar(absorberConstante(c, Cn(1)))
-      if (cumple(F, 1, y, 1)) return y
-      if (cumple(F, 1, c, 1)) return c
+      if (cumple(F, 1, y, 1)) anota(y)
+      else if (cumple(F, 1, c, 1)) anota(c)
     }
   } catch {
     /* sin despeje */
   }
-  return null
+  return ramas
 }
 
 /**
@@ -656,12 +670,17 @@ function primerOrden(F: E, pasos: Paso[], clases: string[]): Omit<SolEdo, 'orden
       } catch {
         /* sin ceros */
       }
-      const y = despejarY(simplificar(suma(sinAbsEnLn(H), prod(MENOS, sinAbsEnLn(K)))), F) ?? despejarLogs(H, K, F)
-      if (y) sub.push({ t: 'Despejando y (el signo del valor absoluto se lo come C₁)', tex: `y = ${tex(y)}` })
+      const ramas = despejarY(simplificar(suma(sinAbsEnLn(H), prod(MENOS, sinAbsEnLn(K)))), F)
+      if (!ramas.length) {
+        const l = despejarLogs(H, K, F)
+        if (l) ramas.push(l)
+      }
+      const y = ramas[0] ?? null
+      if (y) sub.push({ t: 'Despejando y (el signo del valor absoluto se lo come C₁)', tex: ramas.map((r) => `y = ${tex(r)}`).join(',\\quad ') })
       if (y || cumpleImplicita(phi, G)) {
         pasos.push(...sub)
         if (singulares.length) pasos.push({ t: 'Al dividir por Y(y) se pierden las constantes', tex: singulares.map((c) => `y = ${tex(c)}`).join(',\\quad ') })
-        return { metodo: 'separación de variables', pasos, explicita: y, implicita: y ? null : phi, singulares }
+        return { metodo: 'separación de variables', pasos, explicita: y, implicita: y ? null : phi, singulares, ramas }
       }
     }
   }
@@ -711,10 +730,11 @@ function primerOrden(F: E, pasos: Paso[], clases: string[]): Omit<SolEdo, 'orden
     const phi = exacta(M, N, sub)
     if (phi && cumpleImplicita(phi, G)) {
       clases.push('exacta')
-      const y = despejarY(phi, F)
+      const ramas = despejarY(phi, F)
+      const y = ramas[0] ?? null
       pasos.push(...sub)
-      if (y) pasos.push({ t: 'Despejando y', tex: `y = ${tex(y)}` })
-      return { metodo: 'ecuación exacta', pasos, explicita: y, implicita: y ? null : phi, singulares: [] }
+      if (y) pasos.push({ t: 'Despejando y', tex: ramas.map((r) => `y = ${tex(r)}`).join(',\\quad ') })
+      return { metodo: 'ecuación exacta', pasos, explicita: y, implicita: y ? null : phi, singulares: [], ramas }
     }
     const My = derivar(M, 'y')
     const Nx = derivar(N, 'x')
@@ -730,10 +750,11 @@ function primerOrden(F: E, pasos: Paso[], clases: string[]): Omit<SolEdo, 'orden
       const phi2 = exacta(simplificar(prod(mu, M)), simplificar(prod(mu, N)), sub2)
       if (phi2 && cumpleImplicita(phi2, G)) {
         clases.push(`exacta con factor integrante ${cual}`)
-        const y = despejarY(phi2, F)
+        const ramas = despejarY(phi2, F)
+        const y = ramas[0] ?? null
         pasos.push(...sub2)
-        if (y) pasos.push({ t: 'Despejando y', tex: `y = ${tex(y)}` })
-        return { metodo: `factor integrante ${cual}`, pasos, explicita: y, implicita: y ? null : phi2, singulares: [] }
+        if (y) pasos.push({ t: 'Despejando y', tex: ramas.map((r) => `y = ${tex(r)}`).join(',\\quad ') })
+        return { metodo: `factor integrante ${cual}`, pasos, explicita: y, implicita: y ? null : phi2, singulares: [], ramas }
       }
     }
   }
@@ -754,13 +775,14 @@ function primerOrden(F: E, pasos: Paso[], clases: string[]): Omit<SolEdo, 'orden
       if (H) {
         const phi = simplificar(suma(sustituir(sinAbsEnLn(H), s('v'), prod(s('y'), pot(X, MENOS))), prod(MENOS, fn('ln', [X]))))
         if (cumpleImplicita(phi, G)) {
-          const y = despejarY(phi, F)
+          const ramas = despejarY(phi, F)
+          const y = ramas[0] ?? null
           pasos.push(
             { t: 'Homogénea: con y = v·x, x·v′ = R(v) − v', tex: `R(v) = ${tex(R)}` },
             { t: 'Separando', tex: String.raw`\int \frac{dv}{R(v) - v} = ${tex(H)} = \ln x + C_1` },
           )
-          if (y) pasos.push({ t: 'Despejando y', tex: `y = ${tex(y)}` })
-          return { metodo: 'homogénea (cambio y = v·x)', pasos, explicita: y, implicita: y ? null : phi, singulares: [] }
+          if (y) pasos.push({ t: 'Despejando y', tex: ramas.map((r) => `y = ${tex(r)}`).join(',\\quad ') })
+          return { metodo: 'homogénea (cambio y = v·x)', pasos, explicita: y, implicita: y ? null : phi, singulares: [], ramas }
         }
       }
     }
@@ -905,6 +927,19 @@ function gauss(A: number[][], b: number[]): number[] | null {
 }
 
 export function particular(sol: SolEdo, conds: Condicion[]): Particular | null {
+  const ramas = sol.ramas ?? []
+  if (ramas.length < 2) return particularRama(sol, conds)
+  // cada rama por separado: la condición inicial decide cuál es
+  let primero: Particular | null = null
+  for (const r of ramas) {
+    const p = particularRama({ ...sol, explicita: r }, conds)
+    if (p?.y) return p
+    primero ??= p
+  }
+  return primero
+}
+
+function particularRama(sol: SolEdo, conds: Condicion[]): Particular | null {
   if (!conds.length) return null
   if (sol.implicita) {
     const c = conds.find((c) => c.k === 0)

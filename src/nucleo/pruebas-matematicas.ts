@@ -36,6 +36,8 @@ import { convertir, mismaDimension, unidad } from '../lib/unidades'
 import { analizar as analizarExpr } from '../lib/expresion'
 import { clave as claveE, desdeNodo, evaluar as evaluarE, s as simb, sustituir as sustE } from '../lib/cas/expr'
 import { tex as texE } from '../lib/cas/tex'
+import { definida as definidaE } from '../lib/cas/definida'
+import type { Punto } from '../lib/cas/limites'
 import { derivar as derivarE } from '../lib/cas/derivar'
 import { desarrollar as desarrollarE, factorizar as factorizarE, simplificar as simplificarE } from '../lib/cas/algebra'
 import { resolver as resolverE, resolverSistema } from '../lib/cas/resolver'
@@ -806,10 +808,17 @@ seccion('EDO simbólica: métodos de libro, condiciones y numérica')
     cierto('exacta: Φ(1, 1) − C = 0', !!p?.phi && Math.abs(evaluarE(p.phi, { x: 1, y: 1 })) < 1e-12)
   }
   cierto('y′ = (x + y)/x se resuelve', ((s) => s.verificada && !!s.explicita)(resolverEdo("y' = (x + y)/x")))
+  // el despeje da dos ramas (±√…): la condición inicial elige la buena
+  for (const [ec, c, x0, y0] of [["y' = -x/y", 'y(0) = 2', 0, 2], ["y' = -x/y", 'y(0) = -3', 0, -3], ["(2*x + y) + (x + 2*y)*y' = 0", 'y(0) = 1', 0, 1]] as const) {
+    const p = particular(resolverEdo(ec), leerCondiciones(c))
+    cerca(`${ec} con ${c}: la rama que pasa por el punto`, p?.y ? evaluarE(p.y, { x: x0 }) : NaN, y0, 1e-12)
+  }
+  // variación de parámetros con ∫ sin x·tan x (potencias trigonométricas y fracciones simples)
+  cierto('y″ + y = tan x: variación de parámetros, comprobada', ((s) => s.verificada && !!s.explicita)(resolverEdo("y'' + y = tan(x)")))
   // la particular que no es elemental deja al menos la homogénea
   {
-    const sol = resolverEdo("y'' + y = tan(x)")
-    cierto('y″ + y = tan x: da la homogénea', !!sol.homogenea && !sol.explicita)
+    const sol = resolverEdo("y'' + y = exp(x^2)")
+    cierto('y″ + y = e^{x²}: da la homogénea', !!sol.homogenea && !sol.explicita)
   }
   // Taylor: Airy y″ + x·y = 0, y(0) = 1, y′(0) = 0 → 1 − x³/6 + x⁶/180 − …
   {
@@ -1286,6 +1295,9 @@ seccion('CAS: cada resultado se comprueba por otro camino')
     '1/(x^2-1)', '(x+1)/(x^2+x-2)', '1/(x^3+x)', '(2x+3)/(x^2+2x+5)', '1/((x-1)^2 (x+2))', '(x^3+1)/(x^2-4)', '1/(x^2+4x+13)', 'x/(x^4-1)', '(x^2+1)/(x (x-1)^3)',
     // cambio de variable
     'x e^(x^2)', 'sin(x)^3 cos(x)', 'ln(x)/x', 'x/sqrt(x^2+1)', '1/(x ln(x))', 'cos(x)/(1+sin(x)^2)', 'e^x/(1+e^(2x))', 'sin(sqrt(x))/sqrt(x)', 'x cos(x^2)', 'sec(x)^2 tan(x)',
+    // potencias trigonométricas, sec, csc y sustituciones trigonométricas
+    'cos(x)^3', 'sin(x)^3', 'sin(x)^4', 'sin(x)^2 cos(x)^2', 'sin(2x)^3 cos(2x)^2', 'sin(x)^5 cos(x)^4', 'sec(x)', 'sec(x)^3', '1/sin(x)', 'tan(x)^2', 'tan(x)^3', 'sin(x) tan(x)', 'sin(x)^2/cos(x)',
+    'sqrt(1-x^2)', 'sqrt(9-4x^2)', 'sqrt(x^2+4)', 'sqrt(x^2-1)', '1/sqrt(x^2+1)', '1/sqrt(x^2-4)',
   ]
   for (const f of integrables) {
     const F = integrarE(E(f), 'x')
@@ -1321,7 +1333,7 @@ seccion('CAS: cada resultado se comprueba por otro camino')
   cierto('sistema incompatible', resolverSistema([E('x+y-1'), E('x+y-2')], ['x', 'y']).tipo === 'incompatible')
 
   const lim = (f: string, a: string | 'inf') => {
-    const l = limiteE(E(f), 'x', a === 'inf' ? 'inf' : E(a))
+    const l = limiteE(E(f), 'x', a === 'inf' || a === '-inf' ? a : E(a))
     return l.tipo === 'valor' ? evaluarE(l.v) : l.tipo === 'infinito' ? l.signo * Infinity : NaN
   }
   cerca('lím sin x / x', lim('sin(x)/x', '0'), 1, 0)
@@ -1333,6 +1345,41 @@ seccion('CAS: cada resultado se comprueba por otro camino')
   cerca('lím (x − sin x)/x³', lim('(x-sin(x))/x^3', '0'), 1 / 6, 1e-12)
   cierto('lím √x en ∞ = ∞', lim('sqrt(x)', 'inf') === Infinity)
   cierto('lím 1/x en 0 no existe', limiteE(E('1/x'), 'x', E('0')).tipo === 'no existe')
+  // lo que antes se escapaba a la estimación numérica y no convergía
+  cerca('lím 1/√x en ∞ = 0', lim('1/sqrt(x)', 'inf'), 0, 0)
+  cerca('lím −1/ln x en ∞ = 0', lim('-1/ln(x)', 'inf'), 0, 0)
+  cerca('lím x² e^(−x) en ∞ = 0', lim('x^2 e^(-x)', 'inf'), 0, 0)
+  cerca('lím sin x / x en ∞ = 0 (acotada por algo que tiende a 0)', lim('sin(x)/x', 'inf'), 0, 0)
+  cerca('lím x ln x − x en 0 = 0 (suma término a término)', lim('x ln(x) - x', '0'), 0, 0)
+  cerca('lím atan x en −∞ = −π/2', lim('atan(x)', '-inf'), -Math.PI / 2, 1e-15)
+
+  // integrales definidas: Barrow solo si la primitiva es continua; impropias por límites
+  {
+    const def = (f: string, a: string, b: string) => {
+      const P = (t: string): Punto => (t === 'inf' ? 'inf' : t === '-inf' ? '-inf' : E(t))
+      const r = definidaE(E(f), 'x', P(a), P(b))
+      return r.tipo === 'valor' ? evaluarE(r.v) : NaN
+    }
+    for (const [f, a, b] of [['1/x^2', '-1', '1'], ['1/x', '-1', '1'], ['tan(x)', '0', 'pi'], ['1/(x-2)', '0', '3'], ['1/x', '1', 'inf'], ['ln(x)/x', '1', 'inf'], ['1/x', '0', '1']])
+      cierto(`∫ ${f} de ${a} a ${b} diverge (no se aplica Barrow a ciegas)`, Number.isNaN(def(f, a, b)))
+    cerca('∫₁^∞ dx/x² = 1', def('1/x^2', '1', 'inf'), 1, 1e-12)
+    cerca('∫₀¹ dx/√x = 2', def('1/sqrt(x)', '0', '1'), 2, 1e-12)
+    cerca('∫₀¹ ln x dx = −1', def('ln(x)', '0', '1'), -1, 1e-12)
+    cerca('∫₀¹ x ln x dx = −1/4', def('x ln(x)', '0', '1'), -0.25, 1e-12)
+    cerca('∫₋₁⁸ x^(−1/3) dx = 9/2 (se parte en 0)', def('x^(-1/3)', '-1', '8'), 4.5, 1e-9)
+    cerca('∫_{−∞}^{∞} e^(−x²) dx = √π', def('e^(-x^2)', '-inf', 'inf'), Math.sqrt(Math.PI), 1e-10)
+    cerca('∫_{−∞}^{∞} dx/(1 + x²) = π', def('1/(1+x^2)', '-inf', 'inf'), Math.PI, 1e-12)
+    cerca('∫₀^π sin x / x dx (Si(π))', def('sin(x)/x', '0', 'pi'), 1.851937051982466, 1e-10)
+    cerca('∫_e^∞ dx/(x ln² x) = 1', def('1/(x ln(x)^2)', 'e', 'inf'), 1, 1e-12)
+    cerca('∫₋₁¹ atan(1/x) dx = 0 (salto del integrando, primitiva continua)', def('atan(1/x)', '-1', '1'), 0, 1e-12)
+    cerca('∫₋₁¹ √(1 − x²) dx = π/2', def('sqrt(1-x^2)', '-1', '1'), Math.PI / 2, 1e-12)
+    cerca('∫₃⁰ x² dx = −9', def('x^2', '3', '0'), -9, 1e-12)
+  }
+  // simplificación
+  cierto('(x³ − 8)/(x² − 4) = (x² + 2x + 4)/(x + 2)', texE(simplificarE(E('(x^3-8)/(x^2-4)'))) === '\\frac{x^{2} + 2 x + 4}{x + 2}', texE(simplificarE(E('(x^3-8)/(x^2-4)'))))
+  cierto('ln 8 / ln 2 = 3', texE(simplificarE(E('ln(8)/ln(2)'))) === '3')
+  cierto('5! = 120 y C(10, 3) = 120 exactos', texE(E('5!')) === '120' && texE(E('nCr(10, 3)')) === '120')
+  cierto('−1/4 se escribe con el signo fuera', texE(E('-1/4')) === '-\\frac{1}{4}')
 
   const coef = (e: ReturnType<typeof E>, n: number) => {
     // coeficiente de xⁿ: derivada n-ésima en 0 / n!

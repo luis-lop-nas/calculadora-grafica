@@ -28,7 +28,7 @@ function texSimbolo(v: string) {
 }
 
 export function texNumero(x: Num): string {
-  if (x.t === 'q') return x.d === 1n ? `${x.n}` : `\\frac{${x.n}}{${x.d}}`
+  if (x.t === 'q') return x.d === 1n ? `${x.n}` : x.n < 0n ? `-\\frac{${-x.n}}{${x.d}}` : `\\frac{${x.n}}{${x.d}}`
   const v = x.v
   if (!Number.isFinite(v)) return Number.isNaN(v) ? '\\text{indefinido}' : v > 0 ? '\\infty' : '-\\infty'
   if (v !== 0 && (Math.abs(v) >= 1e10 || Math.abs(v) < 1e-6)) {
