@@ -4,6 +4,7 @@ import { campoEspacio, campoPlano, circulacionBorde, circulacionPlana, curvaPlan
 import { brewster, campoPolarizado, critico, elipse, fase, fresnel, picoEnvolvente } from '../../lib/ondas'
 import { airy, anillosOscuros, fraunhofer2D, intensidadMichelson, intensidadNumerica, intensidadRendijas, J11, reflectanciaAiry, reflectanciaMatriz, rendijas } from '../../lib/optica'
 import { besselJx, gauss20 } from '../../lib/especiales'
+import { cauchy, corteEje, reflejoEsferico, desviacionMinima, desviacionPrisma, det, focales, imagen, matrizLentes, matrizSistema, trazar } from '../../lib/rayos'
 import { cerca, cierto, parecido, seccion } from './comun'
 
 export function pruebasFisica() {
@@ -228,5 +229,64 @@ export function pruebasFisica() {
     const an = anillosOscuros(12.4, 0.55, 0.5)
     cierto('Michelson: hay varios anillos', an.length >= 4, String(an.length))
     cerca('Michelson: los anillos oscuros tienen intensidad 0', Math.max(...an.map((th) => intensidadMichelson(12.4, 0.55, th))), 0, 1e-24)
+  }
+
+  seccion('Física · óptica geométrica')
+  {
+    // lente delgada: 1/s + 1/s′ = 1/f y m = −s′/s
+    const im = imagen([{ z: 0, f: 10 }], -30)
+    cerca('lente delgada: s′ = 15 para s = 30, f = 10', im.z, 15, 1e-12)
+    cerca('lente delgada: aumento m = −s′/s = −1/2', im.m, -0.5, 1e-14)
+    const virt = imagen([{ z: 0, f: 10 }], -6)
+    cerca('objeto dentro de la focal: imagen virtual en s′ = −15', virt.z, -15, 1e-12)
+    cierto('objeto dentro de la focal: la imagen no es real', !virt.real)
+    // dos lentes: focal 1/f = 1/f₁ + 1/f₂ − d/(f₁f₂)
+    const par = [{ z: 2, f: 12 }, { z: 7, f: -20 }]
+    const F = focales(par)
+    cerca('dos lentes: 1/f = 1/f₁ + 1/f₂ − d/(f₁f₂)', 1 / F.f, 1 / 12 + 1 / -20 - 5 / (12 * -20), 1e-15)
+    cerca('dos lentes: det ABCD = 1', det(matrizLentes(par)), 1, 1e-15)
+    cerca('det de la matriz objeto → última lente = 1', det(matrizSistema(par, -40)), 1, 1e-15)
+    // la imagen de ABCD frente al corte de dos rayos trazados desde la punta del objeto
+    const z0 = -40
+    const zf = 200
+    const r1 = trazar(par, z0, [1, 0], zf)
+    const r2 = trazar(par, z0, [1, -0.03], zf)
+    const [a1, b1] = [r1.at(-2)!, r1.at(-1)!]
+    const [a2, b2] = [r2.at(-2)!, r2.at(-1)!]
+    const m1 = (b1[1] - a1[1]) / (b1[0] - a1[0])
+    const m2 = (b2[1] - a2[1]) / (b2[0] - a2[0])
+    const zc = a1[0] + (a2[1] - a1[1]) / (m1 - m2)
+    const ip = imagen(par, z0)
+    cerca('dos lentes: imagen ABCD = corte de dos rayos trazados', zc, ip.z, 1e-9)
+    cerca('dos lentes: altura de la imagen = m', a1[1] + m1 * (zc - a1[0]), ip.m, 1e-10)
+    // foco posterior: un rayo paralelo cruza el eje en la BFD
+    const rp = trazar(par, -10, [0.5, 0], 300)
+    const [p, q] = [rp.at(-2)!, rp.at(-1)!]
+    cerca('dos lentes: un rayo paralelo corta el eje en la distancia focal posterior', p[0] - p[1] / ((q[1] - p[1]) / (q[0] - p[0])), 7 + F.posterior, 1e-9)
+    const kepler = matrizLentes([{ z: 0, f: 24 }, { z: 32, f: 8 }])
+    cerca('anteojo de Kepler (d = f₁ + f₂): afocal, C = 0', kepler[1][0], 0, 1e-16)
+    cerca('anteojo de Kepler: aumento angular D = −f₁/f₂', kepler[1][1], -3, 1e-14)
+    // espejo esférico: trazado exacto frente a la fórmula cerrada y al foco paraxial R/2
+    const R = 8
+    for (const h of [1, 3, 5.5]) cerca(`espejo cóncavo R = 8, h = ${h}: corte exacto a R − R/(2 cos α) del vértice`, corteEje(R, h), -(R - R / (2 * Math.cos(Math.asin(h / R)))), 1e-12)
+    cerca('espejo: rayo casi axial → foco paraxial a R/2', corteEje(R, 1e-4), -R / 2, 1e-8)
+    cierto('espejo cóncavo: el reflejo vuelve hacia la luz', reflejoEsferico(R, 3)!.d[0] < 0)
+    cierto('espejo: aberración esférica, los rayos altos cortan más cerca del espejo', corteEje(R, 5) > corteEje(R, 2))
+    // prisma: mínima desviación numérica frente a n = sin((A + δ)/2)/sin(A/2)
+    const A = Math.PI / 3
+    const n = cauchy(486.1)
+    const g = (Math.sqrt(5) - 1) / 2
+    let lo = 0.3
+    let hi = 1.4
+    for (let i = 0; i < 200; i++) {
+      const x1 = hi - g * (hi - lo)
+      const x2 = lo + g * (hi - lo)
+      if ((desviacionPrisma(A, n, x1) ?? 9) < (desviacionPrisma(A, n, x2) ?? 9)) hi = x2
+      else lo = x1
+    }
+    const t = (lo + hi) / 2
+    cerca('prisma: desviación mínima numérica = fórmula', desviacionPrisma(A, n, t)!, desviacionMinima(A, n), 1e-14)
+    cerca('prisma: en el mínimo el paso es simétrico, θ₁′ = A/2', Math.asin(Math.sin(t) / n), A / 2, 1e-7)
+    cierto('prisma: el azul se desvía más que el rojo', desviacionMinima(A, cauchy(450)) > desviacionMinima(A, cauchy(650)))
   }
 }

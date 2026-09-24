@@ -47,6 +47,7 @@ import electrostatica from '../modulos/fisica/electrostatica'
 import magnetostatica from '../modulos/fisica/magnetostatica'
 import ondas from '../modulos/fisica/ondas'
 import difraccion from '../modulos/fisica/difraccion'
+import geometrica from '../modulos/fisica/geometrica'
 
 /** El orden de esta lista es el orden del menú. */
 export const MODULOS: ModuloAny[] = [
@@ -59,5 +60,5 @@ export const MODULOS: ModuloAny[] = [
   aplicaciones, subespacios, hilbert, estructuras, espacios, unidades,
   fourier, transformadaF, convolucionM, laplaceT, control, circuito, filtros,
   lagrangiano, orbitas, oscilaciones, solido, relatividad,
-  electrostatica, magnetostatica, ondas, difraccion,
+  electrostatica, magnetostatica, ondas, difraccion, geometrica,
 ]
