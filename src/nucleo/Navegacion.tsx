@@ -9,25 +9,29 @@ export function Navegacion({
   id,
   onElegir,
   acciones,
+  exportar,
 }: {
   modulos: ModuloAny[]
   id: string
   onElegir: (id: string) => void
   acciones?: ReactNode
+  /** Botones que van al final del menú ☰, en «Exportar». */
+  exportar?: ReactNode
 }) {
   const [paleta, setPaleta] = useState(false)
+  const [menu, setMenu] = useState(false)
   const activo = modulos.find((m) => m.id === id)!
   const porArea = useMemo(() => {
     const g = new Map<Area, ModuloAny[]>()
     for (const m of modulos) g.set(m.area, [...(g.get(m.area) ?? []), m])
     return g
   }, [modulos])
-  const hermanos = porArea.get(activo.area) ?? []
 
   useEffect(() => {
     const atajo = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
+        setMenu(false)
         setPaleta((v) => !v)
       }
     }
@@ -39,23 +43,14 @@ export function Navegacion({
     <>
       <header className="navegacion">
         <div className="barra">
-          <div className="marca-menu" aria-hidden="true">Calculadora</div>
-          <div className="areas" role="tablist" aria-label="Ámbitos matemáticos">
-          {ORDEN.filter((a) => porArea.has(a)).map((a) => (
-            <button
-              key={a}
-              type="button"
-              role="tab"
-              aria-selected={a === activo.area}
-              title={AREAS[a]}
-              onClick={() => {
-                if (a !== activo.area) onElegir(porArea.get(a)![0].id)
-              }}
-            >
-              {AREAS_CORTAS[a]}
-            </button>
-          ))}
-          </div>
+          <button type="button" className="hamburguesa" aria-label="Menú de secciones" aria-expanded={menu} onClick={() => setMenu(true)}>
+            <span aria-hidden="true" />
+          </button>
+          <button type="button" className="ruta" title="Todas las secciones" onClick={() => setMenu(true)}>
+            <span className="ruta-area">{AREAS_CORTAS[activo.area]}</span>
+            <span className="ruta-sep" aria-hidden="true">›</span>
+            <span className="ruta-modulo">{activo.corto ?? activo.resumen}</span>
+          </button>
           <div className="navegacion-relleno" />
           <button type="button" className="buscar" onClick={() => setPaleta(true)} aria-label="Buscar módulo">
             <span className="buscar-icono" aria-hidden="true">⌕</span>
@@ -64,17 +59,20 @@ export function Navegacion({
           </button>
           {acciones}
         </div>
-
-        <nav className="modulos" aria-label={`Herramientas de ${AREAS_CORTAS[activo.area]}`}>
-          <div className="modulos-lista">
-            {hermanos.map((m) => (
-              <button key={m.id} type="button" aria-current={m.id === id} onClick={() => onElegir(m.id)}>
-                {m.corto ?? m.resumen}
-              </button>
-            ))}
-          </div>
-        </nav>
       </header>
+
+      {menu && (
+        <Cajon
+          areas={ORDEN.filter((a) => porArea.has(a)).map((a) => [a, porArea.get(a)!] as const)}
+          id={id}
+          exportar={exportar}
+          onCerrar={() => setMenu(false)}
+          onElegir={(x) => {
+            onElegir(x)
+            setMenu(false)
+          }}
+        />
+      )}
 
       {paleta && (
         <Paleta
@@ -88,6 +86,77 @@ export function Navegacion({
         />
       )}
     </>
+  )
+}
+
+/** Menú ☰: todas las áreas con sus módulos, en panel lateral; Esc o clic fuera lo cierra. */
+function Cajon({
+  areas,
+  id,
+  exportar,
+  onElegir,
+  onCerrar,
+}: {
+  areas: ReadonlyArray<readonly [Area, ModuloAny[]]>
+  id: string
+  exportar?: ReactNode
+  onElegir: (id: string) => void
+  onCerrar: () => void
+}) {
+  const caja = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const previo = document.activeElement as HTMLElement | null
+    const actual = caja.current?.querySelector<HTMLButtonElement>('[aria-current="true"]')
+    actual?.scrollIntoView({ block: 'center' })
+    actual?.focus()
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCerrar()
+    }
+    document.addEventListener('keydown', tecla)
+    return () => {
+      document.removeEventListener('keydown', tecla)
+      previo?.focus?.()
+    }
+  }, [])
+
+  return (
+    <div className="velo-cajon" role="presentation" onMouseDown={onCerrar}>
+      <nav ref={caja} className="cajon" aria-label="Secciones" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="cajon-cabeza">
+          <b>Calculadora</b>
+          <button type="button" className="cajon-cerrar" aria-label="Cerrar menú" onClick={onCerrar}>
+            ×
+          </button>
+        </div>
+        <div className="cajon-lista">
+          {areas.map(([a, mods]) => (
+            <section key={a}>
+              <h2 title={AREAS[a]}>{AREAS_CORTAS[a]}</h2>
+              <ul>
+                {mods.map((m) => (
+                  <li key={m.id}>
+                    <button type="button" aria-current={m.id === id} title={m.resumen} onClick={() => onElegir(m.id)}>
+                      {m.corto ?? m.resumen}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+        {exportar && (
+          <div
+            className="cajon-pie"
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest('button')) onCerrar()
+            }}
+          >
+            <h2>Exportar</h2>
+            {exportar}
+          </div>
+        )}
+      </nav>
+    </div>
   )
 }
 

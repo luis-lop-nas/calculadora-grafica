@@ -191,7 +191,7 @@ export default definir<S>({
   id: 'complejos',
   area: 'funciones',
   resumen: 'Variable compleja: coloreado del dominio',
-  corto: 'Complejos',
+  corto: 'Variable compleja',
   titulo: 'Variable <i>compleja</i>',
   entradilla: 'Una función de C en C no cabe en una gráfica: se pinta el plano con la fase y el módulo.',
   inicial: {

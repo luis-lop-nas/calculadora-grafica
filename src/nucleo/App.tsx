@@ -304,11 +304,15 @@ export default function App() {
                 Autogiro
               </button>
             )}
-            <button type="button" className="accion exportar-json" onClick={() => descargarEstado(estados, id)}>
-              JSON
+          </>
+        }
+        exportar={
+          <>
+            <button type="button" onClick={() => descargarEstado(estados, id)}>
+              Estado del módulo <small>JSON</small>
             </button>
-            <button type="button" className="accion exportar-json" onClick={() => descargarLecturas(id, lecturas)} disabled={!lecturas?.length}>
-              CSV
+            <button type="button" onClick={() => descargarLecturas(id, lecturas)} disabled={!lecturas?.length}>
+              Lecturas <small>CSV</small>
             </button>
           </>
         }

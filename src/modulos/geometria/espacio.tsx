@@ -277,7 +277,7 @@ export default definir<S>({
   id: 'espacio',
   area: 'geometria',
   resumen: 'Geometría en el espacio: superficies, sólidos y cortes',
-  corto: 'Espacio',
+  corto: 'Espacio 3D',
   titulo: 'Geometría en el <i>espacio</i>',
   entradilla: 'Superficies implícitas, planos, rectas, curvas, sólidos y la curva donde se cortan dos superficies.',
   inicial: {

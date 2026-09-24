@@ -95,8 +95,8 @@ export default definir<S>({
   id: 'espacios',
   area: 'algebra',
   resumen: 'Espacios métricos euclídeos y no euclídeos',
-  corto: 'Espacios y métricas',
-  titulo: 'Espacios y <i>métricas</i>',
+  corto: 'Espacios métricos',
+  titulo: 'Espacios <i>métricos</i>',
   entradilla: 'Compara distancias, bolas unidad y geometrías en espacios euclídeos y no euclídeos.',
   inicial: {
     metricaA: 'euclidea', metricaB: 'manhattan', comparar: true,

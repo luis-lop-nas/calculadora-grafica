@@ -69,7 +69,7 @@ export default definir<S>({
   id: 'estructuras',
   area: 'algebra',
   resumen: 'Grupos, anillos y cuerpos',
-  corto: 'Grupos y anillos',
+  corto: 'Grupos, anillos y cuerpos',
   titulo: 'Grupos, anillos y <i>cuerpos</i>',
   entradilla: 'La tabla de la operación es la estructura entera: todo lo demás se lee en ella.',
   inicial: { tipo: 'anillo', n: 12 },

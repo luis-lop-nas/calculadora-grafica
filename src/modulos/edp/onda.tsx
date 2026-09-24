@@ -591,7 +591,7 @@ export default definir<EstadoOnda>({
   id: 'onda',
   area: 'edp',
   resumen: 'Ecuación de onda en 1D, 2D y 3D',
-  corto: 'Onda 1D/2D/3D',
+  corto: 'Ecuación de onda',
   titulo: 'Ecuación de <i>onda</i>',
   entradilla: 'u_tt = c²Δu: la misma ecuación en una cuerda, una membrana y una caja, con sus dos condiciones iniciales.',
   inicial: {

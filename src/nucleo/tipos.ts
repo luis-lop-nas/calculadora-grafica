@@ -12,7 +12,7 @@ export const AREAS_CORTAS: Record<Area, string> = {
   cuantica: 'Cuántica',
   edp: 'EDP',
   edo: 'EDO',
-  campos: 'Campos',
+  campos: 'Cálculo vectorial',
   algebra: 'Álgebra',
   senales: 'Señales',
   mecanica: 'Mecánica',
@@ -22,16 +22,16 @@ export const AREAS_CORTAS: Record<Area, string> = {
 }
 
 export const AREAS: Record<Area, string> = {
-  funciones: 'Funciones y variable compleja',
+  funciones: 'Funciones, cálculo simbólico y variable compleja',
   geometria: 'Geometría con regla y compás, y en el espacio',
-  cuantica: 'Cuántica',
+  cuantica: 'Mecánica cuántica',
   edp: 'Ecuaciones en derivadas parciales',
   edo: 'Ecuaciones diferenciales ordinarias',
-  campos: 'Campos y superficies',
-  algebra: 'Álgebra y análisis funcional',
+  campos: 'Cálculo en varias variables y vectorial',
+  algebra: 'Álgebra lineal, estructuras y análisis funcional',
   senales: 'Señales y sistemas',
-  mecanica: 'Mecánica y medios continuos',
-  fisica: 'Electromagnetismo, óptica y térmica',
+  mecanica: 'Mecánica clásica y relatividad',
+  fisica: 'Electromagnetismo, ondas, óptica, termodinámica y unidades',
   estadistica: 'Probabilidad y estadística',
   numerico: 'Métodos numéricos',
 }

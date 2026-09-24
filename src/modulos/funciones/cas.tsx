@@ -100,7 +100,7 @@ export default definir<S>({
   id: 'cas',
   area: 'funciones',
   resumen: 'Cálculo simbólico: derivar, integrar, resolver, límites y Taylor',
-  corto: 'CAS',
+  corto: 'Cálculo simbólico',
   titulo: 'Cálculo <i>simbólico</i>',
   entradilla: 'Una orden por fila; el resultado exacto sale a la derecha.',
   inicial: {

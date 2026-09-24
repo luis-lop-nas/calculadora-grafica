@@ -52,9 +52,9 @@ function Panel({ s, set }: PropsPanel<S>) {
 
 export default definir<S>({
   id: 'unidades',
-  area: 'algebra',
+  area: 'fisica',
   resumen: 'Unidades físicas y análisis dimensional',
-  corto: 'Unidades',
+  corto: 'Unidades y magnitudes',
   titulo: 'Unidades y <i>magnitudes</i>',
   entradilla: 'Convierte magnitudes físicas sin mezclar dimensiones incompatibles.',
   inicial: { familia: 'longitud', desde: 'm', hasta: 'km', valor: 1500 },

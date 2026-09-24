@@ -255,7 +255,7 @@ export default definir<EstadoControl>({
   id: 'control',
   area: 'senales',
   resumen: 'Sistemas LTI y control: escalón, Bode, Nyquist, lugar de las raíces, PID y Routh–Hurwitz',
-  corto: 'Control',
+  corto: 'Sistemas y control',
   titulo: 'Sistemas y <i>control</i>',
   entradilla: 'Escribe G(s), cierra el lazo, añade un PID y mira estabilidad, márgenes y respuesta.',
   inicial: { G: '10/(s*(s+2)*(s+5))', K: 1, cerrado: true, pid: false, Kp: 1, Ki: 0, Kd: 0, vista: 'escalon', tMax: 12 },

@@ -283,7 +283,7 @@ export default definir<S>({
   id: 'resolver',
   area: 'edo',
   resumen: 'Resolver una EDO escrita tal cual: fórmula cerrada, pasos y numérica',
-  corto: 'Resolver EDO',
+  corto: 'Resolver una EDO',
   titulo: 'Resolver una <i>EDO</i>',
   entradilla: 'Escribe la ecuación y sus condiciones: la clasifica, la resuelve con pasos y la dibuja.',
   inicial: {

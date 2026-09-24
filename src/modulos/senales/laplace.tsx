@@ -241,7 +241,7 @@ export default definir<EstadoLaplaceT>({
   id: 'transformada-laplace',
   area: 'senales',
   resumen: 'Transformada de Laplace, su inversa por fracciones simples y EDO lineales con condiciones iniciales',
-  corto: 'Laplace',
+  corto: 'Transformada de Laplace',
   titulo: 'Transformada de <i>Laplace</i>',
   entradilla: 'Con pasos. Cada resultado se comprueba con la integral ∫₀^∞ f e^{−st} dt.',
   inicial: { modo: 'edo', f: 't*exp(-2t)', F: '(s+3)/(s^2+2s+5)', edo: "y''+3y'+2y=exp(-t)", ci: "y(0)=1, y'(0)=0", tMax: 10 },

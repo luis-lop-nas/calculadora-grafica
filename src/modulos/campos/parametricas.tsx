@@ -189,7 +189,7 @@ export default definir<S>({
   id: 'parametricas',
   area: 'campos',
   resumen: 'Superficies paramétricas r(u, v)',
-  corto: 'Paramétricas',
+  corto: 'Superficies paramétricas',
   titulo: 'Superficies <i>paramétricas</i>',
   entradilla: 'Dos parámetros y tres funciones: la carta que convierte un rectángulo en una superficie.',
   inicial: {

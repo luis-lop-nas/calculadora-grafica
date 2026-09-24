@@ -211,7 +211,7 @@ export default definir<EstadoLaplace>({
   id: 'laplace',
   area: 'edp',
   resumen: 'Laplace: problema de Dirichlet',
-  corto: 'Laplace',
+  corto: 'Ecuación de Laplace',
   titulo: 'Ecuación de <i>Laplace</i>',
   entradilla: 'Δu = 0 con el valor prescrito en el borde: la solución más lisa que lo cumple.',
   inicial: { dominio: 'disco', dato: 'escalon', modo: 2, terminos: 40, expr: 'cos(3*t)+sin(t)/2', alambre: false, sonda: [0.25, -0.2] },

@@ -249,7 +249,7 @@ export default definir<EstadoRelatividad>({
   id: 'relatividad',
   area: 'mecanica',
   resumen: 'Relatividad especial: diagrama de Minkowski, simultaneidad, dilatación, contracción, gemelos y composición de velocidades',
-  corto: 'Relatividad',
+  corto: 'Relatividad especial',
   titulo: 'Relatividad <i>especial</i>',
   entradilla: 'Diagrama de Minkowski con un sistema que se mueve: arrastra los sucesos y el eje t′.',
   inicial: {

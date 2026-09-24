@@ -144,7 +144,7 @@ export default definir<S>({
   id: 'subespacios',
   area: 'algebra',
   resumen: 'Subespacios y proyección ortogonal',
-  corto: 'Subespacios',
+  corto: 'Subespacios y proyección',
   titulo: 'Subespacios y <i>proyección</i>',
   entradilla: 'La proyección es el punto del subespacio más cercano a w; el resto es perpendicular.',
   inicial: {

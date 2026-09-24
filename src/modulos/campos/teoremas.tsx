@@ -355,7 +355,7 @@ export default definir<EstadoTeoremas>({
   id: 'teoremas',
   area: 'campos',
   resumen: 'Teoremas integrales: Green, divergencia en el plano, Stokes y Gauss, con los dos lados calculados por separado',
-  corto: 'Green, Stokes, Gauss',
+  corto: 'Teoremas integrales',
   titulo: 'Teoremas <i>integrales</i>',
   entradilla: 'Escribe el campo y la curva, superficie o sólido: la integral del borde y la del interior salen por caminos distintos.',
   inicial: {

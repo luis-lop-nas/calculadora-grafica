@@ -188,7 +188,7 @@ export default definir<EstadoSegundo>({
   id: 'segundoorden',
   area: 'edo',
   resumen: 'Segundo orden: valor inicial y de contorno',
-  corto: 'Segundo orden',
+  corto: 'Segundo orden y contorno',
   titulo: 'Segundo <i>orden</i>',
   entradilla: 'y″ = f(t, y, y′): dos datos en un punto, o uno en cada extremo.',
   inicial: {

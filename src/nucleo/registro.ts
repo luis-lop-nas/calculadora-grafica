@@ -56,7 +56,7 @@ import termodinamica from '../modulos/fisica/termodinamica'
  * de la más potente a la más concreta.
  */
 export const MODULOS: ModuloAny[] = [
-  matrices, aplicaciones, subespacios, hilbert, estructuras, espacios, unidades,
+  matrices, aplicaciones, subespacios, hilbert, estructuras, espacios,
   geometria, espacio,
   grafica, complejos, cas,
   resolver, campo, segundoorden, fases,
@@ -64,6 +64,6 @@ export const MODULOS: ModuloAny[] = [
   superficies, parametricas, vectorial, teoremas,
   fourier, transformadaF, convolucionM, laplaceT, control, circuito, filtros,
   lagrangiano, orbitas, oscilaciones, solido, relatividad,
-  electrostatica, magnetostatica, ondas, difraccion, geometrica, termodinamica,
+  electrostatica, magnetostatica, ondas, difraccion, geometrica, termodinamica, unidades,
   orbitales, paquete, pozo,
 ]

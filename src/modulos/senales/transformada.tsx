@@ -291,7 +291,7 @@ export default definir<EstadoTransformada>({
   id: 'transformada',
   area: 'senales',
   resumen: 'Transformada de Fourier, muestreo, aliasing y DFT con ventanas',
-  corto: 'Transformada y muestreo',
+  corto: 'Transformada de Fourier',
   titulo: 'Transformada de <i>Fourier</i>',
   entradilla: 'Espectro continuo de una señal escrita, qué le hace el muestreo y cómo lo ve la DFT.',
   inicial: { expr: 'cos(2*pi*3*t)*exp(-t^2)', L: 5, modo: 'espectro', nuMax: 5, fs: 5, ventana: 'hann', Nd: 64, ver: 'modulo' },

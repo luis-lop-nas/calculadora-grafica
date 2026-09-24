@@ -606,7 +606,7 @@ export default definir<EstadoCalor>({
   id: 'calor',
   area: 'edp',
   resumen: 'Ecuación del calor en 1D, 2D y 3D',
-  corto: 'Calor 1D/2D/3D',
+  corto: 'Ecuación del calor',
   titulo: 'Ecuación del <i>calor</i>',
   entradilla: 'u_t = kΔu: cada modo se apaga como e^(−kλt), y el más alto se va primero.',
   inicial: {

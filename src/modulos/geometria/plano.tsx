@@ -468,7 +468,7 @@ export default definir<S>({
   id: 'geometria',
   area: 'geometria',
   resumen: 'Geometría con regla y compás',
-  corto: 'Plano',
+  corto: 'Regla y compás',
   titulo: 'Regla y <i>compás</i>',
   entradilla: 'Construcciones que se mantienen al mover los puntos libres.',
   inicial: {

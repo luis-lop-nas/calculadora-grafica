@@ -616,7 +616,7 @@ export default definir<S>({
   id: 'edp-propia',
   area: 'edp',
   resumen: 'Escribe tu EDP: calor, ondas, transporte, reacción–difusión y Poisson en 1D y 2D',
-  corto: 'Tu EDP',
+  corto: 'Escribe tu EDP',
   titulo: 'Escribe tu <i>EDP</i>',
   entradilla: 'La ecuación, el contorno y el dato inicial, tal cual: la resuelve y la anima. Un clic deja caer una gota.',
   inicial: {

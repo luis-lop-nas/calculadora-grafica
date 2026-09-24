@@ -186,7 +186,7 @@ export default definir<S>({
   id: 'superficies',
   area: 'campos',
   resumen: 'Superficies z = f(x, y) y plano tangente',
-  corto: 'Superficies',
+  corto: 'Superficies z = f(x, y)',
   titulo: 'Superficies y <i>tangentes</i>',
   entradilla: 'Las dos curvas que pasan por P dan las derivadas parciales; sus tangentes generan el plano.',
   inicial: {
