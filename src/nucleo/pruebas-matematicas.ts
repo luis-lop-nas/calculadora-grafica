@@ -50,51 +50,8 @@ import { analizarFilas, asintotas, ceros, extremos, inflexiones, integral as int
 
 declare const process: { exitCode?: number }
 
-let total = 0
-let fallos = 0
-const problemas: string[] = []
-
-/** Compara en relativo: para lo que se calcula con diferencias finitas. */
-function parecido(nombre: string, v: number, esperado: number, rel = 1e-4) {
-  total++
-  const escala = Math.max(Math.abs(esperado), 1e-12)
-  if (!Number.isFinite(v) || Math.abs(v - esperado) / escala > rel) {
-    fallos++
-    problemas.push(`${nombre}: ${v} ≠ ${esperado} (error relativo ${(Math.abs(v - esperado) / escala).toExponential(2)})`)
-  }
-}
-
-function cerca(nombre: string, v: number, esperado: number, tol = 1e-6) {
-  total++
-  if (!Number.isFinite(v) || Math.abs(v - esperado) > tol) {
-    fallos++
-    problemas.push(`${nombre}: ${v} ≠ ${esperado} (tolerancia ${tol})`)
-  }
-}
-
-function cierto(nombre: string, cond: boolean, detalle = '') {
-  total++
-  if (!cond) {
-    fallos++
-    problemas.push(`${nombre}${detalle ? ': ' + detalle : ''}`)
-  }
-}
-
-function seccion(t: string) {
-  console.log(`\n── ${t}`)
-}
-
-/** Saca el número de una fila de lecturas del módulo. */
-function lectura(filas: Array<[string, string]>, etiqueta: string): number {
-  const f = filas.find((x) => x[0] === etiqueta)
-  if (!f) {
-    problemas.push(`no existe la lectura «${etiqueta}»`)
-    fallos++
-    total++
-    return NaN
-  }
-  return parseFloat(f[1].replace(',', '.'))
-}
+import { cerca, cierto, cuenta, lectura, parecido, seccion } from './pruebas/comun'
+import { pruebasBase } from './pruebas/base'
 
 /* ═══════════ funciones especiales ═══════════ */
 seccion('Funciones especiales')
@@ -1507,6 +1464,8 @@ seccion('Espacio: sólidos, filas y curvas de corte')
 }
 
 
+pruebasBase()
+
 /* ═══════════ Asas: soltar un asa donde está no cambia nada ═══════════ */
 seccion('Asas: ida y vuelta en todos los módulos')
 {
@@ -1539,10 +1498,10 @@ seccion('Asas: ida y vuelta en todos los módulos')
 
 /* ═══════════ resumen ═══════════ */
 console.log('')
-if (fallos === 0) {
-  console.log(`✓ ${total} comprobaciones matemáticas en verde`)
+if (cuenta.fallos === 0) {
+  console.log(`✓ ${cuenta.total} comprobaciones matemáticas en verde`)
 } else {
-  console.log(`✗ ${fallos} de ${total} comprobaciones fallan:\n`)
-  for (const p of problemas) console.log('  · ' + p)
+  console.log(`✗ ${cuenta.fallos} de ${cuenta.total} comprobaciones fallan:\n`)
+  for (const p of cuenta.problemas) console.log('  · ' + p)
   process.exitCode = 1
 }

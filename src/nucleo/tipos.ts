@@ -3,6 +3,7 @@ import type { Escena3D } from '../render/escena3d'
 import type { Pintor2D } from '../render/pintor2d'
 
 export type Area = 'funciones' | 'geometria' | 'cuantica' | 'edp' | 'edo' | 'campos' | 'algebra'
+  | 'senales' | 'mecanica' | 'fisica' | 'estadistica' | 'numerico'
 
 /** Nombre corto para las pestañas; el largo solo aparece donde hay sitio. */
 export const AREAS_CORTAS: Record<Area, string> = {
@@ -13,6 +14,11 @@ export const AREAS_CORTAS: Record<Area, string> = {
   edo: 'EDO',
   campos: 'Campos',
   algebra: 'Álgebra',
+  senales: 'Señales',
+  mecanica: 'Mecánica',
+  fisica: 'Física',
+  estadistica: 'Estadística',
+  numerico: 'Numérico',
 }
 
 export const AREAS: Record<Area, string> = {
@@ -23,6 +29,11 @@ export const AREAS: Record<Area, string> = {
   edo: 'Ecuaciones diferenciales ordinarias',
   campos: 'Campos y superficies',
   algebra: 'Álgebra y análisis funcional',
+  senales: 'Señales y sistemas',
+  mecanica: 'Mecánica y medios continuos',
+  fisica: 'Electromagnetismo, óptica y térmica',
+  estadistica: 'Probabilidad y estadística',
+  numerico: 'Métodos numéricos',
 }
 
 /** Lo que el panel izquierdo recibe para pintar sus controles. */

@@ -11,33 +11,8 @@ import { mkdirSync } from 'node:fs'
 const DIR = process.env.TIROS ?? 'comprobar/tiros'
 const URL = process.env.URL ?? 'http://localhost:5173/'
 
-const MODULOS = [
-  ['grafica', 'Gráficas: funciones, curvas, regiones y deslizadores'],
-  ['complejos', 'Variable compleja: coloreado del dominio'],
-  ['cas', 'Cálculo simbólico: derivar, integrar, resolver, límites y Taylor'],
-  ['geometria', 'Geometría con regla y compás'],
-  ['espacio', 'Geometría en el espacio: superficies, sólidos y cortes'],
-  ['orbitales', 'Orbitales y estados ligados 3D'],
-  ['paquete', 'Paquete de ondas y dispersión'],
-  ['pozo', 'Pozos, barrera y efecto túnel'],
-  ['edp-propia', 'Escribe tu EDP'],
-  ['onda', 'Ecuación de onda en 1D, 2D y 3D'],
-  ['calor', 'Ecuación del calor en 1D, 2D y 3D'],
-  ['laplace', 'Laplace: problema de Dirichlet'],
-  ['resolver', 'Resolver una EDO escrita tal cual'],
-  ['campo', 'Campo de direcciones y′ = f(x, y)'],
-  ['segundoorden', 'Segundo orden: valor inicial y de contorno'],
-  ['fases', 'Retrato de fase de sistemas 2×2'],
-  ['superficies', 'Superficies z = f(x, y) y plano tangente'],
-  ['parametricas', 'Superficies paramétricas r(u, v)'],
-  ['vectorial', 'Campos vectoriales, divergencia y rotacional'],
-  ['aplicaciones', 'Aplicaciones lineales en R³'],
-  ['subespacios', 'Subespacios y proyección ortogonal'],
-  ['hilbert', 'Bases de Hilbert y aproximación'],
-  ['estructuras', 'Grupos, anillos y cuerpos'],
-  ['espacios', 'Espacios métricos euclídeos y no euclídeos'],
-  ['unidades', 'Unidades físicas y análisis dimensional'],
-]
+// Solo estos módulos (separados por comas); sin SOLO se recorren todos.
+const SOLO = process.env.SOLO ? new Set(process.env.SOLO.split(',')) : null
 
 mkdirSync(DIR, { recursive: true })
 
@@ -63,15 +38,21 @@ await p.evaluate(() => {
 await p.reload({ waitUntil: 'networkidle' })
 await p.waitForTimeout(900)
 
-for (const [id, nombre] of MODULOS) {
+// La lista sale de la propia paleta (⌘K vacía), así un módulo nuevo nunca se queda sin recorrer.
+await p.keyboard.press('Meta+k')
+await p.waitForTimeout(200)
+const TODOS = await p.$$eval('.paleta li[id^="modulo-"]', (lis) => lis.map((li) => li.id.slice('modulo-'.length)))
+await p.keyboard.press('Escape')
+const MODULOS = TODOS.filter((id) => !SOLO || SOLO.has(id))
+console.log(`${MODULOS.length} de ${TODOS.length} módulos`)
+
+for (const id of MODULOS) {
   const antes = errores.length
   await p.keyboard.press('Meta+k')
   await p.waitForTimeout(150)
-  await p.fill('.paleta input', nombre)
-  await p.waitForTimeout(250)
-  const primero = await p.$('.paleta li')
+  const primero = await p.$(`.paleta li#modulo-${id}`)
   if (!primero) {
-    errores.push(`[paleta] sin resultados para ${id}`)
+    errores.push(`[paleta] no aparece ${id}`)
     await p.keyboard.press('Escape')
     continue
   }

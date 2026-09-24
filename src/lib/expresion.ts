@@ -84,6 +84,24 @@ const UNARIAS: Record<string, (x: number) => number> = {
   sqrt: Math.sqrt, raiz: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs,
   sign: Math.sign, sgn: Math.sign, floor: Math.floor, ceil: Math.ceil, round: Math.round, trunc: Math.trunc,
   gamma, erf, fact: factorial,
+  // Señales. En los saltos valen la media de los dos lados (H(0) = ½), que es a donde converge Fourier.
+  heaviside: (x) => (x > 0 ? 1 : x < 0 ? 0 : 0.5),
+  escalon: (x) => (x > 0 ? 1 : x < 0 ? 0 : 0.5),
+  rect: (x) => (Math.abs(x) < 0.5 ? 1 : Math.abs(x) === 0.5 ? 0.5 : 0),
+  tri: (x) => Math.max(0, 1 - Math.abs(x)),
+  // sinc normalizada, la de señales: sin(πx)/(πx)
+  sinc: (x) => (x === 0 ? 1 : Math.sin(Math.PI * x) / (Math.PI * x)),
+  // periódicas de periodo 2π, como sin: cuadrada = sgn(sin x), sierra = x/π en (−π, π), triangular = 1 − 2|x|/π en [−π, π]
+  cuadrada: (x) => Math.sign(Math.sin(x)),
+  sierra: (x) => {
+    const r = x / (2 * Math.PI) + 0.5
+    const f = r - Math.floor(r)
+    return f === 0 ? 0 : 2 * f - 1
+  },
+  triangular: (x) => {
+    const r = x / (2 * Math.PI) + 0.5
+    return 1 - 2 * Math.abs(2 * (r - Math.floor(r)) - 1)
+  },
 }
 
 /** Funciones de más de un argumento: [mínimo, máximo] de argumentos y cómo se evalúan. */

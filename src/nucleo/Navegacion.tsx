@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AREAS, AREAS_CORTAS, type Area, type ModuloAny } from './tipos'
 
-const ORDEN: Area[] = ['funciones', 'geometria', 'cuantica', 'edp', 'edo', 'campos', 'algebra']
+const ORDEN: Area[] = ['funciones', 'geometria', 'cuantica', 'edp', 'edo', 'campos', 'algebra', 'senales', 'mecanica', 'fisica', 'estadistica', 'numerico']
 
 export function Navegacion({
   modulos,

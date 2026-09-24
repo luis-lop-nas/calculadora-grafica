@@ -12,7 +12,8 @@
     "mate": "tsx src/nucleo/pruebas-matematicas.ts",
     "app": "npm run build && env -u ELECTRON_RUN_AS_NODE electron .",
     "app:dev": "node electron/dev.mjs",
-    "app:empaquetar": "npm run build && electron-builder --mac dir"
+    "app:empaquetar": "npm run build && electron-builder --mac dir",
+    "comprobar:app": "npm run build && node comprobar/app.mjs"
   },
   "dependencies": {
     "katex": "^0.16.11",

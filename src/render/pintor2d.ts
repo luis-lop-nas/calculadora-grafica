@@ -195,6 +195,41 @@ export class Pintor2D {
 
   /** Curva de y = f(x) muestreada en la ventana visible. */
   /** Rectángulo de fondo para distinguir una región de otra. */
+  /** Polígono relleno en coordenadas del mundo (áreas, regiones críticas). */
+  rellenar(pts: Array<[number, number]>, color: string, opacidad = 0.25) {
+    if (pts.length < 3) return
+    const { ctx } = this
+    ctx.save()
+    ctx.globalAlpha = opacidad
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.moveTo(this.X(pts[0][0]), this.Y(pts[0][1]))
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(this.X(pts[i][0]), this.Y(pts[i][1]))
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+  }
+
+  /** Barras de histograma o de función de masa: una por `x` con su altura y anchura en unidades del mundo. */
+  barras(xs: ArrayLike<number>, alturas: ArrayLike<number>, ancho: number, color: string, opacidad = 0.55) {
+    const { ctx } = this
+    ctx.save()
+    ctx.fillStyle = color
+    ctx.strokeStyle = color
+    ctx.lineWidth = 1
+    for (let i = 0; i < xs.length; i++) {
+      const x0 = this.X(xs[i] - ancho / 2)
+      const x1 = this.X(xs[i] + ancho / 2)
+      const y0 = this.Y(0)
+      const y1 = this.Y(alturas[i])
+      ctx.globalAlpha = opacidad
+      ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0))
+      ctx.globalAlpha = 1
+      ctx.strokeRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0))
+    }
+    ctx.restore()
+  }
+
   fondoRegion(color: string) {
     this.ctx.save()
     this.ctx.fillStyle = color
