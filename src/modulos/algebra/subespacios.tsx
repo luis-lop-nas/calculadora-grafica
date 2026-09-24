@@ -1,6 +1,6 @@
 import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
 import { Boton, Grupo, Interruptor, Matriz, Muestra, Nota } from '../../nucleo/controles'
-import { cruz, gramSchmidt, norma, producto, proyectar, rango } from '../../lib/matrices'
+import { cruz, gramSchmidt, norma, nucleo, producto, proyectar, rango } from '../../lib/matrices'
 
 interface S {
   V: number[][] // dos generadores y el vector a proyectar
@@ -26,6 +26,22 @@ function piezasDe(V: number[][]) {
 
 function piezas(s: S) {
   return piezasDe(s.V)
+}
+
+/**
+ * W₁ ∩ W₂ y W₁ + W₂: la suma la generan todos los vectores juntos; la
+ * intersección sale del núcleo de (G₁ | −G₂), que da las combinaciones de W₁
+ * que también lo son de W₂. Grassmann: dim(W₁+W₂) = dim W₁ + dim W₂ − dim(W₁∩W₂).
+ */
+export function sumaEInterseccion(G1: number[][], G2: number[][]) {
+  const d1 = rango(G1)
+  const d2 = rango(G2)
+  const dSuma = rango([...G1, ...G2])
+  // columnas: los generadores de W₁ y los de W₂ cambiados de signo
+  const M = [0, 1, 2].map((c) => [...G1.map((v) => v[c]), ...G2.map((v) => -v[c])])
+  const ker = nucleo(M)
+  const inter = gramSchmidt(ker.map((k) => [0, 1, 2].map((c) => G1.reduce((acc, v, i) => acc + k[i] * v[c], 0))).filter((v) => norma(v) > 1e-9))
+  return { d1, d2, dSuma, dInter: inter.length, inter }
 }
 
 function Panel({ s, set }: PropsPanel<S>) {
@@ -178,6 +194,17 @@ export default definir<S>({
     if (nw > 1e-9 && np > 1e-9)
       filas.push(['Ángulo w–W', `${((Math.acos(Math.min(1, np / nw)) * 180) / Math.PI).toFixed(2)}°`])
     base.forEach((u, i) => filas.push([`u${i + 1}`, `(${u.map((c) => c.toFixed(3)).join(', ')})`]))
+    if (s.verSegundo) {
+      const si = sumaEInterseccion(s.V.slice(0, 2), s.V2)
+      filas.push(
+        ['dim W₂', `${si.d2}`],
+        ['dim (W₁ + W₂)', `${si.dSuma}`],
+        ['dim (W₁ ∩ W₂)', `${si.dInter}`],
+        ['Grassmann', `${si.dSuma} = ${si.d1} + ${si.d2} − ${si.dInter} ${si.dSuma === si.d1 + si.d2 - si.dInter ? '✓' : '✗'}`],
+        ['¿Suma directa?', si.dInter === 0 ? 'sí: W₁ ∩ W₂ = {0}' : 'no'],
+      )
+      si.inter.forEach((u, i) => filas.push([`base de W₁ ∩ W₂ (${i + 1})`, `(${u.map((c) => c.toFixed(3)).join(', ')})`]))
+    }
     return filas
   },
   leyenda: (s) => (
@@ -186,6 +213,7 @@ export default definir<S>({
       <Muestra color="var(--ink)">w</Muestra>
       <Muestra color="var(--pos)">proyección P_W w</Muestra>
       {s.verResiduo && <Muestra color="var(--aux)">residuo ⊥ W</Muestra>}
+      {s.verSegundo && <Muestra color="var(--rosa)">W₁ ∩ W₂</Muestra>}
     </>
   ),
   vista: {
@@ -246,6 +274,13 @@ export default definir<S>({
           e.linea([[-u[0] * k2, -u[1] * k2, -u[2] * k2], [u[0] * k2, u[1] * k2, u[2] * k2]], otro, 0.9)
         }
         for (const u of base2) e.flecha(u as [number, number, number], otro, [0, 0, 0], 0.009)
+        // la intersección, en tinta gruesa
+        const { inter } = sumaEInterseccion(s.V.slice(0, 2), s.V2)
+        if (inter.length === 1) {
+          const u = inter[0]
+          const k3 = 1.9
+          e.linea([[-u[0] * k3, -u[1] * k3, -u[2] * k3], [u[0] * k3, u[1] * k3, u[2] * k3]], e.color('--rosa'), 1)
+        }
       }
 
       // generadores originales, en gris

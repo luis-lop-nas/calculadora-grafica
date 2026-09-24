@@ -24,6 +24,7 @@ function detNum(A0: number[][]): number {
 }
 import { generador } from '../../lib/azar'
 import { cerca, cierto, seccion } from './comun'
+import { sumaEInterseccion } from '../../modulos/algebra/subespacios'
 
 export function pruebasAlgebra() {
   seccion('Álgebra · matrices exactas paso a paso')
@@ -96,6 +97,17 @@ export function pruebasAlgebra() {
   const irr = X.autovalores(M([[1, 2], [3, 4]])).valores
   cierto('(1 2; 3 4): λ = 5/2 ± √33/2 con radicales', irr.map((v) => v.tex).join(' | ') === '\\frac{5}{2} - \\frac{\\sqrt{33}}{2} | \\frac{5}{2} + \\frac{\\sqrt{33}}{2}', irr.map((v) => v.tex).join(' | '))
   cierto('polinomio característico de (2 0 0; 0 3 4; 0 4 9): λ³ − 14λ² + 35λ − 22', X.texPolinomio(X.polinomioCaracteristico(M([[2, 0, 0], [0, 3, 4], [0, 4, 9]]))) === '\\lambda^{3} - 14\\lambda^{2} + 35\\lambda - 22')
+  // subespacios: Grassmann y la intersección
+  {
+    const r1 = sumaEInterseccion([[1, 0, 0], [0, 1, 0]], [[1, 0, 1], [0, 0, 1]])
+    cierto('plano xy y plano xz: dim suma 3, intersección 1', r1.dSuma === 3 && r1.dInter === 1 && r1.d1 + r1.d2 - r1.dInter === r1.dSuma)
+    cierto('plano xy ∩ plano xz = eje x', r1.inter.length === 1 && Math.abs(Math.abs(r1.inter[0][0]) - 1) < 1e-12)
+    const r2 = sumaEInterseccion([[1, 2, 0], [0, 1, 1]], [[1, 3, 1], [2, 5, 1]])
+    cierto('el mismo plano con otros generadores: intersección = el plano', r2.dInter === 2 && r2.dSuma === 2)
+    const r3 = sumaEInterseccion([[1, 0, 0], [2, 0, 0]], [[0, 1, 0], [0, 0, 1]])
+    cierto('una recta (generadores repetidos) y el plano yz: suma directa ℝ³', r3.d1 === 1 && r3.dInter === 0 && r3.dSuma === 3)
+    for (const u of r1.inter) cerca('el vector de W₁ ∩ W₂ tiene y = 0 (está en xz) y z = 0 (está en xy)', Math.abs(u[1]) + Math.abs(u[2]), 0, 1e-12)
+  }
   // SVD: los σ² son los autovalores de AᵀA; QR: Q ortonormal y QR = A
   const An = [[3, 0], [4, 5], [1, 2]]
   const sv = X.svd(An)

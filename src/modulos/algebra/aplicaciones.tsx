@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
 import { Atajos, Boton, Grupo, Interruptor, Matriz, Muestra, Nota, Rango, Segmentado } from '../../nucleo/controles'
-import { aplicar, autovalores3, autovector, det, nucleo, rango, traza } from '../../lib/matrices'
+import { aplicar, autovalores3, autovector, det, nucleo, raicesPolinomio, rango, traza } from '../../lib/matrices'
 import { divergente } from '../../render/tema'
 
 type Objeto = 'cubo' | 'esfera' | 'rejilla'
@@ -222,7 +222,19 @@ export default definir<S>({
       ['Orientación', d > 1e-9 ? 'se conserva' : d < -1e-9 ? 'se invierte' : 'se pierde'],
     ]
     lam.forEach((l, i) => filas.push([`λ${i + 1} (real)`, l.toFixed(5)]))
-    if (lam.length < 3) filas.push(['Autovalores reales', `${lam.length} de 3 (el resto, complejos)`])
+    if (lam.length < 3) {
+      // polinomio característico λ³ − tr λ² + c₁ λ − det, con c₁ la suma de los menores principales 2×2
+      const A = s.A
+      const c1 = A[0][0] * A[1][1] - A[0][1] * A[1][0] + A[0][0] * A[2][2] - A[0][2] * A[2][0] + A[1][1] * A[2][2] - A[1][2] * A[2][1]
+      const par = raicesPolinomio([-d, c1, -traza(A), 1]).filter(([, im]) => im > 1e-9)[0]
+      if (par) {
+        const [re, im] = par
+        filas.push(
+          ['λ complejos', `${re.toFixed(5)} ± ${im.toFixed(5)}i`],
+          ['En su plano invariante', `gira ${((Math.atan2(im, re) * 180) / Math.PI).toFixed(2)}° y escala × ${Math.hypot(re, im).toFixed(5)}`],
+        )
+      }
+    }
     ker.forEach((v, i) => filas.push([`ker ${i + 1}`, `(${v.map((c) => c.toFixed(2)).join(', ')})`]))
     return filas
   },
