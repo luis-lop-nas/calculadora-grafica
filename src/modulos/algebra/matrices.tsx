@@ -85,6 +85,9 @@ function EditorMatriz({ T, onChange, nombre, malas, derecha, onDerecha }: {
   const m = T.length
   const n = T[0]?.length ?? 0
   const mala = (i: number, j: number) => malas.some(([a, b]) => a === i && b === j)
+  // que quepan hasta 6 columnas (7 con b) en el panel
+  const columnas = n + (derecha ? 1 : 0)
+  const ancho = columnas <= 4 ? 54 : columnas === 5 ? 46 : columnas === 6 ? 39 : 34
   const celda = (valor: string, cambia: (v: string) => void, error: boolean, clave: string) => (
     <div className="celda" key={clave}>
       <input
@@ -111,7 +114,7 @@ function EditorMatriz({ T, onChange, nombre, malas, derecha, onDerecha }: {
       <div className="matriz-marco" style={{ overflowX: 'auto' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           {T.map((f, i) => (
-            <div key={i} className="celdas" style={{ gridTemplateColumns: `repeat(${n}, 54px)${derecha ? ' 8px 54px' : ''}` }}>
+            <div key={i} className="celdas" style={{ gridTemplateColumns: `repeat(${n}, ${ancho}px)${derecha ? ` 8px ${ancho}px` : ''}` }}>
               {f.map((v, j) => celda(v, (x) => onChange(T.map((g, a) => (a === i ? g.map((w, b) => (b === j ? x : w)) : g))), mala(i, j), `${nombre}${i + 1}${j + 1}`))}
               {derecha && onDerecha && (
                 <>
