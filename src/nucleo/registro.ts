@@ -38,6 +38,8 @@ import control from '../modulos/senales/control'
 import circuito from '../modulos/senales/circuito'
 import filtros from '../modulos/senales/filtros'
 import lagrangiano from '../modulos/mecanica/lagrangiano'
+import orbitas from '../modulos/mecanica/orbitas'
+import oscilaciones from '../modulos/mecanica/oscilaciones'
 
 /** El orden de esta lista es el orden del menú. */
 export const MODULOS: ModuloAny[] = [
@@ -49,5 +51,5 @@ export const MODULOS: ModuloAny[] = [
   superficies, parametricas, vectorial,
   aplicaciones, subespacios, hilbert, estructuras, espacios, unidades,
   fourier, transformadaF, convolucionM, laplaceT, control, circuito, filtros,
-  lagrangiano,
+  lagrangiano, orbitas, oscilaciones,
 ]
