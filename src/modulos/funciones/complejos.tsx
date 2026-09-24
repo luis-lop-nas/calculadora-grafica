@@ -138,18 +138,27 @@ export default definir<S>({
     const z: K.C = [s.sonda[0][0], s.sonda[0][1]]
     const w = f(z)
     if (!Number.isFinite(w[0]) || !Number.isFinite(w[1])) return [['f(z₀)', 'no definido ahí']]
+    // diferencias centradas: el cociente incremental por las dos direcciones
     const h = 1e-5
-    const dx = K.div(K.resta(f([z[0] + h, z[1]]), w), [h, 0])
-    const dy = K.div(K.resta(f([z[0], z[1] + h]), w), [0, h])
+    const dx = K.div(K.resta(f([z[0] + h, z[1]]), f([z[0] - h, z[1]])), [2 * h, 0])
+    const dy = K.div(K.resta(f([z[0], z[1] + h]), f([z[0], z[1] - h])), [0, 2 * h])
     const desvio = K.abs(K.resta(dx, dy))
+    const holo = desvio < 1e-5 * (1 + K.abs(dx))
+    const texC = (c: K.C) => `${c[0].toFixed(4)} ${c[1] >= 0 ? '+' : '−'} ${Math.abs(c[1]).toFixed(4)}i`
     return [
       ['z₀', `${z[0].toFixed(3)} ${z[1] >= 0 ? '+' : '−'} ${Math.abs(z[1]).toFixed(3)}i`],
       ['f(z₀)', `${w[0].toFixed(4)} ${w[1] >= 0 ? '+' : '−'} ${Math.abs(w[1]).toFixed(4)}i`],
       ['|f(z₀)|', K.abs(w).toFixed(5)],
       ['arg f(z₀)', `${((K.arg(w) * 180) / Math.PI).toFixed(2)}°`],
-      ["f′(z₀)", `${dx[0].toFixed(4)} ${dx[1] >= 0 ? '+' : '−'} ${Math.abs(dx[1]).toFixed(4)}i`],
-      ['Desvío entre direcciones', desvio.toFixed(6)],
-      ['¿Holomorfa aquí?', desvio < 1e-3 * (1 + K.abs(dx)) ? 'sí, cumple Cauchy-Riemann' : 'no'],
+      ...(holo
+        ? ([["f′(z₀)", texC(dx)]] as Array<[string, string]>)
+        : ([
+            ['f′(z₀)', 'no existe: depende de la dirección'],
+            ['cociente en dirección real', texC(dx)],
+            ['cociente en dirección imaginaria', texC(dy)],
+          ] as Array<[string, string]>)),
+      ['Desvío entre direcciones', desvio.toExponential(2)],
+      ['¿Holomorfa aquí?', holo ? 'sí, cumple Cauchy-Riemann' : 'no'],
     ]
   },
   leyenda: (s) =>

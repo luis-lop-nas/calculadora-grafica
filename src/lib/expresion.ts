@@ -84,6 +84,8 @@ const UNARIAS: Record<string, (x: number) => number> = {
   sqrt: Math.sqrt, raiz: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs,
   sign: Math.sign, sgn: Math.sign, floor: Math.floor, ceil: Math.ceil, round: Math.round, trunc: Math.trunc,
   gamma, erf, fact: factorial,
+  // de variable compleja; con números reales se quedan en lo que valen ahí
+  conj: (x) => x, re: (x) => x, im: () => 0, arg: (x) => (x < 0 ? Math.PI : 0),
   // Señales. En los saltos valen la media de los dos lados (H(0) = ½), que es a donde converge Fourier.
   heaviside: (x) => (x > 0 ? 1 : x < 0 ? 0 : 0.5),
   escalon: (x) => (x > 0 ? 1 : x < 0 ? 0 : 0.5),

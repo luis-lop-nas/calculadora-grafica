@@ -111,14 +111,20 @@ function autovector2(A: Mat, l: number): Vec {
   return [v[0] / n, v[1] / n]
 }
 
-/** Clasificación del punto de equilibrio de x' = A x. */
-export function clasificar(A: Mat): { nombre: string; estable: 'estable' | 'inestable' | 'neutro' } {
+/**
+ * Clasificación del punto de equilibrio de x' = A x. `tol` es lo que se considera
+ * cero: con un jacobiano de diferencias finitas en un equilibrio hallado
+ * numéricamente conviene más holgura que con una matriz escrita a mano.
+ */
+export function clasificar(A: Mat, tol = 1e-9): { nombre: string; estable: 'estable' | 'inestable' | 'neutro' } {
   const t = traza(A)
   const d = det(A)
   const disc = t * t - 4 * d
-  if (Math.abs(d) < 1e-9) {
-    if (t > 1e-9) return { nombre: 'degenerado inestable (λ = 0 y λ > 0)', estable: 'inestable' }
-    if (t < -1e-9) return { nombre: 'degenerado estable (λ = 0 y λ < 0)', estable: 'estable' }
+  const escala = Math.max(1, ...A.flat().map(Math.abs))
+  const [tolD, tolT] = [tol * escala * escala, tol * escala]
+  if (Math.abs(d) < tolD) {
+    if (t > tolT) return { nombre: 'degenerado inestable (λ = 0 y λ > 0)', estable: 'inestable' }
+    if (t < -tolT) return { nombre: 'degenerado estable (λ = 0 y λ < 0)', estable: 'estable' }
     const tam = A.reduce((s, f) => s + f.reduce((q, v) => q + v * v, 0), 0)
     return tam < 1e-18
       ? { nombre: 'equilibrio completamente neutro', estable: 'neutro' }
@@ -126,12 +132,12 @@ export function clasificar(A: Mat): { nombre: string; estable: 'estable' | 'ines
   }
   if (d < 0) return { nombre: 'punto de silla', estable: 'inestable' }
   if (disc < 0) {
-    if (Math.abs(t) < 1e-9) return { nombre: 'centro', estable: 'neutro' }
+    if (Math.abs(t) < tolT) return { nombre: 'centro', estable: 'neutro' }
     return t < 0
       ? { nombre: 'foco estable (espiral)', estable: 'estable' }
       : { nombre: 'foco inestable (espiral)', estable: 'inestable' }
   }
-  if (Math.abs(disc) < 1e-9)
+  if (Math.abs(disc) < tolD)
     return t < 0
       ? { nombre: 'nodo impropio estable', estable: 'estable' }
       : { nombre: 'nodo impropio inestable', estable: 'inestable' }

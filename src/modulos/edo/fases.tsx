@@ -4,6 +4,18 @@ import { compilarSuave } from '../../lib/expresion'
 import { trayectoria } from '../../lib/numerico'
 import type { Pintor2D } from '../../render/pintor2d'
 import { auto2, clasificar, det, traza } from '../../lib/matrices'
+
+/**
+ * En un sistema no lineal la linealización solo decide si el equilibrio es
+ * hiperbólico; un centro o un caso degenerado pueden ser otra cosa.
+ */
+function clasificarNoLineal(J: number[][]) {
+  const c = clasificar(J, 1e-5)
+  if (c.nombre === 'centro') return { ...c, nombre: 'centro lineal (lo no lineal decide)' }
+  if (c.nombre.startsWith('degenerado') || c.nombre.startsWith('equilibrio completamente'))
+    return { nombre: 'no hiperbólico (λ = 0): la linealización no decide', estable: 'neutro' as const }
+  return c
+}
 import { contorno, equilibrios, jacobiano } from '../../lib/contorno'
 
 type Modo = 'lineal' | 'campo'
@@ -183,7 +195,7 @@ export default definir<S>({
     const filas: Array<[string, string]> = [['Equilibrios en [−6, 6]²', `${eqs.length}`]]
     for (const p of eqs.slice(0, 4)) {
       const J = jacobiano(f, g, p[0], p[1])
-      filas.push([`(${p[0].toFixed(2)}, ${p[1].toFixed(2)})`, clasificar(J).nombre])
+      filas.push([`(${p[0].toFixed(2)}, ${p[1].toFixed(2)})`, clasificarNoLineal(J).nombre])
     }
     return filas
   },
@@ -348,7 +360,7 @@ function planoDeFases(
         : equilibrios(f, q, marco, 60)
     for (const p of eqs) {
       const J = s.modo === 'lineal' ? s.A : jacobiano(f, q, p[0], p[1])
-      const c = clasificar(J)
+      const c = s.modo === 'lineal' ? clasificar(J) : clasificarNoLineal(J)
       const color =
         c.estable === 'estable' ? g.color('--neg') : c.estable === 'inestable' ? g.color('--pos') : g.color('--ink')
       g.punto(p[0], p[1], color, 6)
