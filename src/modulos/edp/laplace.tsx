@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, coords, radios } from '../../nucleo/menu'
 import { Expresion, Grupo, Interruptor, Muestra, Nota, Rango, Segmentado, Resultado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { divergente } from '../../render/tema'
@@ -216,6 +217,19 @@ export default definir<EstadoLaplace>({
   entradilla: 'Δu = 0 con el valor prescrito en el borde: la solución más lisa que lo cumple.',
   inicial: { dominio: 'disco', dato: 'escalon', modo: 2, terminos: 40, expr: 'cos(3*t)+sin(t)/2', alambre: false, sonda: [0.25, -0.2] },
   Panel,
+  capas: (s) => [
+    capaFija<EstadoLaplace>('pos', 'u > 0', '--pos'),
+    capaFija<EstadoLaplace>('neg', 'u < 0', '--neg'),
+    capaFija<EstadoLaplace>('sonda', 'Sonda (propiedad de la media)', '--ink', coords(s.sonda)),
+    capaVer(s, 'alambre', 'Malla de alambre', '--ink-soft'),
+  ],
+  menu: (s) => ({
+    acciones: [
+      radios<EstadoLaplace, Dominio>('Dominio', [{ v: 'rectangulo', t: 'Cuadrado' }, { v: 'disco', t: 'Disco' }], s.dominio, (dominio) => ({ dominio })),
+      radios<EstadoLaplace, Dato>('Dato en el borde', [{ v: 'seno', t: 'Armónico' }, { v: 'escalon', t: 'Escalón' }, { v: 'pulso', t: 'Pulso' }, { v: 'lineal', t: 'Lineal' }, { v: 'propia', t: 'El mío' }], s.dato, (dato) => ({ dato })),
+      accion<EstadoLaplace>('Sonda al centro', () => ({ sonda: [0, 0] })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({
     nombre: s.dominio === 'disco' ? 'Disco unidad' : 'Cuadrado unidad',

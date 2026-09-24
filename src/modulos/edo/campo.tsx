@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaVer, coords, radios } from '../../nucleo/menu'
 import { Atajos, Boton, Expresion, Grupo, Interruptor, Muestra, Rango, Segmentado, Resultado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { euler, rk2, rk4 } from '../../lib/numerico'
@@ -138,6 +139,23 @@ export default definir<S>({
   entradilla: 'Pulsa en el lienzo para lanzar una solución por ese punto.',
   inicial: { expr: 'y*(1-y)', h: 0.05, metodo: 'rk4', semillas: [[-3, 0.2]], verCampo: true, verIsoclinas: false },
   Panel,
+  capas: (s) => [
+    capaVer(s, 'verCampo', 'Campo de direcciones', '--ink-soft'),
+    capaVer(s, 'verIsoclinas', 'Isoclinas', '--aux'),
+    ...s.semillas.map((q, i) => ({ id: `S${i}`, nombre: `Solución por ${coords(q)}`, color: '--accent', quitar: (t: S) => ({ semillas: t.semillas.filter((_, k) => k !== i) }) })),
+  ],
+  menu: (s) => ({
+    anadir: [
+      accion<S>('Solución por (0, 1)', (t) => ({ semillas: [...t.semillas, [0, 1] as [number, number]] })),
+      accion<S>('Cinco soluciones en x = 0', (t) => ({ semillas: [...t.semillas, ...[-2, -1, 0, 1, 2].map((y) => [0, y] as [number, number])] })),
+    ],
+    ejemplos: EJEMPLOS.map((e) => ({ t: e.t, tipo: 'radio' as const, activo: s.expr === e.e, hacer: () => ({ expr: e.e, semillas: [] }) })),
+    acciones: [
+      radios<S, Metodo>('Método', [{ v: 'rk4', t: 'Runge–Kutta 4' }, { v: 'rk2', t: 'Punto medio (RK2)' }, { v: 'euler', t: 'Euler' }, { v: 'comparar', t: 'Comparar los tres' }], s.metodo, (metodo) => ({ metodo })),
+      radios<S, number>('Paso h', [0.01, 0.05, 0.1, 0.2, 0.5].map((v) => ({ v, t: String(v).replace('.', ',') })), s.h, (h) => ({ h })),
+      accion<S>('Borrar las soluciones', () => ({ semillas: [] }), !s.semillas.length),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: 'y′ = f(x, y)', apunte: `${s.semillas.length} curva(s)` }),
   formula: (s) => [

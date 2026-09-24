@@ -3,8 +3,8 @@ import { MODULOS } from './registro'
 import { Navegacion } from './Navegacion'
 import { Lienzo2D, Lienzo3D, type Enlace } from './lienzos'
 import { Formula, Lecturas, RanuraResultado } from './controles'
-import { AREAS_CORTAS, type ModuloAny, type Vista } from './tipos'
-import { escritorio, type Orden } from './escritorio'
+import { AREAS_CORTAS, type Capa, type EntradaMenu, type ModuloAny, type Vista } from './tipos'
+import { escritorio, type CapaMenu, type EntradaSerie, type Orden } from './escritorio'
 import { ContextoVista, guardarPrefs, leerPrefs, ordenVista, type OrdenVista, type PrefsVista } from './vista'
 import { HojaAtajos } from './Atajos'
 
@@ -21,6 +21,55 @@ function copiarImagen() {
         if (b) navigator.clipboard?.write?.([new ClipboardItem({ 'image/png': b })]).catch(() => {})
       }, 'image/png'),
   })
+}
+
+/** Color CSS (o variable del tema) a #rrggbb, pasando por un canvas que lo normaliza. */
+let lienzoColor: CanvasRenderingContext2D | null = null
+function resolverColor(c: string | undefined): string | null {
+  if (!c) return null
+  const valor = c.startsWith('--') ? getComputedStyle(document.documentElement).getPropertyValue(c).trim() : c
+  if (!valor) return null
+  lienzoColor ??= document.createElement('canvas').getContext('2d')
+  if (!lienzoColor) return null
+  lienzoColor.fillStyle = '#000'
+  lienzoColor.fillStyle = valor
+  const r = String(lienzoColor.fillStyle)
+  if (r.startsWith('#')) return r
+  const m = r.match(/[\d.]+/g)
+  return m && m.length >= 3 ? `#${m.slice(0, 3).map((x) => Math.round(+x).toString(16).padStart(2, '0')).join('')}` : null
+}
+
+const serieEntradas = (es: EntradaMenu<any>[] | undefined): EntradaSerie[] =>
+  (es ?? []).map((e) => ({
+    t: e.t,
+    tipo: e.tipo ?? 'accion',
+    activo: !!e.activo,
+    desactivado: !!e.desactivado,
+    ...(e.hijos ? { hijos: serieEntradas(e.hijos) } : {}),
+  }))
+
+const serieCapas = (cs: Capa<any>[]): CapaMenu[] =>
+  cs.map((c) => ({
+    id: c.id,
+    nombre: c.nombre,
+    color: resolverColor(c.color),
+    visible: c.alternar ? c.visible !== false : null,
+    alternable: !!c.alternar,
+    quitable: !!c.quitar,
+    ...(c.detalle ? { detalle: c.detalle } : {}),
+  }))
+
+/** Aplica una tras otra funciones de estado y junta los parches (para «solo esta», «mostrar todas»…). */
+function encadenar<S>(s: S, pasos: Array<(s: S) => Partial<S> | void>): Partial<S> {
+  let actual = s
+  let parche: Partial<S> = {}
+  for (const f of pasos) {
+    const p = f(actual)
+    if (!p) continue
+    actual = { ...actual, ...p }
+    parche = { ...parche, ...p }
+  }
+  return parche
 }
 
 interface Historia {
@@ -356,6 +405,32 @@ export default function App() {
         setCmp((c) => ({ ...c, ...(dato as Partial<Comparar>) }))
       }
     } else if (orden === 'atajos') setAtajos((v) => !v)
+    else if (orden === 'menuModulo' && dato && typeof dato === 'object') {
+      const { grupo, ruta } = dato as { grupo: 'anadir' | 'ejemplos' | 'acciones'; ruta: number[] }
+      let lista = moduloP.menu?.(s)?.[grupo]
+      let e: EntradaMenu<any> | undefined
+      for (const i of ruta) {
+        e = lista?.[i]
+        lista = e?.hijos
+      }
+      const p = e?.hacer?.(s)
+      if (p) set(p)
+    } else if (orden === 'capa' && dato && typeof dato === 'object') {
+      const { id: idCapa, op } = dato as { id?: string; op: 'alternar' | 'quitar' | 'solo' | 'todas' | 'ninguna' }
+      const cs = moduloP.capas?.(s) ?? []
+      const c = cs.find((x) => x.id === idCapa)
+      let p: Partial<any> | void = undefined
+      if (op === 'alternar') p = c?.alternar?.(s)
+      else if (op === 'quitar') p = c?.quitar?.(s)
+      else if (op === 'solo' && c)
+        p = encadenar(s, [
+          ...cs.filter((x) => x !== c && x.alternar && x.visible !== false).map((x) => x.alternar!),
+          ...(c.alternar && c.visible === false ? [c.alternar] : []),
+        ])
+      else if (op === 'todas') p = encadenar(s, cs.filter((x) => x.alternar && x.visible === false).map((x) => x.alternar!))
+      else if (op === 'ninguna') p = encadenar(s, cs.filter((x) => x.alternar && x.visible !== false).map((x) => x.alternar!))
+      if (p && Object.keys(p).length) set(p)
+    }
   }
 
   useEffect(() => {
@@ -370,6 +445,14 @@ export default function App() {
   const hayLienzo = vistaA.tipo !== 'html'
   const hayLecturas = !!lecturas?.length
   const hayFormula = !!formula?.length
+  // capas y entradas propias del módulo que se edita; se mandan como texto para no reconstruir el menú sin motivo
+  const capasMenu = JSON.stringify(serieCapas(moduloP.capas?.(s) ?? []))
+  const menuPropio = moduloP.menu?.(s)
+  const menuMenu = JSON.stringify({
+    anadir: serieEntradas(menuPropio?.anadir),
+    ejemplos: serieEntradas(menuPropio?.ejemplos),
+    acciones: serieEntradas(menuPropio?.acciones),
+  })
   useEffect(() => {
     escritorio?.estado({
       id,
@@ -387,8 +470,11 @@ export default function App() {
       disposicion: cmp.disposicion,
       enlazar: cmp.enlazar,
       mismoModulo: cmp.idB === id,
+      nombreModulo: moduloP.corto ?? moduloP.resumen,
+      capas: JSON.parse(capasMenu),
+      menu: JSON.parse(menuMenu),
     })
-  }, [id, cmp.activo, cmp.disposicion, cmp.enlazar, cmp.idB, giro, es3D, hayLienzo, hayLecturas, modificado, vistaA.tipo, hayFormula, puedeDeshacer, puedeRehacer, prefs])
+  }, [id, cmp.activo, cmp.disposicion, cmp.enlazar, cmp.idB, giro, es3D, hayLienzo, hayLecturas, modificado, vistaA.tipo, hayFormula, puedeDeshacer, puedeRehacer, prefs, moduloP, capasMenu, menuMenu])
   // superponer solo tiene sentido con dos lienzos del mismo tipo
   const superpuesto = cmp.activo && cmp.disposicion === 'encima' && vistaA.tipo === vistaB.tipo && vistaA.tipo !== 'html'
 

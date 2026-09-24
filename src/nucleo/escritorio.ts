@@ -28,6 +28,10 @@ export type Orden =
   /** dato: { disposicion } | { enlazar } | 'copiarAenB' */
   | 'cmp'
   | 'atajos'
+  /** dato: { grupo: 'anadir' | 'ejemplos' | 'acciones', ruta: number[] } */
+  | 'menuModulo'
+  /** dato: { id?: string, op: 'alternar' | 'quitar' | 'solo' | 'todas' | 'ninguna' } */
+  | 'capa'
 
 export interface EstadoMenu {
   id: string
@@ -46,6 +50,29 @@ export interface EstadoMenu {
   enlazar: boolean
   /** B es el mismo módulo que A: tiene sentido «Copiar A en B». */
   mismoModulo: boolean
+  /** Nombre corto del módulo que se está editando (cabecera de su sección en el menú). */
+  nombreModulo: string
+  capas: CapaMenu[]
+  menu: { anadir: EntradaSerie[]; ejemplos: EntradaSerie[]; acciones: EntradaSerie[] }
+}
+
+/** Capa lista para el proceso principal: sin funciones, con el color ya resuelto (#rrggbb). */
+export interface CapaMenu {
+  id: string
+  nombre: string
+  color: string | null
+  visible: boolean | null
+  alternable: boolean
+  quitable: boolean
+  detalle?: string
+}
+
+export interface EntradaSerie {
+  t: string
+  tipo: 'accion' | 'casilla' | 'radio'
+  activo: boolean
+  desactivado: boolean
+  hijos?: EntradaSerie[]
 }
 
 export interface ModuloMenu {

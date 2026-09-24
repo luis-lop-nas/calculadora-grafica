@@ -1,5 +1,6 @@
 import katex from 'katex'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion } from '../../nucleo/menu'
 import { Atajos, Boton, Expresion, Grupo, Nota } from '../../nucleo/controles'
 import { ejecutar, type ResultadoFila } from '../../lib/cas/cas'
 
@@ -114,5 +115,27 @@ export default definir<S>({
     ],
   },
   Panel,
+  menu: () => {
+    const fila = (t: string, src: string) => accion<S>(t, (x) => anadir(x, src))
+    return {
+      anadir: [
+        fila('Fila vacía', ''),
+        fila('Derivar', 'derivar(x^3 sin(x), x)'),
+        fila('Integrar (primitiva)', 'integrar(x e^x, x)'),
+        fila('Integral definida', 'integrar(x^2, x, 0, 1)'),
+        fila('Límite', 'limite((1+1/x)^x, x, inf)'),
+        fila('Serie de Taylor', 'taylor(cos(x), x, 0, 6)'),
+        fila('Resolver una ecuación', 'resolver(x^2 = 2, x)'),
+        fila('Sistema lineal', 'resolver({x+y=3, x-y=1}, {x, y})'),
+        fila('Simplificar', 'simplificar((x^2-1)/(x+1))'),
+        fila('Factorizar', 'factorizar(x^2-5x+6)'),
+        fila('Desarrollar', 'desarrollar((x+2)^3)'),
+        fila('Definir una función', 'f(x) := x^2'),
+        fila('Transformada de Laplace', 'laplace(sin(t))'),
+      ],
+      ejemplos: EJEMPLOS.map((e) => fila(e.t, e.e)),
+      acciones: [accion<S>('Borrar todas las filas', () => ({ filas: [{ src: '' }] }))],
+    }
+  },
   vista: { tipo: 'html', Componente: Hoja },
 })

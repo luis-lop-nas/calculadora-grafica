@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { capaFija, capaVer, casilla, coords, radios } from '../../nucleo/menu'
 import { Eleccion, Grupo, Interruptor, Nota, Rango } from '../../nucleo/controles'
 import type { Pintor2D } from '../../render/pintor2d'
 
@@ -103,6 +104,22 @@ export default definir<S>({
     p: [-0.55, -0.3], q: [0.5, 0.45], pesoX: 1.8, pesoY: 0.8, orden: 3,
   },
   Panel,
+  capas: (s) => [
+    capaFija<S>('A', `Bola unidad · ${NOMBRES[s.metricaA]}`, '--accent'),
+    { ...capaVer(s, 'comparar', `Bola unidad · ${NOMBRES[s.metricaB]}`, '--pos') },
+    capaFija<S>('p', 'p', '--ink', coords(s.p)),
+    capaFija<S>('q', 'q', '--ink', coords(s.q)),
+  ],
+  menu: (s) => {
+    const opciones = (Object.keys(NOMBRES) as Metrica[]).map((v) => ({ v, t: NOMBRES[v] }))
+    return {
+      acciones: [
+        radios<S, Metrica>('Métrica A', opciones, s.metricaA, (metricaA) => ({ metricaA })),
+        casilla<S>('Comparar con otra métrica', s.comparar, (comparar) => ({ comparar })),
+        radios<S, Metrica>('Métrica B', opciones, s.metricaB, (metricaB) => ({ metricaB, comparar: true })),
+      ],
+    }
+  },
   comparaciones: [
     { t: 'Otra métrica', a: { metricaA: 'euclidea', comparar: false }, b: { metricaA: 'manhattan', comparar: false } },
     { t: 'Euclídea / Poincaré', a: { metricaA: 'euclidea', comparar: false }, b: { metricaA: 'hiperbolica', comparar: false } },

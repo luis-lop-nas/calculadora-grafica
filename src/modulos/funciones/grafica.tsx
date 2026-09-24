@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
+import { definir, type Asa, type Capa, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaVer, casilla, radios, submenu } from '../../nucleo/menu'
 import { Atajos, Boton, Expresion, Grupo, Interruptor, Muestra, Rango, Segmentado } from '../../nucleo/controles'
 import type { Pintor2D } from '../../render/pintor2d'
 import { contorno, encadenar } from '../../lib/contorno'
@@ -813,6 +814,82 @@ export default definir<S>({
     verEstudio: false,
   },
   Panel,
+  capas: (s) => {
+    const an = analisis(s)
+    const out: Capa<S>[] = s.filas.map((f, i) => {
+      const o = an.objetos[i]
+      const texto = f.src.length > 42 ? `${f.src.slice(0, 40)}…` : f.src || '(vacía)'
+      const tipo = !o ? '' : o.k === 'funcion' ? 'función' : o.k === 'punto' ? 'punto' : o.k === 'inecuacion' ? 'región' : o.k === 'deslizador' ? 'deslizador' : o.k === 'error' ? 'error' : o.k === 'vacio' ? '' : 'curva'
+      return {
+        id: `F${i}`,
+        nombre: texto,
+        color: o?.k === 'deslizador' ? '--ink-soft' : colorDe(i),
+        detalle: tipo || undefined,
+        visible: f.visible,
+        alternar: (t: S) => ({ filas: t.filas.map((g, k) => (k === i ? { ...g, visible: !g.visible } : g)) }),
+        quitar: (t: S) => quitarFila(t, i),
+      }
+    })
+    out.push(
+      capaVer(s, 'verTangente', 'Tangente en x₀', '--ink'),
+      capaVer(s, 'verDerivada', 'Derivada f′', '--pos'),
+      capaVer(s, 'verTaylor', `Taylor de grado ${s.ordenTaylor}`, '--morado'),
+      capaVer(s, 'verRaices', 'Raíces', '--ink'),
+      capaVer(s, 'verExtremos', 'Extremos', '--ink'),
+      capaVer(s, 'verInflexion', 'Inflexiones', '--ink'),
+      capaVer(s, 'verAsintotas', 'Asíntotas', '--ink-soft'),
+      capaVer(s, 'verCortes', 'Cortes entre curvas', '--ink'),
+      capaVer(s, 'verProyecciones', 'Proyecciones de las marcas', '--ink-soft'),
+    )
+    s.marcas.forEach((m, k) =>
+      out.push({ id: `M${k}`, nombre: `Marca en x = ${String(Math.round(m[0] * 1000) / 1000).replace('.', ',')}`, color: colorDe(m[1]), quitar: (t: S) => ({ marcas: t.marcas.filter((_, j) => j !== k) }) }),
+    )
+    return out
+  },
+  menu: (s) => {
+    const an = analisis(s)
+    const fs = funciones(s, an)
+    const fila = (t: string, src: string) => accion<S>(t, (x) => anadirFila(x, src))
+    return {
+      anadir: [
+        fila('Fila vacía', ''),
+        fila('Función f(x)', 'f(x) = x^2'),
+        fila('Función de y  (x = g(y))', 'x = y^2'),
+        accion<S>('Punto', (x) => anadirFila(x, `${nombrePunto(x.filas)} = (1, 1)`)),
+        fila('Deslizador', 'k = 1'),
+        fila('Curva implícita', 'x^2+y^2=9'),
+        fila('Región', 'y < sin(x)'),
+        fila('Curva paramétrica', '(cos(3t), sin(2t))'),
+        fila('Curva polar', 'r = 1+cos(θ)'),
+        fila('Recta', 'y = 2x + 1'),
+      ],
+      ejemplos: EJEMPLOS.map((e) => fila(e.t, e.e)),
+      acciones: [
+        { t: 'Función activa', desactivado: !fs.length, hijos: fs.length ? fs.map((f) => ({ t: f.o.nombre, tipo: 'radio' as const, activo: activa(s, an)?.i === f.i, hacer: () => ({ activa: f.i }) })) : [{ t: 'No hay funciones', desactivado: true }] },
+        submenu<S>('Análisis', [
+          casilla<S>('Tangente en x₀', s.verTangente, (verTangente) => ({ verTangente })),
+          casilla<S>('Derivada', s.verDerivada, (verDerivada) => ({ verDerivada })),
+          casilla<S>('Raíces', s.verRaices, (verRaices) => ({ verRaices })),
+          casilla<S>('Extremos', s.verExtremos, (verExtremos) => ({ verExtremos })),
+          casilla<S>('Inflexiones', s.verInflexion, (verInflexion) => ({ verInflexion })),
+          casilla<S>('Asíntotas', s.verAsintotas, (verAsintotas) => ({ verAsintotas })),
+          casilla<S>('Cortes entre curvas', s.verCortes, (verCortes) => ({ verCortes })),
+          casilla<S>('Estudio de la función', s.verEstudio, (verEstudio) => ({ verEstudio })),
+          casilla<S>('Tabla de valores', s.verTabla, (verTabla) => ({ verTabla })),
+        ]),
+        radios<S, S['area']>('Área', [{ v: 'no', t: 'Sin área' }, { v: 'bajo', t: 'Bajo la curva' }, { v: 'entre', t: 'Entre dos curvas' }], s.area, (area) => ({ area })),
+        radios<S, S['riemann']>(
+          'Sumas de Riemann',
+          [{ v: 'no', t: 'No' }, { v: 'izquierda', t: 'Izquierda' }, { v: 'derecha', t: 'Derecha' }, { v: 'medio', t: 'Punto medio' }, { v: 'trapecio', t: 'Trapecios' }],
+          s.riemann,
+          (riemann) => ({ riemann, ...(riemann !== 'no' && s.area === 'no' ? { area: 'bajo' as const } : {}) }),
+        ),
+        { t: 'Polinomio de Taylor', hijos: [casilla<S>('Mostrar', s.verTaylor, (verTaylor) => ({ verTaylor })), ...[1, 2, 3, 4, 5, 6, 8, 10].map((n) => ({ t: `Grado ${n}`, tipo: 'radio' as const, activo: s.ordenTaylor === n, hacer: () => ({ ordenTaylor: n, verTaylor: true }) }))] },
+        accion<S>('Quitar las marcas', () => ({ marcas: [] }), !s.marcas.length),
+        accion<S>('Borrar todas las filas', () => ({ filas: [{ src: '', visible: true }], marcas: [], activa: 0 })),
+      ],
+    }
+  },
   rotulo: (s) => ({ nombre: `x₀ = ${s.x0.toFixed(3)}`, apunte: 'arrastra el punto por la curva' }),
   formula: (s) => {
     const an = analisis(s)

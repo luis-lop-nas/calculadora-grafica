@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaVer, casilla, radios } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Matriz, Muestra, Nota, Rango, Segmentado } from '../../nucleo/controles'
 import { compilarCSuave } from '../../lib/expresion'
 import * as K from '../../lib/complejo'
@@ -199,6 +200,22 @@ export default definir<S>({
     sonda: [[0.6, 0.5]], fuente: 2, verSingulares: true, contorno: false, rho: 1.5,
   },
   Panel,
+  capas: (s) => [
+    ...s.sonda.map((z, i) => ({ id: `z${i}`, nombre: 'Sonda z₀', color: '--ink', detalle: `${String(Math.round(z[0] * 100) / 100).replace('.', ',')} ${z[1] < 0 ? '−' : '+'} ${String(Math.abs(Math.round(z[1] * 100) / 100)).replace('.', ',')} i` })),
+    capaVer(s, 'verSingulares', 'Ceros, polos y singularidades', '--rosa'),
+    capaVer(s, 'contorno', 'Contorno |z − z₀| = ρ', '--accent'),
+    ...(s.modo === 'dominio' ? [capaVer(s, 'bandas', 'Bandas de módulo', '--ink-soft')] : []),
+  ],
+  menu: (s) => ({
+    ejemplos: EJEMPLOS.map((e) => ({ t: `${e.t}   ${e.e}`, tipo: 'radio' as const, activo: s.expr === e.e, hacer: () => ({ expr: e.e }) })),
+    acciones: [
+      radios<S, Modo>('Representación', [{ v: 'dominio', t: 'Coloreado del dominio' }, { v: 'rejilla', t: 'Imagen de una rejilla' }, { v: 'polya', t: 'Campo de Pólya' }], s.modo, (modo) => ({ modo })),
+      casilla<S>('Bandas de módulo', s.bandas, (bandas) => ({ bandas })),
+      casilla<S>('Ceros, polos y singularidades', s.verSingulares, (verSingulares) => ({ verSingulares })),
+      casilla<S>('Integral sobre el contorno', s.contorno, (contorno) => ({ contorno })),
+      accion<S>('Llevar z₀ al origen', () => ({ sonda: [[0, 0]] })),
+    ],
+  }),
   comparaciones: [{ t: 'Dominio ↔ imagen', a: { modo: 'dominio' }, b: { modo: 'rejilla' } }],
   rotulo: (s) => ({ nombre: 'f : C → C', apunte: s.modo === 'dominio' ? 'color = fase, brillo = módulo' : s.modo === 'rejilla' ? 'imagen de la rejilla' : 'campo de Pólya' }),
   formula: () => [

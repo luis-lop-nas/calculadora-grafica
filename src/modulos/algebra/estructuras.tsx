@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { radios } from '../../nucleo/menu'
 import { Grupo as GrupoUI, Nota, Rango, Segmentado } from '../../nucleo/controles'
 import {
   abeliano, centro, diedral, divisores, inverso, mcd, orden, simetrico, subgrupos, zn,
@@ -74,6 +75,17 @@ export default definir<S>({
   entradilla: 'La tabla de la operación es la estructura entera: todo lo demás se lee en ella.',
   inicial: { tipo: 'anillo', n: 12 },
   Panel,
+  menu: (s) => ({
+    acciones: [
+      radios<S, Tipo>('Estructura', [{ v: 'anillo', t: 'Anillo Zₙ' }, { v: 'simetrico', t: 'Grupo simétrico Sₙ' }, { v: 'diedral', t: 'Grupo diédrico Dₙ' }], s.tipo, (tipo) => ({ tipo, n: tipo === 'simetrico' ? 3 : tipo === 'diedral' ? 4 : 12 })),
+      radios<S, number>(
+        'n',
+        Array.from({ length: (s.tipo === 'simetrico' ? 4 : s.tipo === 'diedral' ? 8 : 24) - 1 }, (_, i) => ({ v: i + 2, t: String(i + 2) })),
+        s.n,
+        (n) => ({ n }),
+      ),
+    ],
+  }),
   rotulo: (s) => {
     const G = grupo(s)
     if (s.tipo === 'anillo')

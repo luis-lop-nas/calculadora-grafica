@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaVer, casilla, coords, radios } from '../../nucleo/menu'
 import { Atajos, Boton, Expresion, Grupo, Interruptor, Matriz, Muestra, Rango, Segmentado, Resultado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { trayectoria } from '../../lib/numerico'
@@ -162,6 +163,36 @@ export default definir<S>({
     T: 14,
   },
   Panel,
+  capas: (s) => [
+    capaVer(s, 'verCampo', 'Campo de direcciones', '--ink-soft'),
+    capaVer(s, 'verNulclinas', 'Nulclinas x′ = 0, y′ = 0', '--pos'),
+    capaVer(s, 'verEquilibrios', 'Equilibrios', '--ink'),
+    capaVer(s, 'verSeparatrices', 'Separatrices', '--morado'),
+    capaVer(s, 'verTiempo', 'Series x(t), y(t)', '--aux'),
+    ...s.semillas.map((q, i) => ({ id: `S${i}`, nombre: `Órbita por ${coords(q)}`, color: '--accent', quitar: (t: S) => ({ semillas: t.semillas.filter((_, k) => k !== i) }) })),
+  ],
+  menu: (s) => ({
+    anadir: [
+      accion<S>('Órbita por (1, 0)', (t) => ({ semillas: [...t.semillas, [1, 0] as [number, number]] })),
+      accion<S>('Rejilla de órbitas', () => ({ sembrar: true })),
+    ],
+    ejemplos: [
+      ...PRESETS.map((p) => ({ t: p.t, tipo: 'radio' as const, activo: s.modo === 'campo' && s.fx === p.fx && s.fy === p.fy, hacer: () => ({ modo: 'campo' as Modo, fx: p.fx, fy: p.fy, semillas: [] }) })),
+      ...[
+        { t: 'Lineal · centro', A: [[0, 1], [-1, 0]] },
+        { t: 'Lineal · silla', A: [[1, 0], [0, -1]] },
+        { t: 'Lineal · foco estable', A: [[-0.3, 1], [-1, -0.3]] },
+        { t: 'Lineal · nodo inestable', A: [[2, 0], [0, 1]] },
+        { t: 'Lineal · nodo degenerado', A: [[-1, 1], [0, -1]] },
+      ].map((p) => accion<S>(p.t, () => ({ modo: 'lineal', A: p.A, semillas: [] }))),
+    ],
+    acciones: [
+      radios<S, Modo>('Sistema', [{ v: 'lineal', t: 'Lineal x′ = A x' }, { v: 'campo', t: 'No lineal (escrito)' }], s.modo, (modo) => ({ modo })),
+      casilla<S>('Rejilla de órbitas', s.sembrar, (sembrar) => ({ sembrar })),
+      casilla<S>('Series temporales x(t), y(t)', s.verTiempo, (verTiempo) => ({ verTiempo })),
+      accion<S>('Borrar las órbitas', () => ({ semillas: [] }), !s.semillas.length),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => {
     if (s.modo !== 'lineal') return { nombre: 'Sistema no lineal', apunte: `${s.semillas.length} órbita(s)` }

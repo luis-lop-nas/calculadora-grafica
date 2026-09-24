@@ -1,5 +1,6 @@
 import katex from 'katex'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, radios } from '../../nucleo/menu'
 import { Atajos, Grupo, Nota, Numero, Resultado, Segmentado } from '../../nucleo/controles'
 import {
   aNum, autovalores, baseImagen, determinante, diagonalizar, fmtNum, gaussJordan, identidadR, inversa, leerR, lu, mulR, nucleo, qr, R0, rango,
@@ -486,6 +487,20 @@ export default definir<EstadoMatrices>({
   entradilla: 'Con fracciones exactas y cada operación de fila a la vista, como en papel.',
   inicial: { op: 'rref', A: aTexto([[2, 1, 1], [1, 3, 2], [1, 0, 0]]), B: aTexto([[1, 0, 2], [0, 1, 0], [1, 1, 1]]), b: ['1', '2', '3'], k: 2 },
   Panel,
+  menu: (s) => ({
+    ejemplos: EJEMPLOS.map((e) =>
+      accion<EstadoMatrices>(e.t, () => ({
+        A: e.A.map((f) => f.map(String)),
+        ...(e.op ? { op: e.op } : {}),
+        ...(e.b ? { b: e.b.map(String) } : { b: e.A.map(() => '0') }),
+      })),
+    ),
+    acciones: [
+      radios<EstadoMatrices, Op>('Operación', (Object.keys(NOMBRES) as Op[]).map((v) => ({ v, t: NOMBRES[v] })), s.op, (op) => ({ op })),
+      accion<EstadoMatrices>('Transponer A', (x) => ({ A: x.A[0].map((_, j) => x.A.map((f) => f[j])) })),
+      accion<EstadoMatrices>('A pasa a ser la identidad', (x) => ({ A: x.A.map((f, i) => f.map((_, j) => (i === j ? '1' : '0'))) })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: NOMBRES[s.op], apunte: `${s.A.length}×${s.A[0]?.length ?? 0}` }),
   formula: (s) => {

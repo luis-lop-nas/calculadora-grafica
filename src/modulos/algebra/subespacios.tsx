@@ -1,4 +1,5 @@
-import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
+import { definir, type Asa, type Capa, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, coords } from '../../nucleo/menu'
 import { Boton, Grupo, Interruptor, Matriz, Muestra, Nota } from '../../nucleo/controles'
 import { cruz, det, gramSchmidt, norma, nucleo, producto, proyectar, rango } from '../../lib/matrices'
 
@@ -228,6 +229,33 @@ export default definir<S>({
     P: [],
   },
   Panel,
+  capas: (s) => {
+    const { dim } = piezas(s)
+    const out: Capa<S>[] = [
+      capaFija<S>('W', dim === 2 ? 'Subespacio W (plano)' : dim === 1 ? 'Subespacio W (recta)' : 'Subespacio W = {0}', '--accent'),
+      capaFija<S>('w', 'w', '--ink', coords(s.V[2])),
+      capaFija<S>('p', 'Proyección P_W w', '--pos'),
+      capaVer(s, 'verGram', 'Base ortonormal u₁, u₂', '--accent'),
+      capaVer(s, 'verResiduo', 'Residuo w − p', '--aux'),
+      capaVer(s, 'verComplemento', 'Complemento ortogonal W⊥', '--aux'),
+      capaVer(s, 'verSegundo', 'Segundo subespacio W₂', '--aux'),
+    ]
+    s.P.forEach((q, i) =>
+      out.push({ id: `P${i}`, nombre: `Punto q${sub(i + 1)}`, color: '--pos', detalle: coords(q), quitar: (t) => ({ P: t.P.filter((_, k) => k !== i) }) }),
+    )
+    if (!esCanonica(s)) out.push({ id: 'B', nombre: 'Ejes x′, y′, z′', color: '--ink-soft', quitar: () => ({ B: undefined }) })
+    return out
+  },
+  menu: (s) => ({
+    anadir: [
+      accion<S>('Punto a proyectar', (t) => ({ P: [...t.P, [1, 1, 0.5]] })),
+      accion<S>('Segundo subespacio W₂', () => ({ verSegundo: true }), s.verSegundo),
+    ],
+    acciones: [
+      accion<S>('Volver a los ejes x, y, z', () => ({ B: undefined }), esCanonica(s)),
+      accion<S>('Quitar todos los puntos', () => ({ P: [] }), !s.P.length),
+    ],
+  }),
   rotulo: (s) => {
     const { dim } = piezas(s)
     return {

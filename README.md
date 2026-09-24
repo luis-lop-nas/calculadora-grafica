@@ -39,7 +39,14 @@ Menús, al estilo de Illustrator o Blender:
   campo de texto, el del campo), cortar/copiar/pegar, **Copiar como ▸** imagen del lienzo ⇧⌘C,
   fórmula en LaTeX, lecturas; **Restablecer el módulo**.
 - **Módulo**: un submenú por área (Álgebra ▸ Matrices…), ⌘1…⌘9 por área, ⌘[ ⌘] anterior/siguiente,
-  ⌘K buscar.
+  ⌘K buscar; debajo, lo propio del módulo abierto: **Ejemplos ▸** y sus opciones (operación de
+  Matrices, base de Hilbert, método del campo de direcciones, dimensión de onda y calor…).
+- **Objeto**: **Añadir ▸** lo que el módulo sabe crear (en Gráficas función, punto, deslizador,
+  región, paramétrica, polar…; en Espacio 3D puntos, superficies, curvas y sólidos; en Regla y
+  compás las herramientas por grupos; puntos, soluciones, órbitas, focos…), **Eliminar ▸**, ocultar
+  y mostrar todo.
+- **Capas**: cada cosa dibujada con su **muestra de color** y su nombre (y coordenadas o tipo al
+  lado); en su submenú, Mostrar, **Solo esta** y Eliminar. Mostrar todas ⌥⌘3.
 - **Vista**: **Punto de vista ▸** partida, desde X/Y/Z, isométrica y **proyección ortográfica**
   ⇧⌘O; **encuadrar todo ⌘0**, acercar ⌘+ / alejar ⌘− (el lienzo); **Superposiciones ▸** ejes,
   nombres de los ejes, rejilla, rejilla en los tres planos, leyenda, fórmula, lecturas; **ajustar a
@@ -54,6 +61,11 @@ Las preferencias de Vista son de quien usa la app (se guardan aparte), no del do
 sesiones se guardan como documentos `.calc` (el mismo JSON del autoguardado; también abre los
 `.json` exportados) y Finder los abre con doble clic. El autoguardado sigue funcionando, pero es
 **aparte del del navegador**.
+
+Un módulo entra en esos menús declarando `capas(s)` (nombre, color, visible, `alternar`,
+`quitar`) y `menu(s)` (`anadir`, `ejemplos`, `acciones`), con las ayudas de `src/nucleo/menu.ts`
+(`capaVer`, `casilla`, `radios`…). Hoy los declaran los 19 módulos de Álgebra, Geometría,
+Funciones, EDO y EDP.
 
 Piezas: `electron/main.cjs` (ventanas, menú, diálogos), `electron/preload.cjs` (el puente que la
 página ve como `window.escritorio`) y `src/nucleo/escritorio.ts` (sus tipos; en la web no existe).

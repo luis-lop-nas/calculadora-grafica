@@ -1,4 +1,5 @@
 import { definir, type Asa, type Interaccion, type PropsPanel, type Vista } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, casilla, coords, radios } from '../../nucleo/menu'
 import { Boton, Expresion, Grupo, Interruptor, Matriz, Muestra, Nota, Rango, Segmentado, Resultado } from '../../nucleo/controles'
 import { crearReloj } from '../../lib/reloj'
 import { compilarSuave } from '../../lib/expresion'
@@ -615,6 +616,40 @@ export default definir<EstadoCalor>({
     focos: [[0.3, 0.35, 0.5, 1], [0.72, 0.6, 0.4, 0.7]], ancho: 0.08,
   },
   Panel,
+  capas: (s) =>
+    s.dim === 1
+      ? [capaFija<EstadoCalor>('u', 'u(x, t)', '--accent'), capaVer(s, 'verFamilia', 'Instantes fijos', '--aux'), capaFija<EstadoCalor>('est', 'Estado estacionario', '--pos')]
+      : s.inicial === 'focos'
+        ? s.focos.map((f, i) => ({ id: `F${i}`, nombre: `Foco ${i + 1}`, color: '--rosa', detalle: coords(f.slice(0, s.dim)), quitar: (t: EstadoCalor) => ({ focos: t.focos.filter((_, k) => k !== i) }) }))
+        : [],
+  menu: (s) => ({
+    anadir: s.dim > 1 ? [accion<EstadoCalor>('Foco de calor', (t) => {
+      reloj.reiniciar()
+      return { inicial: 'focos', focos: [...(t.inicial === 'focos' ? t.focos : []), [0.5, 0.5, 0.5, 1]] }
+    })] : [],
+    acciones: [
+      casilla<EstadoCalor>('Reproducir', s.jugando, (jugando) => ({ jugando })),
+      accion<EstadoCalor>('Reiniciar', () => {
+        reloj.reiniciar()
+      }),
+      radios<EstadoCalor, Dim>('Dimensión', [{ v: 1, t: 'Barra 1D' }, { v: 2, t: 'Placa 2D' }, { v: 3, t: 'Cubo 3D' }], s.dim, (dim) => {
+        reloj.reiniciar()
+        return { dim }
+      }),
+      ...(s.dim === 1
+        ? [radios<EstadoCalor, Contorno>('Extremos', [{ v: 'dirichlet', t: 'A cero (Dirichlet)' }, { v: 'mixta', t: 'A T₀ y T₁' }, { v: 'neumann', t: 'Aislados (Neumann)' }, { v: 'robin', t: 'Convección (Robin)' }], s.contorno, (contorno) => ({ contorno }))]
+        : []),
+      radios<EstadoCalor, Inicial>(
+        'Temperatura inicial',
+        [{ v: 'escalon', t: 'Escalón' }, { v: 'gaussiana', t: 'Punto caliente' }, { v: 'rampa', t: 'Rampa' }, { v: 'modo', t: 'Modo puro' }, { v: 'propia', t: 'La mía' }, { v: 'focos', t: 'Focos' }],
+        s.inicial,
+        (inicial) => {
+          reloj.reiniciar()
+          return { inicial }
+        },
+      ),
+    ],
+  }),
   resultadoEnPanel: true,
   lecturasVivas: true,
   rotulo: (s) =>

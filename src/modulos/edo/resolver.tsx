@@ -1,5 +1,6 @@
 import katex from 'katex'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, casilla } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Muestra, Nota, Resultado } from '../../nucleo/controles'
 import { compilarEdo, derivadaAlta, solucionEn, valoresIniciales, type Cond, type EdoNum } from '../../lib/edo'
 import {
@@ -297,6 +298,22 @@ export default definir<S>({
     encuadre: 0,
   },
   Panel,
+  capas: (s) => [
+    capaFija<S>('y', 'y(x) numérica', '--accent'),
+    capaFija<S>('cerrada', 'Fórmula cerrada', '--pos'),
+    capaVer(s, 'verFamilia', 'Familia de soluciones', '--ink-soft'),
+    capaVer(s, 'verDerivada', 'y′(x)', '--aux'),
+    capaVer(s, 'verSerie', 'Serie de Taylor', '--neg'),
+    capaVer(s, 'verCampo', 'Campo de direcciones', '--ink-soft'),
+  ],
+  menu: (s) => ({
+    ejemplos: EJEMPLOS.map((e) => ({ t: `${e.t}   ${e.e}`, tipo: 'radio' as const, activo: s.ecuacion === e.e, hacer: (x: S) => ({ ecuacion: e.e, condiciones: e.c, encuadre: x.encuadre + 1 }) })),
+    acciones: [
+      casilla<S>('Pasos de la resolución', s.verPasos, (verPasos) => ({ verPasos })),
+      accion<S>('Encuadrar la solución', (x) => ({ encuadre: x.encuadre + 1 })),
+      accion<S>('Quitar las condiciones iniciales', () => ({ condiciones: '' }), !s.condiciones.trim()),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => {
     const r = estudio(s)

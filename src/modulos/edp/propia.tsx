@@ -1,4 +1,5 @@
 import { definir, type PropsPanel, type Vista } from '../../nucleo/tipos'
+import { accion, casilla, radios } from '../../nucleo/menu'
 import { Atajos, Boton, Expresion, Grupo, Interruptor, Muestra, Nota, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { aLatex, compilar } from '../../lib/expresion'
 import {
@@ -641,6 +642,21 @@ export default definir<S>({
     gotas: 0,
   },
   Panel,
+  menu: (s) => ({
+    ejemplos: EJEMPLOS.map((e) => ({
+      t: `${e.s.dim === 2 ? '2D' : '1D'} · ${e.t}`,
+      tipo: 'radio' as const,
+      activo: s.ecU === e.s.ecU && s.iniU === e.s.iniU,
+      hacer: (x: S) => ({ ecV: '', parametros: '', iniUt: '0', iniV: '0', iniVt: '0', bordeV: '0', ver: 'u' as const, ...e.s, reinicio: x.reinicio + 1, jugando: true }),
+    })),
+    acciones: [
+      casilla<S>('Reproducir', s.jugando, (jugando) => ({ jugando })),
+      accion<S>('Reiniciar la simulación', (x) => ({ reinicio: x.reinicio + 1 })),
+      radios<S, 1 | 2>('Dimensión', [{ v: 1, t: '1D' }, { v: 2, t: '2D' }], s.dim, (dim) => ({ dim })),
+      radios<S, S['vista']>('Vista', [{ v: 'plano', t: 'Mapa de color' }, { v: 'superficie', t: 'Superficie 3D' }], s.vista, (vista) => ({ vista })),
+      radios<S, Contorno>('Contorno', [{ v: 'dirichlet', t: 'Dirichlet' }, { v: 'neumann', t: 'Neumann' }, { v: 'periodica', t: 'Periódico' }], s.contorno, (contorno) => ({ contorno })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => {
     const { p, error } = problema(s)

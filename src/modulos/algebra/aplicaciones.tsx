@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { definir, type Asa, type ObjetoMovible, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, coords, radios } from '../../nucleo/menu'
 import { Atajos, Boton, Grupo, Interruptor, Matriz, Muestra, Nota, Rango, Segmentado } from '../../nucleo/controles'
 import { aplicar, autovalores3, autovector, det, nucleo, raicesPolinomio, rango, traza } from '../../lib/matrices'
 import { FIGURAS, lineasDe, type Figura } from '../../lib/figuras3d'
@@ -219,6 +220,31 @@ export default definir<S>({
     X: [],
   },
   Panel,
+  capas: (s) => [
+    capaFija<S>('figura', `${FIGURAS[s.objeto].t} deformado`, '--accent'),
+    capaVer(s, 'verComparacion', 'La misma figura con B', '--neg'),
+    capaVer(s, 'verBase', 'A·e₁, A·e₂, A·e₃', '--pos'),
+    capaVer(s, 'verAutovectores', 'Autovectores (direcciones fijas)', '--neg'),
+    ...s.X.map((x, i) => ({
+      id: `X${i}`,
+      nombre: `Punto x${sub(i + 1)} y su imagen`,
+      color: '--ink',
+      detalle: coords(x),
+      quitar: (t: S) => ({ X: t.X.filter((_, k) => k !== i) }),
+    })),
+  ],
+  menu: (s) => ({
+    anadir: [
+      accion<S>('Punto x y su imagen A·x', (t) => ({ X: [...t.X, [1, 1, 0.5]] })),
+      radios<S, Figura>('Figura', (Object.keys(FIGURAS) as Figura[]).map((v) => ({ v, t: FIGURAS[v].t })), s.objeto, (objeto) => ({ objeto })),
+    ],
+    ejemplos: PRESETS.map((p) => ({ t: p.t, tipo: 'radio' as const, activo: JSON.stringify(p.A) === JSON.stringify(s.A), hacer: () => ({ A: p.A.map((f) => f.slice()) }) })),
+    acciones: [
+      radios<S, number>('Deformación', [0, 0.25, 0.5, 0.75, 1].map((v) => ({ v, t: `${v * 100} %` })), s.t, (t) => ({ t })),
+      accion<S>('Recolocar la figura', () => ({ figPos: undefined, figRot: undefined }), !s.figPos && !s.figRot),
+      accion<S>('Quitar todos los puntos', () => ({ X: [] }), !s.X.length),
+    ],
+  }),
   comparaciones: [{ t: 'Dominio ↔ imagen', a: { t: 0 }, b: { t: 1 } }],
   rotulo: (s) => {
     const r = rango(s.A)

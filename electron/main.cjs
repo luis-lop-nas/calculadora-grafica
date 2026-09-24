@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain, net, protocol, shell } = require('electron')
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, net, protocol, shell } = require('electron')
 const fs = require('node:fs/promises')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
@@ -134,6 +134,74 @@ function enviar(win, orden, dato) {
 
 const alFoco = (orden, dato) => () => enviar(BrowserWindow.getFocusedWindow(), orden, dato)
 
+/** Muestra de color para el menú Capas: un círculo de 12 pt (24 px a 2×), cacheado por color. */
+const muestras = new Map()
+function muestra(hex) {
+  if (!hex || !/^#[0-9a-f]{6}$/i.test(hex)) return undefined
+  if (muestras.has(hex)) return muestras.get(hex)
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  const n = 24
+  const px = Buffer.alloc(n * n * 4)
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      // borde suavizado: cobertura según la distancia al centro
+      const d = Math.hypot(x + 0.5 - n / 2, y + 0.5 - n / 2)
+      const a = Math.max(0, Math.min(1, 9.5 - d))
+      const k = (y * n + x) * 4
+      // BGRA premultiplicado
+      px[k] = Math.round(b * a)
+      px[k + 1] = Math.round(g * a)
+      px[k + 2] = Math.round(r * a)
+      px[k + 3] = Math.round(255 * a)
+    }
+  const img = nativeImage.createFromBitmap(px, { width: n, height: n, scaleFactor: 2 })
+  muestras.set(hex, img)
+  return img
+}
+
+/** Entradas que declara el módulo (Añadir, Ejemplos, acciones) → plantilla de Electron. */
+function entradasModulo(lista, grupo, ruta = []) {
+  return (lista ?? []).map((e, i) => {
+    const aqui = [...ruta, i]
+    if (e.hijos) return { label: e.t, enabled: !e.desactivado, submenu: entradasModulo(e.hijos, grupo, aqui) }
+    return {
+      label: e.t,
+      type: e.tipo === 'casilla' ? 'checkbox' : e.tipo === 'radio' ? 'radio' : 'normal',
+      checked: e.activo,
+      enabled: !e.desactivado,
+      click: alFoco('menuModulo', { grupo, ruta: aqui }),
+    }
+  })
+}
+
+/** Capas: cada cosa dibujada con su color; submenú para mostrarla, dejarla sola o quitarla. */
+function menuCapas(e) {
+  const capas = e.capas ?? []
+  if (!capas.length) return [{ label: 'Este módulo no tiene capas', enabled: false }]
+  const alguna = capas.some((c) => c.alternable)
+  const items = capas.map((c) => {
+    const icon = muestra(c.color)
+    const nombre = `${c.nombre}${c.detalle ? `   ${c.detalle}` : ''}`
+    if (!c.alternable && !c.quitable) return { label: nombre, icon }
+    const sub = []
+    if (c.alternable) {
+      sub.push({ label: 'Mostrar', type: 'checkbox', checked: c.visible !== false, click: alFoco('capa', { id: c.id, op: 'alternar' }) })
+      sub.push({ label: 'Solo esta', click: alFoco('capa', { id: c.id, op: 'solo' }) })
+    }
+    if (c.quitable) {
+      if (sub.length) sub.push({ type: 'separator' })
+      sub.push({ label: 'Eliminar', click: alFoco('capa', { id: c.id, op: 'quitar' }) })
+    }
+    return { label: c.visible === false ? `${nombre}   (oculta)` : nombre, icon, submenu: sub }
+  })
+  return [
+    { label: 'Mostrar todas', accelerator: 'Alt+CmdOrCtrl+3', enabled: alguna, click: alFoco('capa', { op: 'todas' }) },
+    { label: 'Ocultar todas', enabled: alguna, click: alFoco('capa', { op: 'ninguna' }) },
+    { type: 'separator' },
+    ...items,
+  ]
+}
+
 function menuModulos(e) {
   // áreas como submenús, al estilo de los menús de Adobe: Álgebra ▸ Matrices…
   const grupos = []
@@ -158,6 +226,10 @@ function menuModulos(e) {
     },
     { type: 'separator' },
     ...(grupos.length ? porArea : [{ label: 'Cargando…', enabled: false }]),
+    // lo propio del módulo abierto, como la barra de opciones de Illustrator
+    ...(e.menu?.ejemplos?.length || e.menu?.acciones?.length ? [{ type: 'separator' }, { label: e.nombreModulo ?? 'Este módulo', enabled: false }] : []),
+    ...(e.menu?.ejemplos?.length ? [{ label: 'Ejemplos', submenu: entradasModulo(e.menu.ejemplos, 'ejemplos') }] : []),
+    ...entradasModulo(e.menu?.acciones, 'acciones'),
   ]
 }
 
@@ -248,6 +320,24 @@ function construirMenu() {
       ],
     },
     { label: 'Módulo', submenu: menuModulos(e) },
+    {
+      label: 'Objeto',
+      submenu: [
+        { label: 'Añadir', enabled: hay && !!e.menu?.anadir?.length, submenu: e.menu?.anadir?.length ? entradasModulo(e.menu.anadir, 'anadir') : [{ label: 'Nada que añadir aquí', enabled: false }] },
+        { type: 'separator' },
+        {
+          label: 'Eliminar',
+          enabled: hay && (e.capas ?? []).some((c) => c.quitable),
+          submenu: (e.capas ?? []).some((c) => c.quitable)
+            ? e.capas.filter((c) => c.quitable).map((c) => ({ label: c.nombre, icon: muestra(c.color), click: alFoco('capa', { id: c.id, op: 'quitar' }) }))
+            : [{ label: 'Nada que eliminar', enabled: false }],
+        },
+        { type: 'separator' },
+        { label: 'Ocultar todo', enabled: hay && (e.capas ?? []).some((c) => c.alternable), click: alFoco('capa', { op: 'ninguna' }) },
+        { label: 'Mostrar todo', enabled: hay && (e.capas ?? []).some((c) => c.alternable), click: alFoco('capa', { op: 'todas' }) },
+      ],
+    },
+    { label: 'Capas', submenu: hay ? menuCapas(e) : [{ label: 'Sin ventana', enabled: false }] },
     {
       label: 'Vista',
       submenu: [

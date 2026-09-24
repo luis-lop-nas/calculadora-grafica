@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, radios } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Matriz, Muestra, Nota, Rango, Segmentado, Resultado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { rk4 } from '../../lib/numerico'
@@ -197,6 +198,22 @@ export default definir<EstadoSegundo>({
     verFases: true, verDerivada: true,
   },
   Panel,
+  capas: (s) => [
+    capaFija<EstadoSegundo>('y', 'y(t)', '--accent'),
+    capaVer(s, 'verDerivada', 'y′(t)', '--aux'),
+    capaVer(s, 'verFases', 'Plano de fases (y, y′)', '--ink-soft'),
+  ],
+  menu: (s) => ({
+    ejemplos: [
+      ...LINEALES.map((p) => accion<EstadoSegundo>(`Lineal · ${p.t}`, () => ({ modelo: 'lineal', c: p.c, k: p.k, F0: p.F0, W: p.W }))),
+      ...GENERALES.map((p) => accion<EstadoSegundo>(`General · ${p.t}`, () => ({ modelo: 'general', expr: p.e }))),
+    ],
+    acciones: [
+      radios<EstadoSegundo, Problema>('Problema', [{ v: 'inicial', t: 'Valor inicial' }, { v: 'contorno', t: 'De contorno' }], s.problema, (problema) => ({ problema })),
+      radios<EstadoSegundo, Modelo>('Ecuación', [{ v: 'lineal', t: 'Lineal y″ + c y′ + k y = F cos ωt' }, { v: 'general', t: 'General y″ = f(t, y, y′)' }], s.modelo, (modelo) => ({ modelo })),
+      radios<EstadoSegundo, number>('Tiempo final T', [5, 10, 20, 40, 80].map((v) => ({ v, t: String(v) })), s.T, (T) => ({ T })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => {
     if (s.modelo !== 'lineal') return { nombre: 'y″ = f(t, y, y′)', apunte: s.problema === 'inicial' ? 'problema de valor inicial' : 'problema de contorno' }

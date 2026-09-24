@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { definir, type PropsPanel, type Vista } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, casilla, radios } from '../../nucleo/menu'
 import { Boton, Expresion, Grupo, Interruptor, Muestra, Nota, Rango, Segmentado, Resultado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { besselJ, cerosBessel } from '../../lib/especiales'
@@ -602,6 +603,28 @@ export default definir<EstadoOnda>({
     c: 1, jugando: true, alambre: false,
   },
   Panel,
+  capas: (s) =>
+    s.dim === 1
+      ? [capaFija<EstadoOnda>('u', 'u(x, t)', '--accent'), capaVer(s, 'verModos', 'Modos por separado', '--aux'), capaVer(s, 'dalembert', "Ondas viajeras (d'Alembert)", '--pos')]
+      : [capaFija<EstadoOnda>('pos', 'u > 0', '--pos'), capaFija<EstadoOnda>('neg', 'u < 0', '--neg'), ...(s.dim === 2 ? [capaVer(s, 'alambre', 'Malla de alambre', '--ink-soft')] : [])],
+  menu: (s) => ({
+    acciones: [
+      casilla<EstadoOnda>('Reproducir', s.jugando, (jugando) => ({ jugando })),
+      accion<EstadoOnda>('Reiniciar', () => {
+        reloj.reiniciar()
+      }),
+      radios<EstadoOnda, Dim>('Dimensión', [{ v: 1, t: 'Cuerda 1D' }, { v: 2, t: 'Membrana 2D' }, { v: 3, t: 'Caja 3D' }], s.dim, (dim) => ({ dim })),
+      ...(s.dim === 1
+        ? [
+            radios<EstadoOnda, ContornoOnda>('Extremos', [{ v: 'fijo-fijo', t: 'Fijo-fijo' }, { v: 'fijo-libre', t: 'Fijo-libre' }, { v: 'libre-libre', t: 'Libre-libre' }], s.contorno, (contorno) => ({ contorno })),
+            radios<EstadoOnda, Inicial>('Forma inicial', [{ v: 'pinzada', t: 'Pinzada' }, { v: 'gaussiana', t: 'Gaussiana' }, { v: 'cuadrada', t: 'Escalón' }, { v: 'modo', t: 'Modo puro' }, { v: 'propia', t: 'La mía' }], s.inicial, (inicial) => ({ inicial })),
+            radios<EstadoOnda, Velocidad>('Velocidad inicial', [{ v: 'reposo', t: 'En reposo' }, { v: 'martillo', t: 'Martillo' }, { v: 'propia', t: 'La mía' }], s.velocidad, (velocidad) => ({ velocidad })),
+          ]
+        : s.dim === 2
+          ? [radios<EstadoOnda, Forma>('Membrana', [{ v: 'rectangular', t: 'Rectangular' }, { v: 'circular', t: 'Circular' }], s.forma, (forma) => ({ forma }))]
+          : [radios<EstadoOnda, Repr>('Representación', [{ v: 'iso', t: 'Isosuperficies' }, { v: 'cortes', t: 'Cortes' }], s.repr, (repr) => ({ repr }))]),
+    ],
+  }),
   resultadoEnPanel: true,
   lecturasVivas: true,
   rotulo: (s) =>

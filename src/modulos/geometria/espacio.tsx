@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
+import { accion, submenu } from '../../nucleo/menu'
 import { Atajos, Boton, Expresion, Grupo, Rango } from '../../nucleo/controles'
 import type { Escena3D } from '../../render/escena3d'
 import { construirRejilla, marching } from '../../lib/mallado'
@@ -287,6 +288,52 @@ export default definir<S>({
     detalle: 56,
   },
   Panel,
+  capas: (s) => {
+    const an = analisis(s)
+    return s.filas.map((f, i) => {
+      const o = an.objetos[i] as { k: string; nombre?: string | null } | undefined
+      const texto = f.src.length > 42 ? `${f.src.slice(0, 40)}…` : f.src || '(vacía)'
+      return {
+        id: `F${i}`,
+        nombre: o?.nombre ? `${o.nombre}: ${texto}` : texto,
+        color: colorDe(i),
+        detalle: o?.k === 'error' ? 'error' : undefined,
+        visible: f.visible,
+        alternar: (t: S) => ({ filas: t.filas.map((g, k) => (k === i ? { ...g, visible: !g.visible } : g)) }),
+        quitar: (t: S) => ({ filas: t.filas.filter((_, k) => k !== i) }),
+      }
+    })
+  },
+  menu: () => {
+    const fila = (t: string, src: string) => accion<S>(t, (x) => ({ filas: [...x.filas, { src, visible: true }] }))
+    return {
+      anadir: [
+        fila('Fila vacía', ''),
+        submenu<S>('Punto y recta', [fila('Punto', 'P = (1, 1, 1)'), fila('Vector', 'vector((0,0,0), (1,2,1))'), fila('Recta por dos puntos', 'recta((0,0,0), (1,1,1))'), fila('Segmento', 'segmento((0,0,0), (2,1,1))')]),
+        submenu<S>('Superficies', [
+          fila('Plano', 'x + y + z = 1'),
+          fila('Esfera', 'x^2+y^2+z^2=4'),
+          fila('z = f(x, y)', 'x^2 - y^2'),
+          fila('Paramétrica r(u, v)', '(cos(u)sin(v), sin(u)sin(v), cos(v))'),
+          fila('Revolución', 'revolucion(sqrt(x), 0, 3)'),
+        ]),
+        submenu<S>('Curvas', [fila('Hélice', '(2cos(t), 2sin(t), t/4), -12 < t < 12'), fila('Corte de las filas 1 y 2', 'corte(1, 2)')]),
+        submenu<S>('Sólidos', [
+          fila('Cubo', 'cubo((0,0,0), 1.5)'),
+          fila('Prisma hexagonal', 'prisma((0,0,0), 6, 1, 2)'),
+          fila('Pirámide', 'piramide((0,0,0), 4, 1, 2)'),
+          fila('Cono', 'cono((0,0,0), 1, 2)'),
+          fila('Cilindro', 'cilindro((0,0,0), 0.8, 2)'),
+          fila('Tetraedro', 'tetraedro((0,0,0), 1.2)'),
+          fila('Octaedro', 'octaedro((0,0,0), 1.2)'),
+          fila('Icosaedro', 'icosaedro((0,0,0), 1.2)'),
+          fila('Dodecaedro', 'dodecaedro((0,0,0), 1.2)'),
+        ]),
+      ],
+      ejemplos: EJEMPLOS.map((e) => accion<S>(e.t, () => ({ filas: e.f.map((src) => ({ src, visible: true })) }))),
+      acciones: [accion<S>('Borrar todas las filas', () => ({ filas: [] }))],
+    }
+  },
   lecturas: (s) => {
     const an = analisis(s)
     const filas: Array<[string, string]> = []

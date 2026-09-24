@@ -143,6 +143,40 @@ export interface VistaHTML<S> {
 
 export type Vista<S> = Vista3D<S> | Vista2D<S> | VistaHTML<S>
 
+/** Una capa: algo que se dibuja y se puede nombrar, esconder o quitar desde el menú. */
+export interface Capa<S> {
+  id: string
+  nombre: string
+  /** Variable CSS (`--accent`) o color CSS. */
+  color?: string
+  /** Si se puede esconder, si está a la vista; sin `alternar` es solo informativa. */
+  visible?: boolean
+  alternar?: (s: S) => Partial<S>
+  quitar?: (s: S) => Partial<S>
+  /** Texto corto al lado del nombre: coordenadas, ecuación… */
+  detalle?: string
+}
+
+/** Entrada de menú declarada por un módulo: acción, casilla, opción de radio o submenú. */
+export interface EntradaMenu<S> {
+  t: string
+  tipo?: 'accion' | 'casilla' | 'radio'
+  /** Marcada (casillas y radios). */
+  activo?: boolean
+  desactivado?: boolean
+  hacer?: (s: S) => Partial<S> | void
+  hijos?: EntradaMenu<S>[]
+}
+
+export interface MenuModulo<S> {
+  /** Objeto ▸ Añadir */
+  anadir?: EntradaMenu<S>[]
+  /** Módulo ▸ Ejemplos */
+  ejemplos?: EntradaMenu<S>[]
+  /** Módulo ▸ (sección del módulo abierto) */
+  acciones?: EntradaMenu<S>[]
+}
+
 export interface Modulo<S> {
   id: string
   area: Area
@@ -164,6 +198,10 @@ export interface Modulo<S> {
   /** Refresca el panel ~10 veces por segundo (lecturas que dependen del tiempo). */
   lecturasVivas?: boolean
   leyenda?: (s: S) => ReactNode
+  /** Lo que se dibuja, con nombre y color: el menú Capas de la app de Mac (mostrar, ocultar, solo esta, eliminar). */
+  capas?: (s: S) => Capa<S>[]
+  /** Entradas propias para la barra de menús: Objeto ▸ Añadir, Módulo ▸ Ejemplos y acciones del módulo. */
+  menu?: (s: S) => MenuModulo<S>
   pista?: string
   /**
    * Parejas preparadas para el modo Comparar con el mismo módulo en los dos

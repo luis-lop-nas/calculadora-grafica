@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { capaFija, capaVer, radios } from '../../nucleo/menu'
 import { Expresion, Grupo, Interruptor, Muestra, Nota, Rango, Segmentado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { factorial, hermite, legendreP } from '../../lib/especiales'
@@ -180,6 +181,19 @@ export default definir<S>({
   entradilla: 'La serie es la proyección sobre los primeros N vectores de una base ortonormal.',
   inicial: { base: 'fourier', objetivo: 'escalon', expr: 'exp(-x*x)', N: 9, verTerminos: false, verError: true, x0: 0.5 },
   Panel,
+  capas: (s) => [
+    capaFija<S>('f', 'f (la que se aproxima)', '--ink-soft'),
+    capaFija<S>('SN', `Suma parcial S_${s.N} f`, '--accent'),
+    capaVer(s, 'verError', 'Error f − S_N', '--pos'),
+    capaVer(s, 'verTerminos', 'Términos cₙ φₙ', '--neg'),
+  ],
+  menu: (s) => ({
+    acciones: [
+      radios<S, Base>('Base', [{ v: 'fourier', t: 'Fourier' }, { v: 'legendre', t: 'Legendre' }, { v: 'chebyshev', t: 'Chebyshev' }, { v: 'hermite', t: 'Hermite' }], s.base, (base) => ({ base })),
+      radios<S, Objetivo>('Función', [{ v: 'escalon', t: 'Escalón' }, { v: 'diente', t: 'Diente de sierra' }, { v: 'valorAbs', t: '|x|' }, { v: 'propia', t: 'La mía' }], s.objetivo, (objetivo) => ({ objetivo })),
+      radios<S, number>('Términos N', [1, 2, 3, 5, 8, 12, 20, 30].map((v) => ({ v, t: String(v) })), s.N, (N) => ({ N })),
+    ],
+  }),
   rotulo: (s) => ({
     nombre: { fourier: 'Serie de Fourier', legendre: 'Serie de Legendre', chebyshev: 'Serie de Chebyshev', hermite: 'Serie de Hermite' }[s.base],
     apunte: `proyección sobre ${s.N + 1} vectores`,

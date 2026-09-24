@@ -43,6 +43,10 @@ await win.waitForTimeout(1500)
 // la ventana de la app se da por enfocada: lo que se prueba es que cada entrada mande su orden.
 await app.evaluate(({ BrowserWindow }) => {
   BrowserWindow.getFocusedWindow = () => BrowserWindow.getAllWindows().at(-1) ?? null
+  // el menú se reconstruye al cambiar el estado solo si la ventana tiene el foco
+  BrowserWindow.prototype.isFocused = function () {
+    return this === BrowserWindow.getFocusedWindow()
+  }
 })
 
 // descargas (PNG, CSV) a la carpeta temporal, sin diálogo
@@ -79,8 +83,10 @@ async function pulsar(ruta) {
 const menu = await app.evaluate(({ Menu }) => {
   const m = Menu.getApplicationMenu().items.find((i) => i.label === 'Módulo')
   const out = { modulos: [], rutas: [], areas: [] }
+  const areas = new Set(m.submenu.items.find((i) => i.label === 'Ir al área').submenu.items.map((i) => i.label))
   for (const i of m.submenu.items) {
-    if (i.type !== 'submenu' || i.label === 'Ir al área') continue
+    // tras las áreas vienen los submenús propios del módulo abierto (Ejemplos, Operación…)
+    if (i.type !== 'submenu' || !areas.has(i.label)) continue
     out.areas.push(i.label)
     i.submenu.items.filter((j) => j.type === 'radio').forEach((j, k) => {
       out.modulos.push(j.label)
@@ -187,6 +193,45 @@ await win.waitForTimeout(500)
 const rehecho = (await estadoDe('aplicaciones'))?.t
 if (!(cambiado !== deshecho && rehecho === cambiado)) errores.push(`[edición] deshacer/rehacer: ${antesT} → ${cambiado} → ${deshecho} → ${rehecho}`)
 else console.log(`edición: deshacer ${cambiado} → ${deshecho}, rehacer → ${rehecho}`)
+
+// 6. Objeto y Capas: añadir un punto en Gráficas, esconder su capa, eliminarla
+await pulsar(menu.rutas[paleta.indexOf('grafica')])
+await win.waitForTimeout(1200)
+const filas = async () => (await estadoDe('grafica'))?.filas ?? []
+const n0 = (await filas()).length
+const fallo6 = await pulsar(['Objeto', 'Añadir', 'Punto'])
+await win.waitForTimeout(800)
+const tras = await filas()
+if (fallo6 || tras.length < n0 || !/=\s*\(1, 1\)/.test(tras.at(-1)?.src ?? '')) errores.push(`[objeto] «Añadir ▸ Punto» no añadió la fila (${fallo6 ?? ''} ${JSON.stringify(tras.at(-1))})`)
+const capas = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.find((i) => i.label === 'Capas').submenu.items.filter((i) => i.type === 'submenu').map((i) => i.label))
+const ultima = capas.find((c) => /= \(1, 1\)/.test(c))
+if (!ultima) errores.push(`[capas] el punto nuevo no sale en Capas: ${capas.join(' | ')}`)
+else {
+  await pulsar(['Capas', ultima, 'Mostrar'])
+  await win.waitForTimeout(600)
+  if ((await filas()).at(-1)?.visible !== false) errores.push('[capas] «Mostrar» no esconde la capa')
+  const oculta = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.find((i) => i.label === 'Capas').submenu.items.filter((i) => i.type === 'submenu').map((i) => i.label).find((l) => l.includes('(oculta)')))
+  await pulsar(['Capas', oculta ?? ultima, 'Eliminar'])
+  await win.waitForTimeout(600)
+  if ((await filas()).some((f) => /= \(1, 1\)/.test(f.src))) errores.push('[capas] «Eliminar» no quita la capa')
+  else console.log(`capas: ${capas.length} en Gráficas; añadir, esconder y eliminar funcionan`)
+}
+// cada módulo de las cinco áreas grandes declara capas o entradas propias
+const sinMenu = []
+for (const id of ['matrices', 'aplicaciones', 'subespacios', 'hilbert', 'estructuras', 'espacios', 'geometria', 'espacio', 'grafica', 'complejos', 'cas', 'resolver', 'campo', 'segundoorden', 'fases', 'edp-propia', 'onda', 'calor', 'laplace']) {
+  const i = paleta.indexOf(id)
+  if (i < 0) continue
+  await pulsar(menu.rutas[i])
+  await win.waitForTimeout(700)
+  const propio = await app.evaluate(({ Menu }) => {
+    const items = Menu.getApplicationMenu().items
+    const capas = items.find((i) => i.label === 'Capas').submenu.items.length > 1
+    const modulo = items.find((i) => i.label === 'Módulo').submenu.items.some((i) => i.label === 'Ejemplos' || (i.type !== 'separator' && !i.enabled && i.label !== 'Cargando…'))
+    return capas || modulo
+  })
+  if (!propio) sinMenu.push(id)
+}
+if (sinMenu.length) errores.push(`[menú] sin capas ni entradas propias: ${sinMenu.join(', ')}`)
 
 // app.close() se quedaría esperando el «¿guardar cambios?» del documento abierto: se sale sin preguntar
 await app.evaluate(({ app }) => setTimeout(() => app.exit(0), 50)).catch(() => {})

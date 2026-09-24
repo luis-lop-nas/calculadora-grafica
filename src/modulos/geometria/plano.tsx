@@ -1,4 +1,5 @@
 import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
+import { accion, casilla, submenu } from '../../nucleo/menu'
 import { Atajos, Boton, Grupo, Interruptor, Rango } from '../../nucleo/controles'
 import type { Pintor2D } from '../../render/pintor2d'
 import { varCss } from '../../render/tema'
@@ -482,6 +483,43 @@ export default definir<S>({
     ejes: true,
   },
   Panel,
+  capas: (s) => {
+    const vals = valores(s)
+    return s.objs.map((o) => {
+      const v = vals.get(o.id)!
+      const color = v.k === 'punto' ? (o.def === 'libre' ? '--accent' : o.def === 'sobre' ? '--aux' : '--ink') : COLOR[v.k] ?? '--ink-soft'
+      return {
+        id: o.id,
+        nombre: `${o.id} · ${NOMBRE_DEF[o.def] ?? o.def}`,
+        color,
+        detalle: describir(v),
+        visible: o.visible,
+        alternar: (t: S) => ({ objs: t.objs.map((x) => (x.id === o.id ? { ...x, visible: !x.visible } : x)) }),
+        quitar: (t: S) => borrar(t, o.id),
+      }
+    })
+  },
+  menu: (s) => ({
+    // Añadir = coger la herramienta; luego se pulsa en el lienzo (como en GeoGebra)
+    anadir: GRUPOS.filter((g) => g !== 'Mover').map((g) =>
+      submenu<S>(
+        g,
+        Object.entries(HERRAMIENTAS)
+          .filter(([, h]) => h.grupo === g)
+          .map(([k, h]) => ({ t: h.nombre, tipo: 'radio' as const, activo: s.herramienta === k, hacer: () => ({ herramienta: k, grupo: g, pendientes: [] }) })),
+      ),
+    ),
+    ejemplos: EJEMPLOS.map((e) => accion<S>(e.t, () => ({ objs: e.objs, pendientes: [], herramienta: 'mover', grupo: 'Mover' }))),
+    acciones: [
+      { t: 'Herramienta Mover', tipo: 'radio', activo: s.herramienta === 'mover', hacer: () => ({ herramienta: 'mover', grupo: 'Mover', pendientes: [] }) },
+      accion<S>('Cancelar la construcción en curso', () => ({ pendientes: [] }), !s.pendientes.length),
+      casilla<S>('Ajustar a la rejilla', s.ajustar, (ajustar) => ({ ajustar })),
+      casilla<S>('Nombres', s.etiquetas, (etiquetas) => ({ etiquetas })),
+      casilla<S>('Ejes', s.ejes, (ejes) => ({ ejes })),
+      accion<S>('Quitar el último objeto', (t) => (t.objs.length ? borrar(t, t.objs[t.objs.length - 1].id) : undefined), !s.objs.length),
+      accion<S>('Borrar todo', () => ({ objs: [], pendientes: [] }), !s.objs.length),
+    ],
+  }),
   vista: {
     tipo: '2d',
     ventana: { x: [-7, 7], y: [-5, 5] },
