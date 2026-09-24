@@ -28,6 +28,8 @@ interface S {
   semillas: Array<[number, number]>
   verNulclinas: boolean
   verEquilibrios: boolean
+  /** Variedades estable e inestable de las sillas. */
+  verSeparatrices: boolean
   verCampo: boolean
   sembrar: boolean
   verTiempo: boolean
@@ -114,6 +116,9 @@ function Panel({ s, set }: PropsPanel<S>) {
           <Interruptor activo={s.verEquilibrios} onChange={(verEquilibrios) => set({ verEquilibrios })}>
             Equilibrios
           </Interruptor>
+          <Interruptor activo={s.verSeparatrices} onChange={(verSeparatrices) => set({ verSeparatrices })}>
+            Separatrices de las sillas
+          </Interruptor>
           <Boton onClick={() => set({ semillas: [] })}>Borrar órbitas</Boton>
         </div>
         {s.verTiempo && (
@@ -150,6 +155,7 @@ export default definir<S>({
     semillas: [[1.5, 0]],
     verNulclinas: true,
     verEquilibrios: true,
+    verSeparatrices: true,
     verCampo: true,
     sembrar: false,
     verTiempo: false,
@@ -206,6 +212,12 @@ export default definir<S>({
         <>
           <Muestra color="var(--pos)">x′ = 0</Muestra>
           <Muestra color="var(--aux)">y′ = 0</Muestra>
+        </>
+      )}
+      {s.verSeparatrices && (
+        <>
+          <Muestra color="var(--morado)">variedad estable</Muestra>
+          <Muestra color="var(--rosa)">variedad inestable</Muestra>
         </>
       )}
       {s.modo === 'lineal' && <span>líneas gruesas = autovectores</span>}
@@ -269,6 +281,37 @@ function todasLasSemillas(s: S, marco: { x: [number, number]; y: [number, number
   for (let k = 0; k < 6; k++) {
     const a = (2 * Math.PI * k) / 6
     out.push([r * Math.cos(a), r * Math.sin(a)])
+  }
+  return out
+}
+
+/** Ramas de las variedades estable (hacia atrás) e inestable (hacia delante) de cada punto de silla. */
+export function separatrices(
+  s: S,
+  f: (x: number, y: number) => number,
+  q: (x: number, y: number) => number,
+  marco: { x: [number, number]; y: [number, number] },
+  diag: number,
+): Array<{ estable: boolean; pts: Array<[number, number]> }> {
+  const eqs: Array<[number, number]> = s.modo === 'lineal' ? (Math.abs(det(s.A)) > 1e-9 ? [[0, 0]] : []) : equilibrios(f, q, marco, 60)
+  const [xa, xb] = marco.x
+  const [ya, yb] = marco.y
+  const dentro = (y: number[]) => y[0] > xa - diag && y[0] < xb + diag && y[1] > ya - diag && y[1] < yb + diag
+  const h = diag / 900
+  const out: Array<{ estable: boolean; pts: Array<[number, number]> }> = []
+  for (const p of eqs) {
+    const J = s.modo === 'lineal' ? s.A : jacobiano(f, q, p[0], p[1])
+    if (det(J) >= 0) continue
+    for (const l of auto2(J)) {
+      if (!l.vector || l.im !== 0) continue
+      const estable = l.re < 0
+      for (const signo of [1, -1]) {
+        const eps = 1e-4 * diag
+        const ini: [number, number] = [p[0] + signo * eps * l.vector[0], p[1] + signo * eps * l.vector[1]]
+        const tr = orbita(f, q, ini, estable ? -h : h, 5000, dentro)
+        out.push({ estable, pts: [[p[0], p[1]], ...tr.map((y) => [y[0], y[1]] as [number, number])] })
+      }
+    }
   }
   return out
 }
@@ -350,6 +393,12 @@ function planoDeFases(
     }
   })
   for (const p of s.semillas) g.punto(p[0], p[1], g.color('--ink'), 3.5)
+
+  if (s.verSeparatrices) {
+    // en cada silla, las cuatro ramas: se sale un poquito por cada autovector y se integra
+    // hacia delante por la inestable y hacia atrás por la estable
+    for (const r of separatrices(s, f, q, marco, diag)) g.curva(r.pts, g.color(r.estable ? '--morado' : '--rosa'), 2.2)
+  }
 
   if (s.verEquilibrios) {
     const eqs =

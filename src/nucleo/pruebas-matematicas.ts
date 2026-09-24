@@ -11,6 +11,7 @@ import {
 import * as K from '../lib/complejo'
 import { compilarC as compilarCExpr } from '../lib/expresion'
 import { contorno, equilibrios, jacobiano } from '../lib/contorno'
+import fases, { separatrices as separatricesFases } from '../modulos/edo/fases'
 import { abeliano, centro, diedral, inverso, orden, simetrico, subgrupos, zn } from '../lib/grupos'
 
 import { caja, hidrogeno, oscilador } from '../modulos/cuantica/orbitales'
@@ -1110,6 +1111,22 @@ seccion('Superficies paramétricas')
 
 seccion('Sistemas dinámicos')
 {
+  // separatrices: en la silla lineal x′ = x, y′ = −y la estable es el eje y y la inestable el eje x
+  {
+    const st = { ...(fases.inicial as Record<string, unknown>), modo: 'lineal', A: [[1, 0], [0, -1]] } as never
+    const ramas = separatricesFases(st, (x) => x, (_x, y) => -y, { x: [-3, 3], y: [-3, 3] }, Math.hypot(6, 6))
+    cierto('silla lineal: cuatro ramas, dos estables y dos inestables', ramas.length === 4 && ramas.filter((r) => r.estable).length === 2)
+    cierto('silla lineal: la variedad estable es el eje y', ramas.filter((r) => r.estable).every((r) => r.pts.every(([x]) => Math.abs(x) < 1e-9)))
+    cierto('silla lineal: la inestable es el eje x', ramas.filter((r) => !r.estable).every((r) => r.pts.every(([, y]) => Math.abs(y) < 1e-9)))
+    // péndulo amortiguado: la variedad estable de la silla en (π, 0) se conserva la energía… casi; la inestable cae al foco
+    const f = (_x: number, y: number) => y
+    const q = (x: number, y: number) => -Math.sin(x) - 0.2 * y
+    const pend = separatricesFases({ ...(fases.inicial as Record<string, unknown>), modo: 'campo', fx: 'y', fy: '-sin(x)-0.2*y' } as never, f, q, { x: [-5, 5], y: [-4, 4] }, Math.hypot(10, 8))
+    const inest = pend.filter((r) => !r.estable)
+    cierto('péndulo: hay separatrices en las dos sillas (±π, 0)', inest.length === 4, String(inest.length))
+    const cae = inest.some((r) => Math.hypot(...r.pts[r.pts.length - 1]) < 0.2)
+    cierto('péndulo: alguna rama inestable acaba en el foco del origen', cae)
+  }
   // Lotka-Volterra: equilibrios en (0,0) y (1,1)
   const f = (x: number, y: number) => x * (1 - y)
   const q = (x: number, y: number) => y * (x - 1)

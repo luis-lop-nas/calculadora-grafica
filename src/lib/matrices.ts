@@ -106,7 +106,8 @@ export function auto2(A: Mat): Autovalor[] {
 function autovector2(A: Mat, l: number): Vec {
   const [a, b] = A[0]
   const [c, d] = A[1]
-  const v: Vec = Math.abs(b) > 1e-9 ? [b, l - a] : Math.abs(c) > 1e-9 ? [l - d, c] : [1, 0]
+  // diagonal: el autovector de λ = a es e₁ y el de λ = d, e₂
+  const v: Vec = Math.abs(b) > 1e-9 ? [b, l - a] : Math.abs(c) > 1e-9 ? [l - d, c] : Math.abs(l - a) <= Math.abs(l - d) ? [1, 0] : [0, 1]
   const n = norma(v) || 1
   return [v[0] / n, v[1] / n]
 }
