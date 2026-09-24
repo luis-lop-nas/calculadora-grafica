@@ -157,7 +157,7 @@ function primitiva(f: E, x: string, profundidad = 0): E | null {
 /* ---------- fracciones simples ---------- */
 
 /** Resuelve A·v = b sobre Q por Gauss-Jordan; null si es singular. */
-function sistemaQ(A: R[][], b: R[]): R[] | null {
+export function sistemaQ(A: R[][], b: R[]): R[] | null {
   const n = b.length
   const m = A.map((fila, i) => [...fila, b[i]])
   const cols = A[0]?.length ?? 0

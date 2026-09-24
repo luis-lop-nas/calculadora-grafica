@@ -52,6 +52,7 @@ declare const process: { exitCode?: number }
 
 import { cerca, cierto, cuenta, lectura, parecido, seccion } from './pruebas/comun'
 import { pruebasBase } from './pruebas/base'
+import { pruebasSenales } from './pruebas/senales'
 
 /* ═══════════ funciones especiales ═══════════ */
 seccion('Funciones especiales')
@@ -1465,6 +1466,7 @@ seccion('Espacio: sólidos, filas y curvas de corte')
 
 
 pruebasBase()
+pruebasSenales()
 
 /* ═══════════ Asas: soltar un asa donde está no cambia nada ═══════════ */
 seccion('Asas: ida y vuelta en todos los módulos')

@@ -34,6 +34,9 @@ function exterior(v: string, u: E): E {
       return prod(u, pot(fn('abs', [u]), MENOS))
     case 'sign':
       return CERO
+    // en el sentido de las distribuciones: H′ = δ
+    case 'heaviside':
+      return fn('delta', [u])
     case 'erf':
       return prod(DOS, pot(PI, prod(MENOS, MEDIO)), pot(NEPER, prod(MENOS, uu)))
     default:

@@ -12,7 +12,7 @@ const FUNCIONES: Record<string, string> = {
   sin: '\\sin', cos: '\\cos', tan: '\\tan', asin: '\\arcsin', acos: '\\arccos', atan: '\\arctan',
   sinh: '\\sinh', cosh: '\\cosh', tanh: '\\tanh', asinh: '\\operatorname{arsinh}', acosh: '\\operatorname{arcosh}',
   atanh: '\\operatorname{artanh}', ln: '\\ln', sign: '\\operatorname{sgn}', gamma: '\\Gamma', erf: '\\operatorname{erf}',
-  round: '\\operatorname{round}', trunc: '\\operatorname{trunc}',
+  round: '\\operatorname{round}', trunc: '\\operatorname{trunc}', heaviside: 'H', delta: '\\delta',
 }
 /** Las que admiten el exponente pegado al nombre: sin²x. */
 const CON_POTENCIA = new Set(['sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh', 'ln'])

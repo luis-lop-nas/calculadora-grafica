@@ -30,6 +30,10 @@ import hilbert from '../modulos/algebra/hilbert'
 import estructuras from '../modulos/algebra/estructuras'
 import espacios from '../modulos/algebra/espacios'
 import unidades from '../modulos/algebra/unidades'
+import fourier from '../modulos/senales/fourier'
+import transformadaF from '../modulos/senales/transformada'
+import convolucionM from '../modulos/senales/convolucion'
+import laplaceT from '../modulos/senales/laplace'
 
 /** El orden de esta lista es el orden del menú. */
 export const MODULOS: ModuloAny[] = [
@@ -40,4 +44,5 @@ export const MODULOS: ModuloAny[] = [
   resolver, campo, segundoorden, fases,
   superficies, parametricas, vectorial,
   aplicaciones, subespacios, hilbert, estructuras, espacios, unidades,
+  fourier, transformadaF, convolucionM, laplaceT,
 ]

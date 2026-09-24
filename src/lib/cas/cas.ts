@@ -1,10 +1,11 @@
 import { analizar, tex as texNodo, type Nodo } from '../expresion'
 import { desdeNodo, esIndef, esNum, evaluar, flo, MENOS, prod, q, s, simbolos, suma, sustituir, type Definiciones, type E } from './expr'
-import { tex } from './tex'
+import { tex, texConExponenciales } from './tex'
 import { derivarN } from './derivar'
 import { desarrollar, factorizar, simplificar } from './algebra'
 import { resolver, resolverSistema, type Solucion } from './resolver'
 import { limite, taylor, type Punto } from './limites'
+import { laplace, laplaceInversa } from './laplace'
 import { integralNumerica, integrar } from './integrar'
 
 /**
@@ -193,6 +194,22 @@ const ORDENES: Record<string, Orden> = {
     if (!Number.isFinite(v)) throw new Error(simbolos(e).size ? 'tiene variables sin valor' : 'no es un número real')
     return { entrada: `\\operatorname{N}\\left(${texNodo(ctx.nodo(a[0]))}\\right)`, salida: String(+v.toPrecision(15)).replace('.', '{,}') }
   },
+  laplace(a, ctx) {
+    const r = laplace(ctx.expr(a[0]))
+    return {
+      entrada: String.raw`\mathcal{L}\left\{${texNodo(ctx.nodo(a[0]))}\right\}(s)`,
+      salida: texConExponenciales(r.resultado),
+      nota: r.verificada ? `comprobada con ∫₀^∞ f e^{−st} dt (error ${r.error.toExponential(0)})` : `¡no cuadra con la integral numérica! (error ${r.error.toExponential(1)})`,
+    }
+  },
+  ilaplace(a, ctx) {
+    const r = laplaceInversa(ctx.expr(a[0]))
+    return {
+      entrada: String.raw`\mathcal{L}^{-1}\left\{${texNodo(ctx.nodo(a[0]))}\right\}(t)`,
+      salida: texConExponenciales(r.resultado),
+      nota: [r.aproximada ? 'raíces sin forma cerrada: coeficientes decimales' : '', r.verificada ? `comprobada transformándola de vuelta (error ${r.error.toExponential(0)})` : '¡no cuadra al transformarla de vuelta!'].filter(Boolean).join(' · '),
+    }
+  },
   sustituir(a, ctx) {
     const e = ctx.expr(a[0])
     if (a.length < 3) throw new Error('sustituir(expresión, variable, valor)')
@@ -207,6 +224,7 @@ const ALIAS: Record<string, string> = {
   simplify: 'simplificar', expand: 'desarrollar', expandir: 'desarrollar', factor: 'factorizar',
   solve: 'resolver', limit: 'limite', lim: 'limite', series: 'taylor',
   n: 'numerico', numeric: 'numerico', decimal: 'numerico', substitute: 'sustituir', subs: 'sustituir',
+  transformada: 'laplace', inversa: 'ilaplace', laplaceinversa: 'ilaplace', invlaplace: 'ilaplace',
 }
 
 export const ORDENES_DISPONIBLES = Object.keys(ORDENES)

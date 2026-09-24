@@ -87,6 +87,9 @@ const UNARIAS: Record<string, (x: number) => number> = {
   // Señales. En los saltos valen la media de los dos lados (H(0) = ½), que es a donde converge Fourier.
   heaviside: (x) => (x > 0 ? 1 : x < 0 ? 0 : 0.5),
   escalon: (x) => (x > 0 ? 1 : x < 0 ? 0 : 0.5),
+  // δ de Dirac: para dibujar vale 0 fuera del origen; en él no tiene valor (la lee el CAS, no la gráfica).
+  // No se llama «delta» porque esa palabra ya es la letra griega δ.
+  dirac: (x) => (x === 0 ? NaN : 0),
   rect: (x) => (Math.abs(x) < 0.5 ? 1 : Math.abs(x) === 0.5 ? 0.5 : 0),
   tri: (x) => Math.max(0, 1 - Math.abs(x)),
   // sinc normalizada, la de señales: sin(πx)/(πx)

@@ -359,6 +359,8 @@ const NUMERICAS: Record<string, (x: number) => number> = {
   sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos, atan: Math.atan,
   sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh, asinh: Math.asinh, acosh: Math.acosh, atanh: Math.atanh,
   ln: Math.log, abs: Math.abs, sign: Math.sign, floor: Math.floor, ceil: Math.ceil, round: Math.round,
+  // escalón de Heaviside con H(0) = ½, como en el evaluador numérico
+  heaviside: (x) => (x > 0 ? 1 : x < 0 ? 0 : 0.5),
 }
 
 export function fn(v: string, a: E[]): E {
@@ -486,6 +488,8 @@ export function evaluar(x: E, vars: Record<string, number> = {}): number {
       if (x.v === 'fact') return gammaR(a[0] + 1)
       if (x.v === 'gamma') return gammaR(a[0])
       if (x.v === 'erf') return erfR(a[0])
+      // δ es una distribución: vale 0 fuera del origen y no tiene valor en él
+      if (x.v === 'delta') return a[0] === 0 ? NaN : 0
       return NaN
     }
   }
@@ -523,7 +527,7 @@ export interface Definiciones {
 
 const ALIAS: Record<string, string> = {
   sen: 'sin', tg: 'tan', arcsin: 'asin', arcsen: 'asin', arccos: 'acos', arctan: 'atan', arctg: 'atan',
-  senh: 'sinh', arcsinh: 'asinh', arccosh: 'acosh', arctanh: 'atanh', sgn: 'sign', raiz: 'sqrt',
+  senh: 'sinh', arcsinh: 'asinh', arccosh: 'acosh', arctanh: 'atanh', sgn: 'sign', raiz: 'sqrt', escalon: 'heaviside', dirac: 'delta',
 }
 
 /** Un literal decimal se lee exacto: 0.2 es 1/5. */
