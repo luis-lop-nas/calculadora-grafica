@@ -20,6 +20,8 @@ export class Pintor2D {
   private vw = 0
   private vh = 0
 
+  private lienzoMapa?: HTMLCanvasElement
+
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx
   }
@@ -287,6 +289,31 @@ export class Pintor2D {
   }
 
   /** Texto en coordenadas del mundo, con desplazamiento en píxeles. */
+  /** Rejilla de píxeles nx×ny (fila 0 abajo) pintada en el rectángulo del mundo [xa, xb]×[ya, yb]. */
+  mapa(nx: number, ny: number, rgb: (i: number, j: number) => [number, number, number], [xa, xb, ya, yb]: [number, number, number, number], suave = true) {
+    const c = (this.lienzoMapa ??= document.createElement('canvas'))
+    if (c.width !== nx || c.height !== ny) {
+      c.width = nx
+      c.height = ny
+    }
+    const cx = c.getContext('2d')!
+    const img = cx.createImageData(nx, ny)
+    for (let j = 0; j < ny; j++)
+      for (let i = 0; i < nx; i++) {
+        const [r, g, b] = rgb(i, j)
+        const k = ((ny - 1 - j) * nx + i) * 4
+        img.data[k] = r * 255
+        img.data[k + 1] = g * 255
+        img.data[k + 2] = b * 255
+        img.data[k + 3] = 255
+      }
+    cx.putImageData(img, 0, 0)
+    this.ctx.save()
+    this.ctx.imageSmoothingEnabled = suave
+    this.ctx.drawImage(c, this.X(xa), this.Y(yb), this.X(xb) - this.X(xa), this.Y(ya) - this.Y(yb))
+    this.ctx.restore()
+  }
+
   texto(
     txt: string,
     x: number,

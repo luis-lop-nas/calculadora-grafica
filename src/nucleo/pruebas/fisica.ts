@@ -2,6 +2,8 @@ import { campo, flujoEsfera, imagenes, lineaDeCampo, potencial, type Carga } fro
 import { campoCuadratura, campoPoligonal, campoTramo, circulacion, poligonal, type P3 } from '../../lib/magneto'
 import { campoEspacio, campoPlano, circulacionBorde, circulacionPlana, curvaPlana, estrellada, flujoCerrado, flujoPlano, flujoRotacional, integralDivergencia, integralRegion, parametrizacion } from '../../lib/teoremas'
 import { brewster, campoPolarizado, critico, elipse, fase, fresnel, picoEnvolvente } from '../../lib/ondas'
+import { airy, anillosOscuros, fraunhofer2D, intensidadMichelson, intensidadNumerica, intensidadRendijas, J11, reflectanciaAiry, reflectanciaMatriz, rendijas } from '../../lib/optica'
+import { besselJx, gauss20 } from '../../lib/especiales'
 import { cerca, cierto, parecido, seccion } from './comun'
 
 export function pruebasFisica() {
@@ -178,5 +180,53 @@ export function pruebasFisica() {
     const k0 = 3
     cerca('paquete ω = k²/2: el pico está en x = v_g t = k₀ t', picoEnvolvente((k) => (k * k) / 2, k0, 0.5, 4, 11, 3), 12, 1e-6)
     cerca('paquete ω = ck: el pico viaja sin deformarse a c', picoEnvolvente((k) => 1.7 * k, k0, 0.5, 5, 8, 3), 8.5, 1e-6)
+  }
+
+  seccion('Física · óptica ondulatoria')
+  {
+    // N rendijas: fórmula cerrada frente a la integral de Fraunhofer sobre las aberturas
+    const [N, a, d, lam] = [4, 0.3, 1.1, 0.5]
+    for (const sn of [0.037, 0.19, 0.4545, 0.71]) cerca(`${N} rendijas en sin θ = ${sn}: fórmula = integral`, intensidadRendijas(N, a, d, lam, sn), intensidadNumerica(rendijas(N, a, d), lam, sn), 1e-12)
+    cerca('red: máximo principal de orden 2 vale sinc²(2a/d)', intensidadRendijas(N, a, d, lam, (2 * lam) / d), (Math.sin((2 * Math.PI * a) / d) / ((2 * Math.PI * a) / d)) ** 2, 1e-12)
+    cerca('red: primer cero junto al máximo central en sin θ = λ/(Nd)', intensidadRendijas(N, a, d, lam, lam / (N * d)), 0, 1e-28)
+    // Airy: la integral de Hankel de la abertura circular frente a 2J₁(u)/u
+    const R = 0.7
+    for (const rho of [0.3, 0.9, 1.7]) {
+      const amp = gauss20((r) => 2 * Math.PI * besselJx(0, 2 * Math.PI * rho * r) * r, 0, R, 8) / (Math.PI * R * R)
+      cerca(`Airy: ∫ J₀ r dr = 2J₁(u)/u en ρ = ${rho}`, amp * amp, airy(2 * Math.PI * rho * R), 1e-12)
+    }
+    cerca('Airy: primer anillo oscuro en sin θ = 1,21967 λ/D', J11 / Math.PI, 1.2196698912665045, 1e-15)
+    cerca('Airy: intensidad nula en el primer cero de J₁', airy(J11), 0, 1e-28)
+    // FFT 2D de un rectángulo de píxeles = producto de núcleos de Dirichlet discretos
+    const n = 64
+    const [wx, wy] = [9, 5]
+    const t = new Float64Array(n * n)
+    for (let j = 0; j < wy; j++) for (let i = 0; i < wx; i++) t[(j + 3) * n + (i + 11)] = 1
+    const I = fraunhofer2D(t, n)
+    const dir = (k: number, w: number) => (k === 0 ? 1 : Math.sin((Math.PI * k * w) / n) / (w * Math.sin((Math.PI * k) / n))) ** 2
+    let peor = 0
+    for (const [kx, ky] of [[0, 0], [3, 0], [0, 7], [5, -9], [-13, 4], [20, 17]]) peor = Math.max(peor, Math.abs(I[(ky + n / 2) * n + (kx + n / 2)] - dir(kx, wx) * dir(ky, wy)))
+    cerca('FFT 2D de un rectángulo = Dirichlet × Dirichlet', peor, 0, 1e-13)
+    // disco pixelado: el primer mínimo sale donde Airy, salvo la pixelación del borde (tolerancia medio bin)
+    const m = 512
+    const Rp = 16
+    const disco = new Float64Array(m * m)
+    for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) if ((i - m / 2) ** 2 + (j - m / 2) ** 2 <= Rp * Rp) disco[j * m + i] = 1
+    const D = fraunhofer2D(disco, m)
+    const fila = Array.from({ length: 40 }, (_, k) => D[(m / 2) * m + m / 2 + k])
+    let k0 = 1
+    while (k0 < 39 && !(fila[k0] < fila[k0 - 1] && fila[k0] <= fila[k0 + 1])) k0++
+    const sub = k0 + (0.5 * (fila[k0 - 1] - fila[k0 + 1])) / (fila[k0 - 1] - 2 * fila[k0] + fila[k0 + 1])
+    cerca('FFT de un disco: primer mínimo en j₁,₁ n/(2πR) bins (± pixelación)', sub, (J11 * m) / (2 * Math.PI * Rp), 0.5)
+    // películas delgadas: Airy = matriz característica; λ/4 antirreflejante; λ/2 ausente
+    for (const l of [420, 533, 690]) cerca(`película: Airy = matriz característica en λ = ${l} nm`, reflectanciaAiry(1, 1.38, 1.52, 250, l), reflectanciaMatriz(1, 1.38, 1.52, 250, l), 1e-15)
+    const ns = 1.52
+    const nf = Math.sqrt(ns)
+    cerca('capa λ/4 con n_f = √n_s: R = 0', reflectanciaAiry(1, nf, ns, 550 / (4 * nf), 550), 0, 1e-30)
+    cerca('capa λ/2: como si no estuviera', reflectanciaMatriz(1, 1.9, ns, 550 / (2 * 1.9), 550), ((1 - ns) / (1 + ns)) ** 2, 1e-15)
+    // Michelson: intensidad nula en los anillos oscuros
+    const an = anillosOscuros(12.4, 0.55, 0.5)
+    cierto('Michelson: hay varios anillos', an.length >= 4, String(an.length))
+    cerca('Michelson: los anillos oscuros tienen intensidad 0', Math.max(...an.map((th) => intensidadMichelson(12.4, 0.55, th))), 0, 1e-24)
   }
 }
