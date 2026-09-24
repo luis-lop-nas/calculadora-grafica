@@ -83,3 +83,32 @@ export function alOrdenVista(fn: (o: OrdenVista) => void): () => void {
   bus.addEventListener('orden', oyente)
   return () => bus.removeEventListener('orden', oyente)
 }
+
+/**
+ * Reloj común de las animaciones (menú Animación): cada lienzo acumula su propio tiempo con el
+ * dt real multiplicado por `velocidad`, o 0 en pausa. `pasos` y `reinicios` son contadores: cada
+ * lienzo compara con el último que vio y avanza un fotograma o vuelve a t = 0.
+ */
+export const animacion = { pausado: false, velocidad: 1, pasos: 0, reinicios: 0 }
+
+/** Paso de un fotograma, en segundos de animación. */
+export const PASO_ANIMACION = 1 / 30
+
+export function relojLienzo() {
+  let t = 0
+  let pasos = animacion.pasos
+  let reinicios = animacion.reinicios
+  return (dtReal: number) => {
+    if (animacion.reinicios !== reinicios) {
+      reinicios = animacion.reinicios
+      t = 0
+    }
+    let dt = animacion.pausado ? 0 : dtReal * animacion.velocidad
+    if (animacion.pasos !== pasos) {
+      dt += (animacion.pasos - pasos) * PASO_ANIMACION
+      pasos = animacion.pasos
+    }
+    t += dt
+    return { t, dt }
+  }
+}

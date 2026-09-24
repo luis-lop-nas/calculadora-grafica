@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('escritorio', {
   listo: (modulos) => ipcRenderer.invoke('listo', modulos),
   estado: (estado) => ipcRenderer.send('estado', estado),
   guardar: (contenido, como, nombre) => ipcRenderer.invoke('guardar', { contenido, como, nombre }),
+  contextual: () => ipcRenderer.send('contextual'),
   alOrden: (fn) => {
     const oyente = (_ev, orden, dato) => fn(orden, dato)
     ipcRenderer.on('orden', oyente)

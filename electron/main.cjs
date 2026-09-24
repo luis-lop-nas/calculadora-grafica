@@ -233,8 +233,8 @@ function menuModulos(e) {
   ]
 }
 
-function construirMenu() {
-  const win = BrowserWindow.getFocusedWindow()
+/** Piezas del menú que se usan en la barra y en el menú contextual del lienzo. */
+function piezasMenu(win) {
   const e = (win && ventanas.get(win.id)?.estado) || {}
   const hay = !!win
   const p = e.prefs || {}
@@ -252,6 +252,89 @@ function construirMenu() {
     click: (item) => enviar(BrowserWindow.getFocusedWindow(), 'prefs', { [clave]: item.checked }),
     ...extra,
   })
+  const puntoDeVista = {
+    label: 'Punto de vista',
+    enabled: es3D,
+    submenu: [
+      // X, Y, Z y 0 ya los atiende el lienzo: aquí solo se muestran (robarlos rompería los campos)
+      { label: 'Vista de partida', accelerator: '0', registerAccelerator: false, click: vista({ orden: 'punto', modo: '3d' }) },
+      { label: 'Desde el eje X', accelerator: 'X', registerAccelerator: false, click: vista({ orden: 'punto', modo: 'x' }) },
+      { label: 'Desde el eje Y', accelerator: 'Y', registerAccelerator: false, click: vista({ orden: 'punto', modo: 'y' }) },
+      { label: 'Desde el eje Z (planta)', accelerator: 'Z', registerAccelerator: false, click: vista({ orden: 'punto', modo: 'z' }) },
+      { label: 'Isométrica', click: vista({ orden: 'punto', modo: 'iso' }) },
+      { type: 'separator' },
+      casilla('Proyección ortográfica', 'ortografica', { accelerator: 'Shift+CmdOrCtrl+O', enabled: es3D }),
+    ],
+  }
+  const superposiciones = {
+    label: 'Superposiciones',
+    submenu: [
+      casilla('Ejes', 'ejes'),
+      casilla('Nombres de los ejes', 'nombres'),
+      casilla('Rejilla', 'rejilla'),
+      casilla('Rejilla en los tres planos (XY, XZ, YZ)', 'planos', { enabled: es3D }),
+      { type: 'separator' },
+      casilla('Leyenda', 'leyenda'),
+      casilla('Fórmula', 'formula'),
+      casilla('Lecturas', 'lecturas'),
+    ],
+  }
+  const reproducir = {
+    label: 'Reproducir',
+    type: 'checkbox',
+    checked: !e.pausado,
+    accelerator: 'Alt+CmdOrCtrl+P',
+    enabled: hay && !!e.animado,
+    click: (item) => enviar(BrowserWindow.getFocusedWindow(), 'animacion', { pausado: !item.checked }),
+  }
+  const animacion = [
+    reproducir,
+    { label: 'Avanzar un fotograma', accelerator: 'Alt+CmdOrCtrl+Right', enabled: hay && !!e.animado, click: alFoco('animacion', 'paso') },
+    { label: 'Volver al instante 0', accelerator: 'Alt+CmdOrCtrl+Left', enabled: hay && !!e.animado, click: alFoco('animacion', 'reiniciar') },
+    {
+      label: 'Velocidad',
+      enabled: hay && !!e.animado,
+      submenu: [0.25, 0.5, 1, 2, 4].map((v) => ({ label: `${String(v).replace('.', ',')}×`, type: 'radio', checked: (e.velocidad ?? 1) === v, click: alFoco('animacion', { velocidad: v }) })),
+    },
+    { type: 'separator' },
+    { label: 'Grabar vídeo del lienzo (WebM)', type: 'checkbox', checked: !!e.grabando, accelerator: 'Alt+Shift+CmdOrCtrl+R', enabled: lienzo, click: alFoco('grabar') },
+  ]
+  const paso = p.paso ?? 0.5
+  const numero = (v) => String(v).replace('.', ',')
+  const transformar = {
+    label: 'Transformar',
+    enabled: hay && !!e.transformable,
+    submenu: e.transformable
+      ? [
+          {
+            label: 'Mover',
+            submenu: [0, 1, 2].flatMap((k) => [
+              ...(k ? [{ type: 'separator' }] : []),
+              { label: `+${numero(paso)} en ${'XYZ'[k]}`, click: alFoco('transformar', { op: 'mover', eje: k, valor: paso }) },
+              { label: `−${numero(paso)} en ${'XYZ'[k]}`, click: alFoco('transformar', { op: 'mover', eje: k, valor: -paso }) },
+            ]),
+          },
+          {
+            label: 'Girar',
+            submenu: [0, 1, 2].flatMap((k) => [
+              ...(k ? [{ type: 'separator' }] : []),
+              ...[15, -15, 90, -90].map((a) => ({ label: `${a > 0 ? '+' : '−'}${Math.abs(a)}° en ${'XYZ'[k]}`, click: alFoco('transformar', { op: 'girar', eje: k, valor: a }) })),
+            ]),
+          },
+        ]
+      : [{ label: 'Este módulo no tiene figuras que mover', enabled: false }],
+  }
+  const anadir = {
+    label: 'Añadir',
+    enabled: hay && !!e.menu?.anadir?.length,
+    submenu: e.menu?.anadir?.length ? entradasModulo(e.menu.anadir, 'anadir') : [{ label: 'Nada que añadir aquí', enabled: false }],
+  }
+  return { e, hay, p, lienzo, es3D, prefs, vista, casilla, puntoDeVista, superposiciones, reproducir, animacion, transformar, anadir }
+}
+
+function construirMenu() {
+  const win = BrowserWindow.getFocusedWindow()
+  const { e, hay, p, lienzo, es3D, prefs, vista, casilla, puntoDeVista, superposiciones, animacion, transformar, anadir } = piezasMenu(win)
   const plantilla = [
     {
       label: 'Calculadora gráfica',
@@ -323,7 +406,8 @@ function construirMenu() {
     {
       label: 'Objeto',
       submenu: [
-        { label: 'Añadir', enabled: hay && !!e.menu?.anadir?.length, submenu: e.menu?.anadir?.length ? entradasModulo(e.menu.anadir, 'anadir') : [{ label: 'Nada que añadir aquí', enabled: false }] },
+        anadir,
+        transformar,
         { type: 'separator' },
         {
           label: 'Eliminar',
@@ -341,37 +425,12 @@ function construirMenu() {
     {
       label: 'Vista',
       submenu: [
-        {
-          label: 'Punto de vista',
-          enabled: es3D,
-          submenu: [
-            // X, Y, Z y 0 ya los atiende el lienzo: aquí solo se muestran (robarlos rompería los campos)
-            { label: 'Vista de partida', accelerator: '0', registerAccelerator: false, click: vista({ orden: 'punto', modo: '3d' }) },
-            { label: 'Desde el eje X', accelerator: 'X', registerAccelerator: false, click: vista({ orden: 'punto', modo: 'x' }) },
-            { label: 'Desde el eje Y', accelerator: 'Y', registerAccelerator: false, click: vista({ orden: 'punto', modo: 'y' }) },
-            { label: 'Desde el eje Z (planta)', accelerator: 'Z', registerAccelerator: false, click: vista({ orden: 'punto', modo: 'z' }) },
-            { label: 'Isométrica', click: vista({ orden: 'punto', modo: 'iso' }) },
-            { type: 'separator' },
-            casilla('Proyección ortográfica', 'ortografica', { accelerator: 'Shift+CmdOrCtrl+O', enabled: es3D }),
-          ],
-        },
+        puntoDeVista,
         { label: 'Encuadrar todo', accelerator: 'CmdOrCtrl+0', enabled: lienzo, click: vista({ orden: 'encuadrar' }) },
         { label: 'Acercar', accelerator: 'CmdOrCtrl+Plus', enabled: lienzo, click: vista({ orden: 'acercar', factor: 0.8 }) },
         { label: 'Alejar', accelerator: 'CmdOrCtrl+-', enabled: lienzo, click: vista({ orden: 'acercar', factor: 1.25 }) },
         { type: 'separator' },
-        {
-          label: 'Superposiciones',
-          submenu: [
-            casilla('Ejes', 'ejes'),
-            casilla('Nombres de los ejes', 'nombres'),
-            casilla('Rejilla', 'rejilla'),
-            casilla('Rejilla en los tres planos (XY, XZ, YZ)', 'planos', { enabled: es3D }),
-            { type: 'separator' },
-            casilla('Leyenda', 'leyenda'),
-            casilla('Fórmula', 'formula'),
-            casilla('Lecturas', 'lecturas'),
-          ],
-        },
+        superposiciones,
         casilla('Ajustar a la rejilla', 'ajustar', { accelerator: "Shift+CmdOrCtrl+'" }),
         {
           label: 'Paso de la rejilla',
@@ -428,6 +487,7 @@ function construirMenu() {
         },
       ],
     },
+    { label: 'Animación', submenu: animacion },
     {
       role: 'windowMenu',
       label: 'Ventana',
@@ -483,6 +543,30 @@ ipcMain.handle('listo', (ev, lista) => {
   if (v) v.pendiente = null
   construirMenu()
   return doc
+})
+
+// clic derecho en un lienzo: lo más usado de la barra, a mano (como en Blender o Illustrator)
+ipcMain.on('contextual', (ev) => {
+  const win = BrowserWindow.fromWebContents(ev.sender)
+  if (!win) return
+  const { e, lienzo, es3D, puntoDeVista, superposiciones, reproducir, transformar, anadir } = piezasMenu(win)
+  const plantilla = [
+    ...(e.menu?.anadir?.length ? [anadir] : []),
+    ...((e.capas ?? []).length ? [{ label: 'Capas', submenu: menuCapas(e) }] : []),
+    ...(e.transformable ? [transformar] : []),
+    { type: 'separator' },
+    ...(es3D ? [puntoDeVista] : []),
+    { label: 'Encuadrar todo', enabled: lienzo, click: alFoco('vista', { orden: 'encuadrar' }) },
+    superposiciones,
+    ...(e.animado ? [{ type: 'separator' }, reproducir] : []),
+    { type: 'separator' },
+    { label: 'Copiar imagen del lienzo', enabled: lienzo, click: alFoco('copiar', 'imagen') },
+    { label: 'Exportar imagen PNG…', enabled: lienzo, click: alFoco('png') },
+    { type: 'separator' },
+    { label: 'Deshacer', enabled: true, click: alFoco('deshacer') },
+    { label: 'Rehacer', enabled: true, click: alFoco('rehacer') },
+  ]
+  Menu.buildFromTemplate(plantilla).popup({ window: win })
 })
 
 ipcMain.on('estado', (ev, estado) => {

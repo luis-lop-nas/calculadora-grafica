@@ -15,7 +15,8 @@ export function crearReloj(velocidad = 1) {
     },
     /** `pared` es el tiempo del bucle en segundos. */
     avanzar(pared: number, activo: boolean, vel = velocidad) {
-      if (ultimo === null) ultimo = pared
+      // pared puede volver atrás (menú Animación ▸ Reiniciar): se toma como nuevo origen
+      if (ultimo === null || pared < ultimo) ultimo = pared
       const dt = Math.min(0.05, pared - ultimo)
       ultimo = pared
       if (activo) t += dt * vel

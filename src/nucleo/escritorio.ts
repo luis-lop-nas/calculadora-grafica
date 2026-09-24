@@ -32,6 +32,11 @@ export type Orden =
   | 'menuModulo'
   /** dato: { id?: string, op: 'alternar' | 'quitar' | 'solo' | 'todas' | 'ninguna' } */
   | 'capa'
+  /** dato: { pausado } | { velocidad } | 'paso' | 'reiniciar' */
+  | 'animacion'
+  /** dato: { op: 'mover' | 'girar', eje: 0 | 1 | 2, valor } */
+  | 'transformar'
+  | 'grabar'
 
 export interface EstadoMenu {
   id: string
@@ -53,6 +58,13 @@ export interface EstadoMenu {
   /** Nombre corto del módulo que se está editando (cabecera de su sección en el menú). */
   nombreModulo: string
   capas: CapaMenu[]
+  /** Hay algo que se mueve solo (animar, animada o `jugando`). */
+  animado: boolean
+  pausado: boolean
+  velocidad: number
+  grabando: boolean
+  /** El módulo tiene una figura que se mueve y gira entera (Objeto ▸ Transformar). */
+  transformable: boolean
   menu: { anadir: EntradaSerie[]; ejemplos: EntradaSerie[]; acciones: EntradaSerie[] }
 }
 
@@ -87,6 +99,8 @@ interface Escritorio {
   estado: (estado: EstadoMenu) => void
   guardar: (contenido: string, como: boolean, nombre: string) => Promise<string | null>
   alOrden: (fn: (orden: Orden, dato: unknown) => void) => () => void
+  /** Clic derecho en un lienzo: el proceso principal saca el menú contextual. */
+  contextual?: () => void
 }
 
 export const escritorio = (window as unknown as { escritorio?: Escritorio }).escritorio

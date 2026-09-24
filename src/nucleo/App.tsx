@@ -5,7 +5,7 @@ import { Lienzo2D, Lienzo3D, type Enlace } from './lienzos'
 import { Formula, Lecturas, RanuraResultado } from './controles'
 import { AREAS_CORTAS, type Capa, type EntradaMenu, type ModuloAny, type Vista } from './tipos'
 import { escritorio, type CapaMenu, type EntradaSerie, type Orden } from './escritorio'
-import { ContextoVista, guardarPrefs, leerPrefs, ordenVista, type OrdenVista, type PrefsVista } from './vista'
+import { animacion, ContextoVista, guardarPrefs, leerPrefs, ordenVista, type OrdenVista, type PrefsVista } from './vista'
 import { HojaAtajos } from './Atajos'
 
 /** ¿El foco está en un campo de texto? Ahí ⌘Z y compañía son los del propio campo. */
@@ -37,6 +37,39 @@ function resolverColor(c: string | undefined): string | null {
   if (r.startsWith('#')) return r
   const m = r.match(/[\d.]+/g)
   return m && m.length >= 3 ? `#${m.slice(0, 3).map((x) => Math.round(+x).toString(16).padStart(2, '0')).join('')}` : null
+}
+
+/** Graba en WebM lo que pinta el lienzo A (MediaRecorder sobre captureStream); se para con la misma orden o al minuto. */
+function empezarGrabacion(id: string, alTerminar: () => void): Promise<MediaRecorder | null> {
+  return new Promise((listo) => {
+    let hecho = false
+    ordenVista({
+      orden: 'captura',
+      lado: 'A',
+      fn: (canvas) => {
+        hecho = true
+        const tipo = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find((t) => MediaRecorder.isTypeSupported(t))
+        const rec = new MediaRecorder(canvas.captureStream(30), tipo ? { mimeType: tipo, videoBitsPerSecond: 8_000_000 } : undefined)
+        const trozos: Blob[] = []
+        rec.ondataavailable = (e) => {
+          if (e.data.size) trozos.push(e.data)
+        }
+        rec.onstop = () => {
+          alTerminar()
+          const url = URL.createObjectURL(new Blob(trozos, { type: 'video/webm' }))
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `calculadora-${id}.webm`
+          a.click()
+          setTimeout(() => URL.revokeObjectURL(url), 5000)
+        }
+        rec.start(250)
+        setTimeout(() => rec.state === 'recording' && rec.stop(), 60_000)
+        listo(rec)
+      },
+    })
+    if (!hecho) listo(null)
+  })
 }
 
 const serieEntradas = (es: EntradaMenu<any>[] | undefined): EntradaSerie[] =>
@@ -190,6 +223,14 @@ export default function App() {
   const [giro, setGiro] = useState(false)
   const [, tic] = useState(0)
   const [atajos, setAtajos] = useState(false)
+  // menú Animación: el reloj común de los lienzos lee `animacion`; aquí se guarda para el menú
+  const [anim, setAnim] = useState({ pausado: false, velocidad: 1 })
+  useEffect(() => {
+    animacion.pausado = anim.pausado
+    animacion.velocidad = anim.velocidad
+  }, [anim])
+  const grabacion = useRef<MediaRecorder | null>(null)
+  const [grabando, setGrabando] = useState(false)
 
   // Preferencias de vista (menú Vista): de quien usa la app, no del documento
   const [prefs, setPrefs] = useState<PrefsVista>(leerPrefs)
@@ -405,6 +446,30 @@ export default function App() {
         setCmp((c) => ({ ...c, ...(dato as Partial<Comparar>) }))
       }
     } else if (orden === 'atajos') setAtajos((v) => !v)
+    else if (orden === 'animacion') {
+      if (dato === 'paso') {
+        animacion.pasos++
+        setAnim((a) => ({ ...a, pausado: true }))
+      } else if (dato === 'reiniciar') animacion.reinicios++
+      else if (dato && typeof dato === 'object') setAnim((a) => ({ ...a, ...(dato as Partial<typeof a>) }))
+    } else if (orden === 'transformar' && dato && typeof dato === 'object') {
+      const o = vistaP.tipo !== 'html' ? vistaP.interaccion?.objeto : undefined
+      const { op, eje, valor } = dato as { op: 'mover' | 'girar'; eje: 0 | 1 | 2; valor: number }
+      if (o) {
+        if (op === 'mover') set(o.trasladar([0, 1, 2].map((k) => (k === eje ? valor : 0)), s))
+        else set(o.girar((['x', 'y', 'z'] as const)[eje], (valor * Math.PI) / 180, s))
+      }
+    } else if (orden === 'grabar') {
+      if (grabacion.current) grabacion.current.stop()
+      else
+        empezarGrabacion(id, () => {
+          grabacion.current = null
+          setGrabando(false)
+        }).then((r) => {
+          grabacion.current = r
+          setGrabando(!!r)
+        })
+    }
     else if (orden === 'menuModulo' && dato && typeof dato === 'object') {
       const { grupo, ruta } = dato as { grupo: 'anadir' | 'ejemplos' | 'acciones'; ruta: number[] }
       let lista = moduloP.menu?.(s)?.[grupo]
@@ -445,6 +510,9 @@ export default function App() {
   const hayLienzo = vistaA.tipo !== 'html'
   const hayLecturas = !!lecturas?.length
   const hayFormula = !!formula?.length
+  const vistaP = editandoB ? vistaB : vistaA
+  const animado = (vistaP.tipo === '3d' ? !!vistaP.animar : vistaP.tipo === '2d' ? !!vistaP.animada?.(s) : false) || (!!s && 'jugando' in s)
+  const transformable = vistaP.tipo !== 'html' && !!vistaP.interaccion?.objeto
   // capas y entradas propias del módulo que se edita; se mandan como texto para no reconstruir el menú sin motivo
   const capasMenu = JSON.stringify(serieCapas(moduloP.capas?.(s) ?? []))
   const menuPropio = moduloP.menu?.(s)
@@ -472,9 +540,14 @@ export default function App() {
       mismoModulo: cmp.idB === id,
       nombreModulo: moduloP.corto ?? moduloP.resumen,
       capas: JSON.parse(capasMenu),
+      animado,
+      pausado: anim.pausado,
+      velocidad: anim.velocidad,
+      grabando,
+      transformable,
       menu: JSON.parse(menuMenu),
     })
-  }, [id, cmp.activo, cmp.disposicion, cmp.enlazar, cmp.idB, giro, es3D, hayLienzo, hayLecturas, modificado, vistaA.tipo, hayFormula, puedeDeshacer, puedeRehacer, prefs, moduloP, capasMenu, menuMenu])
+  }, [id, cmp.activo, cmp.disposicion, cmp.enlazar, cmp.idB, giro, es3D, hayLienzo, hayLecturas, modificado, vistaA.tipo, hayFormula, puedeDeshacer, puedeRehacer, prefs, moduloP, capasMenu, menuMenu, animado, anim, grabando, transformable])
   // superponer solo tiene sentido con dos lienzos del mismo tipo
   const superpuesto = cmp.activo && cmp.disposicion === 'encima' && vistaA.tipo === vistaB.tipo && vistaA.tipo !== 'html'
 

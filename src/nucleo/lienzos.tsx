@@ -1,6 +1,7 @@
 import { useContext, useEffect, useRef, useState } from 'react'
 import { Escena3D } from '../render/escena3d'
-import { ContextoVista, alOrdenVista, type PrefsVista } from './vista'
+import { ContextoVista, alOrdenVista, relojLienzo, type PrefsVista } from './vista'
+import { escritorio } from './escritorio'
 import { Pintor2D } from '../render/pintor2d'
 import { alCambiarTema } from '../render/tema'
 import * as THREE from 'three'
@@ -35,6 +36,13 @@ function aEjes(p0: number[], q: number[], paso: number): { p: number[]; eje: num
 const aRejilla = (q: number[], paso: number) => q.map((c) => Math.round(c / paso) * paso)
 
 const COLOR_EJE = ['--rosa', '--aux', '--accent']
+
+/** Clic derecho: en la app de Mac, el menú contextual nativo (capas, añadir, vista…). */
+function contextual(ev: MouseEvent) {
+  if (!escritorio?.contextual) return
+  ev.preventDefault()
+  escritorio.contextual()
+}
 
 function ponerPrefs3D(e: Escena3D, p: PrefsVista) {
   e.rejillaCompleta = p.planos
@@ -463,6 +471,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     canvas.addEventListener('pointercancel', arriba)
     canvas.addEventListener('wheel', rueda, { passive: false })
     canvas.addEventListener('dblclick', doble)
+    canvas.addEventListener('contextmenu', contextual)
     canvas.addEventListener('pointerleave', fuera)
     window.addEventListener('keydown', tecla)
 
@@ -473,14 +482,15 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     })
 
     const lento = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    let t0 = performance.now()
-    let previo = t0
+    let previo = performance.now()
+    // el tiempo de la animación sigue al reloj común (pausa, velocidad, paso a paso)
+    const reloj = relojLienzo()
     let vivo = true
     const bucle = (ahora: number) => {
       if (!vivo) return
-      const dt = Math.min(0.05, (ahora - previo) / 1000)
+      const dtReal = Math.min(0.05, (ahora - previo) / 1000)
       previo = ahora
-      const t = (ahora - t0) / 1000
+      const { t, dt } = reloj(dtReal)
       const { vista: v, s: st, giro: g } = estado.current
       if (sucio.current && !construyendo.current) {
         sucio.current = false
@@ -502,7 +512,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
           requestAnimationFrame(construir)
         } else construir()
       }
-      if (g && !lento && punteros.size === 0) e.orb.theta += dt * 0.25
+      if (g && !lento && punteros.size === 0) e.orb.theta += dtReal * 0.25
       v.animar?.(e, st, t, dt)
       const enl = estado.current.enlace
       if (enl) {
@@ -537,6 +547,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
       canvas.removeEventListener('wheel', rueda)
       canvas.removeEventListener('dblclick', doble)
       canvas.removeEventListener('pointerleave', fuera)
+      canvas.removeEventListener('contextmenu', contextual)
       window.removeEventListener('keydown', tecla)
       e.destruir()
       escena.current = null
@@ -802,6 +813,7 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
     canvas.addEventListener('pointercancel', () => (arrastre = null))
     canvas.addEventListener('wheel', rueda, { passive: false })
     canvas.addEventListener('dblclick', doble)
+    canvas.addEventListener('contextmenu', contextual)
     canvas.addEventListener('pointerleave', fuera)
     window.addEventListener('keydown', tecla)
 
@@ -809,12 +821,15 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
       sucio.current = true
     })
 
-    let t0 = performance.now()
+    let previo = performance.now()
+    const reloj = relojLienzo()
     let vivo = true
     let miMarca = -1
     let ultimaFirma = ''
     const bucle = (ahora: number) => {
       if (!vivo) return
+      const { t: tAnim } = reloj(Math.min(0.05, (ahora - previo) / 1000))
+      previo = ahora
       const { vista: v, s: st, enlace: enl } = estado.current
       if (enl && g.ancho > 0) {
         // la firma se saca siempre de la ventana, con la misma cuenta: si al adoptar
@@ -847,7 +862,7 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
         g.mostrarNombres = prefsRef.current.nombres
         g.mostrarRejilla = prefsRef.current.rejilla
         g.limpiar()
-        v.dibujar(g, st, (ahora - t0) / 1000)
+        v.dibujar(g, st, tAnim)
         asas = v.interaccion?.asas(st) ?? []
         if (encima && !asas.some((a) => a.id === encima)) encima = null
         pintarAsas2d(g, asas, mano?.id ?? encima)
@@ -890,6 +905,7 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
       canvas.removeEventListener('wheel', rueda)
       canvas.removeEventListener('dblclick', doble)
       canvas.removeEventListener('pointerleave', fuera)
+      canvas.removeEventListener('contextmenu', contextual)
       window.removeEventListener('keydown', tecla)
     }
   }, [vista])
