@@ -21,6 +21,7 @@ import campo from '../modulos/edo/campo'
 import superficies from '../modulos/campos/superficies'
 import parametricas from '../modulos/campos/parametricas'
 import vectorial from '../modulos/campos/vectorial'
+import teoremas from '../modulos/campos/teoremas'
 import fases from '../modulos/edo/fases'
 import segundoorden from '../modulos/edo/segundoorden'
 
@@ -52,7 +53,7 @@ export const MODULOS: ModuloAny[] = [
   orbitales, paquete, pozo,
   edpPropia, onda, calor, laplace,
   resolver, campo, segundoorden, fases,
-  superficies, parametricas, vectorial,
+  superficies, parametricas, vectorial, teoremas,
   aplicaciones, subespacios, hilbert, estructuras, espacios, unidades,
   fourier, transformadaF, convolucionM, laplaceT, control, circuito, filtros,
   lagrangiano, orbitas, oscilaciones, solido, relatividad,

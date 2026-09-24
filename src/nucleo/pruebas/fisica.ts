@@ -1,5 +1,6 @@
 import { campo, flujoEsfera, imagenes, lineaDeCampo, potencial, type Carga } from '../../lib/electro'
 import { campoCuadratura, campoPoligonal, campoTramo, circulacion, poligonal, type P3 } from '../../lib/magneto'
+import { campoEspacio, campoPlano, circulacionBorde, circulacionPlana, curvaPlana, estrellada, flujoCerrado, flujoPlano, flujoRotacional, integralDivergencia, integralRegion, parametrizacion } from '../../lib/teoremas'
 import { cerca, cierto, parecido, seccion } from './comun'
 
 export function pruebasFisica() {
@@ -76,5 +77,46 @@ export function pruebasFisica() {
     const helice = (s: number): P3 => [Rs * Math.cos(s), Rs * Math.sin(s), -Ls / 2 + (Ls * s) / (2 * Math.PI * N)]
     const sol = poligonal(helice, 0, 2 * Math.PI * N, 200 * 64)
     parecido('solenoide: B en el centro ≈ n I (L/2)/√(R² + L²/4)', campoPoligonal(sol, [0, 0, 0], I)[2], ((N / Ls) * I * (Ls / 2)) / Math.hypot(Rs, Ls / 2), 1e-3)
+  }
+
+  seccion('Campos · teoremas integrales (los dos lados por separado)')
+  {
+    // Green: F = (−y, x)/2 en una elipse descentrada → área πab por los dos lados
+    const [a, b] = [2, 1.3]
+    const elipse = curvaPlana('0.4 + 2*cos(t)', '-0.2 + 1.3*sin(t)', 0, 2 * Math.PI)
+    const area = campoPlano('-y/2', 'x/2')
+    cerca('Green: ∮ (−y dx + x dy)/2 en la elipse = πab', circulacionPlana(area, elipse), Math.PI * a * b, 1e-11)
+    cerca('Green: ∬ rot = πab', integralRegion(area.rot, elipse, [0.4, -0.2]), Math.PI * a * b, 1e-11)
+    // campo y curva sin simetrías: cardioide desplazada
+    const F = campoPlano('exp(x)*sin(y) - y^3', 'x^3 + x*y')
+    const card = curvaPlana('0.3 + (1 + 0.4*cos(t))*cos(t)', '-0.1 + (1 + 0.4*cos(t))*sin(t)', 0, 2 * Math.PI)
+    cierto('la cardioide es estrellada respecto de su polo', estrellada(card, [0.3, -0.1]))
+    const lin = circulacionPlana(F, card)
+    cierto('Green: el caso probado no es trivial', Math.abs(lin) > 0.5, String(lin))
+    cerca('Green: ∮ P dx + Q dy = ∬ (Q_x − P_y) dA (cardioide)', integralRegion(F.rot, card, [0.3, -0.1]), lin, 1e-10)
+    cerca('Green (flujo): ∮ F·n ds = ∬ div F dA (cardioide)', integralRegion(F.div, card, [0.3, -0.1]), flujoPlano(F, card), 1e-10)
+    const radial = campoPlano('x', 'y')
+    cerca('flujo de (x, y) por un círculo de radio 1,5 = 2πR²', flujoPlano(radial, curvaPlana('1.5*cos(t)', '1.5*sin(t)', 0, 2 * Math.PI)), 2 * Math.PI * 2.25, 1e-12)
+    // Stokes: (−y, x, 0) en la semiesfera superior → 2πR², y un campo cualquiera en un paraboloide
+    const R = 1.4
+    const semi = parametrizacion(['1.4*sin(u)*cos(v)', '1.4*sin(u)*sin(v)', '1.4*cos(u)'], ['u', 'v'], [[0, Math.PI / 2], [0, 2 * Math.PI]])
+    const giro = campoEspacio('-y', 'x', '0')
+    cerca('Stokes: ∬ rot F·dS en la semiesfera = 2πR²', flujoRotacional(giro, semi), 2 * Math.PI * R * R, 1e-11)
+    cerca('Stokes: ∮ F·dr por el ecuador = 2πR²', circulacionBorde(giro, semi), 2 * Math.PI * R * R, 1e-11)
+    const G = campoEspacio('y*z^2', 'x^2 - z', 'exp(x)*y')
+    const parab = parametrizacion(['0.2 + u*cos(v)', '-0.3 + u*sin(v)', '1 - u^2'], ['u', 'v'], [[0, 1.1], [0, 2 * Math.PI]])
+    const sup = flujoRotacional(G, parab)
+    cierto('Stokes: el caso probado no es trivial', Math.abs(sup) > 0.1, String(sup))
+    cerca('Stokes: ∬ rot G·dS = ∮ G·dr (paraboloide)', circulacionBorde(G, parab), sup, 1e-10)
+    // Gauss: (x³, y³, z³) en la bola → 12πR⁵/5, y un campo cualquiera en un cilindro
+    const bola = parametrizacion(['u*sin(v)*cos(w)', 'u*sin(v)*sin(w)', 'u*cos(v)'], ['u', 'v', 'w'], [[0, R], [0, Math.PI], [0, 2 * Math.PI]])
+    const cubos = campoEspacio('x^3', 'y^3', 'z^3')
+    cerca('Gauss: ∭ div F en la bola = 12πR⁵/5', integralDivergencia(cubos, bola), (12 * Math.PI * R ** 5) / 5, 1e-9)
+    cerca('Gauss: ∯ F·dS por la esfera = 12πR⁵/5', flujoCerrado(cubos, bola), (12 * Math.PI * R ** 5) / 5, 1e-9)
+    const H = campoEspacio('x*y^2 + 1', 'sin(z) + x*y', 'x*z + y^2*z')
+    const cil = parametrizacion(['0.3 + u*cos(v)', 'u*sin(v)', 'w'], ['u', 'v', 'w'], [[0, 0.9], [0, 2 * Math.PI], [-0.4, 1.1]])
+    const vol = integralDivergencia(H, cil)
+    cierto('Gauss: el caso probado no es trivial', Math.abs(vol) > 0.1, String(vol))
+    cerca('Gauss: ∭ div H = ∯ H·dS (cilindro)', flujoCerrado(H, cil), vol, 1e-10)
   }
 }
