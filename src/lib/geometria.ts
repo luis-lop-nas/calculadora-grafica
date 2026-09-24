@@ -615,6 +615,31 @@ function calcular(o: Obj, ctx: Contexto): Valor {
       if (v.k === 'circ') return { k: 'medida', v: Math.PI * v.r * v.r, unidad: 'u²', en: v.c }
       return NADA
     }
+    case 'perimetro': {
+      const v = vs[0]
+      if (v.k === 'poligono') return { k: 'medida', v: v.pts.reduce((acc, p, i) => acc + dist(p, v.pts[(i + 1) % v.pts.length]), 0), unidad: '', en: centroide(v.pts) }
+      if (v.k === 'circ') return { k: 'medida', v: 2 * Math.PI * v.r, unidad: '', en: sumaP(v.c, { x: 0, y: v.r }) }
+      return NADA
+    }
+    case 'incirculo': {
+      if (!A || !B || !C) return NADA
+      // incentro = media de los vértices pesada por el lado opuesto; r = 2·área / perímetro
+      const [a, b, c] = [dist(B, C), dist(C, A), dist(A, B)]
+      const per = a + b + c
+      const ar = area([A, B, C])
+      if (ar < EPS) return NADA
+      const centro = escala(sumaP(sumaP(escala(A, a), escala(B, b)), escala(C, c)), 1 / per)
+      return { k: 'circ', c: centro, r: (2 * ar) / per }
+    }
+    case 'inversion': {
+      const circ = circDe(vs[1])
+      if (!A || !circ) return NADA
+      const w = resta(A, circ.c)
+      const d2 = punto(w, w)
+      // el centro va al infinito
+      if (d2 < EPS) return NADA
+      return { k: 'punto', p: sumaP(circ.c, escala(w, (circ.r * circ.r) / d2)) }
+    }
     case 'pendiente': {
       const l = lineaDe(vs[0])
       if (!l) return NADA
@@ -711,6 +736,7 @@ export const HERRAMIENTAS: Record<string, Herramienta> = {
     param: { nombre: 'Radio', min: 0.1, max: 10, paso: 0.1, defecto: 2 }, pista: 'El centro',
   },
   circ3: { nombre: 'Por tres puntos', grupo: 'Circunferencias', def: 'circ3', huecos: ['punto', 'punto', 'punto'], pista: 'Tres puntos' },
+  incirculo: { nombre: 'Inscrita en un triángulo', grupo: 'Circunferencias', def: 'incirculo', huecos: ['punto', 'punto', 'punto'], pista: 'Los tres vértices' },
   compas: { nombre: 'Compás', grupo: 'Circunferencias', def: 'compas', huecos: ['punto', 'punto', 'punto'], ordenada: true, pista: 'Dos puntos que dan el radio y luego el centro' },
   arco: { nombre: 'Arco', grupo: 'Circunferencias', def: 'arco', huecos: ['punto', 'punto', 'punto'], ordenada: true, pista: 'Centro, punto inicial y dirección final (antihorario)' },
   semicirculo: { nombre: 'Semicircunferencia', grupo: 'Circunferencias', def: 'semicirculo', huecos: ['punto', 'punto'], ordenada: true, pista: 'Los dos extremos' },
@@ -721,6 +747,7 @@ export const HERRAMIENTAS: Record<string, Herramienta> = {
   angulo: { nombre: 'Ángulo', grupo: 'Medidas', def: 'angulo', huecos: ['punto', 'punto', 'punto'], ordenada: true, pista: 'Tres puntos; el vértice es el segundo' },
   distancia: { nombre: 'Distancia', grupo: 'Medidas', def: 'distancia', huecos: ['punto', 'punto'], pista: 'Dos puntos' },
   area: { nombre: 'Área', grupo: 'Medidas', def: 'area', huecos: ['superficie'], pista: 'Un polígono o una circunferencia' },
+  perimetro: { nombre: 'Perímetro', grupo: 'Medidas', def: 'perimetro', huecos: ['superficie'], pista: 'Un polígono o una circunferencia' },
   pendiente: { nombre: 'Pendiente', grupo: 'Medidas', def: 'pendiente', huecos: ['linea'], pista: 'Una recta' },
   simetria_axial: { nombre: 'Simetría axial', grupo: 'Transformar', def: 'simetria_axial', huecos: ['objeto', 'linea'], ordenada: true, pista: 'El objeto y luego el eje' },
   simetria_central: { nombre: 'Simetría central', grupo: 'Transformar', def: 'simetria_central', huecos: ['objeto', 'punto'], ordenada: true, pista: 'El objeto y luego el centro' },
@@ -733,6 +760,7 @@ export const HERRAMIENTAS: Record<string, Herramienta> = {
     nombre: 'Homotecia', grupo: 'Transformar', def: 'homotecia', huecos: ['objeto', 'punto'], ordenada: true,
     param: { nombre: 'Razón', min: -3, max: 3, paso: 0.1, defecto: 2 }, pista: 'El objeto y luego el centro',
   },
+  inversion: { nombre: 'Inversión', grupo: 'Transformar', def: 'inversion', huecos: ['punto', 'circ'], ordenada: true, pista: 'El punto y luego la circunferencia de inversión' },
   lugar: { nombre: 'Lugar geométrico', grupo: 'Especiales', def: 'lugar', huecos: ['punto', 'punto'], ordenada: true, pista: 'El punto que deja rastro y luego el punto sobre un objeto que lo mueve' },
   borrar: { nombre: 'Borrar', grupo: 'Especiales', def: '', huecos: ['cualquiera'], pista: 'Pulsa un objeto: se va con todo lo que depende de él' },
 }
@@ -781,7 +809,7 @@ export function nombreNuevo(objs: Obj[], tipo: 'punto' | 'medida' | 'otro'): str
 }
 
 export const tipoDeDef = (def: string): 'punto' | 'medida' | 'otro' =>
-  ['libre', 'sobre', 'medio', 'interseccion', 'centro'].includes(def) ? 'punto' : ['angulo', 'distancia', 'area', 'pendiente'].includes(def) ? 'medida' : 'otro'
+  ['libre', 'sobre', 'medio', 'interseccion', 'centro', 'inversion'].includes(def) ? 'punto' : ['angulo', 'distancia', 'area', 'pendiente', 'perimetro'].includes(def) ? 'medida' : 'otro'
 
 const f2 = (v: number) => {
   const r = +v.toFixed(2)
@@ -794,6 +822,47 @@ function termino(c: number, variable: string, primero: boolean): string {
   const a = Math.abs(c)
   const coef = variable && Math.abs(a - 1) < 5e-4 ? '' : f2(a)
   return `${signo}${coef}${variable}`
+}
+
+export interface TipoConica {
+  tipo: 'elipse' | 'circunferencia' | 'hipérbola' | 'parábola' | 'degenerada' | 'vacía'
+  excentricidad: number | null
+  centro: P | null
+}
+
+/**
+ * Tipo de A x² + B xy + C y² + D x + E y + F = 0 por los invariantes: el signo de
+ * B² − 4AC separa elipse, parábola e hipérbola; el determinante de la matriz
+ * completa, las degeneradas. La excentricidad sale de la forma reducida.
+ */
+export function clasificarConica(q: number[]): TipoConica {
+  const [A, B, C, D, E, F] = q
+  const k = Math.max(...q.map(Math.abs)) || 1
+  const disc = (B * B - 4 * A * C) / (k * k)
+  const M = [[A, B / 2, D / 2], [B / 2, C, E / 2], [D / 2, E / 2, F]]
+  const det3 =
+    M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0])
+  if (Math.abs(det3) / k ** 3 < 1e-9) return { tipo: 'degenerada', excentricidad: null, centro: null }
+  if (Math.abs(disc) < 1e-9) return { tipo: 'parábola', excentricidad: 1, centro: null }
+  // centro: gradiente nulo
+  const den = 4 * A * C - B * B
+  const centro = { x: (B * E - 2 * C * D) / den, y: (B * D - 2 * A * E) / den }
+  const Fp = F + (D * centro.x + E * centro.y) / 2
+  // autovalores de la parte cuadrática
+  const t = A + C
+  const r = Math.sqrt(((A - C) / 2) ** 2 + (B / 2) ** 2)
+  const [l1, l2] = [t / 2 + r, t / 2 - r]
+  if (disc < 0) {
+    // λ₁X² + λ₂Y² = −F′: elipse si −F′ tiene el signo de los λ
+    if (-Fp / l1 <= 0) return { tipo: 'vacía', excentricidad: null, centro }
+    const [a2, b2] = [-Fp / Math.min(Math.abs(l1), Math.abs(l2)) * Math.sign(l1), -Fp / Math.max(Math.abs(l1), Math.abs(l2)) * Math.sign(l1)]
+    const e = Math.sqrt(Math.max(0, 1 - b2 / a2))
+    return { tipo: e < 1e-6 ? 'circunferencia' : 'elipse', excentricidad: e, centro }
+  }
+  // hipérbola: el eje real es el del λ con el signo de −F′
+  const [real, imag] = -Fp / l1 > 0 ? [l1, l2] : [l2, l1]
+  const e = Math.sqrt(1 + Math.abs(real / imag))
+  return { tipo: 'hipérbola', excentricidad: e, centro }
 }
 
 /** Ecuación o coordenadas, como en la vista algebraica de GeoGebra. */
@@ -826,7 +895,9 @@ export function describir(v: Valor): string {
       const partes = [termino(q[0], 'x²', true)]
       const vars = ['xy', 'y²', 'x', 'y', '']
       for (let i = 1; i < 6; i++) partes.push(termino(q[i], vars[i - 1], !partes.join('')))
-      return `${partes.join('') || '0'} = 0`
+      const c = clasificarConica(v.q)
+      const extra = [c.tipo, c.excentricidad !== null && c.tipo !== 'circunferencia' ? `e = ${f2(c.excentricidad)}` : '', c.centro && c.tipo !== 'vacía' ? `centro (${f2(c.centro.x)}, ${f2(c.centro.y)})` : '']
+      return `${partes.join('') || '0'} = 0 · ${extra.filter(Boolean).join(', ')}`
     }
     case 'poligono':
       return `área ${f2(area(v.pts))}`

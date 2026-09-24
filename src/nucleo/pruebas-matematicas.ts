@@ -45,7 +45,7 @@ import { desarrollar as desarrollarE, factorizar as factorizarE, simplificar as 
 import { resolver as resolverE, resolverSistema } from '../lib/cas/resolver'
 import { limite as limiteE, taylor as taylorE } from '../lib/cas/limites'
 import { integrar as integrarE } from '../lib/cas/integrar'
-import { evaluar as evaluarGeo, evalConica, dist as distGeo, type Obj as ObjGeo } from '../lib/geometria'
+import { clasificarConica, evaluar as evaluarGeo, evalConica, dist as distGeo, type Obj as ObjGeo } from '../lib/geometria'
 import { MODULOS } from './registro'
 import { uEn } from '../modulos/edp/laplace'
 import { analizarFilas3, cortarMalla, medidasSolido, recortarACaja } from '../lib/objetos3d'
@@ -1481,6 +1481,30 @@ seccion('Geometría: cada construcción cumple la propiedad que la define')
 {
   const o = (id: string, def: string, args = '', x = 0, y = 0, v = 0): ObjGeo => ({ id, def, args, x, y, v, visible: true })
   const pt = (vals: Map<string, any>, id: string) => vals.get(id).p as { x: number; y: number }
+  // lo nuevo: inscrita, perímetro, inversión y tipo de cónica
+  {
+    const t = evaluarGeo([o('P', 'libre', '', 0.3, -0.2), o('Q', 'libre', '', 4.1, 0.6), o('R', 'libre', '', 1.2, 3.4), o('i', 'incirculo', 'P,Q,R'), o('t', 'poligono', 'P,Q,R'), o('π', 'perimetro', 't')])
+    const ci = t.get('i') as { c: { x: number; y: number }; r: number }
+    const pts = ['P', 'Q', 'R'].map((id) => pt(t, id))
+    // la inscrita es tangente a los tres lados: distancia del centro a cada lado = r
+    for (let k = 0; k < 3; k++) {
+      const [a, b] = [pts[k], pts[(k + 1) % 3]]
+      const d = Math.abs((b.x - a.x) * (a.y - ci.c.y) - (a.x - ci.c.x) * (b.y - a.y)) / Math.hypot(b.x - a.x, b.y - a.y)
+      cerca(`inscrita: distancia del incentro al lado ${k + 1} = r`, d, ci.r, 1e-12)
+    }
+    cerca('perímetro = suma de los lados', (t.get('π') as { v: number }).v, pts.reduce((acc, p, k) => acc + distGeo(p, pts[(k + 1) % 3]), 0), 1e-12)
+    const inv = evaluarGeo([o('C', 'libre', '', 1, -1), o('k', 'circ_cr', 'C', 0, 0, 2), o('X', 'libre', '', 2.3, 0.4), o('Y', 'inversion', 'X,k'), o('Z', 'inversion', 'Y,k')])
+    const [C0, X0, Y0, Z0] = ['C', 'X', 'Y', 'Z'].map((id) => pt(inv, id))
+    cerca('inversión: |CX|·|CY| = r²', distGeo(C0, X0) * distGeo(C0, Y0), 4, 1e-12)
+    cerca('inversión: invertir dos veces devuelve el punto', distGeo(X0, Z0), 0, 1e-12)
+    const tipo = (q: number[]) => { const c = clasificarConica(q); return `${c.tipo}${c.excentricidad !== null ? ` ${+c.excentricidad.toFixed(6)}` : ''}` }
+    cierto('x² + 4y² = 4: elipse, e = √3/2', tipo([1, 0, 4, 0, 0, -4]) === `elipse ${+(Math.sqrt(3) / 2).toFixed(6)}`, tipo([1, 0, 4, 0, 0, -4]))
+    cierto('x² − y² = 1: hipérbola, e = √2', tipo([1, 0, -1, 0, 0, -1]) === `hipérbola ${+Math.SQRT2.toFixed(6)}`)
+    cierto('y = x²: parábola, e = 1', tipo([1, 0, 0, 0, -1, 0]) === 'parábola 1')
+    cierto('x² − y² = 0: degenerada (dos rectas)', tipo([1, 0, -1, 0, 0, 0]) === 'degenerada')
+    cierto('x² + y² = −1: vacía', tipo([1, 0, 1, 0, 0, 1]) === 'vacía')
+    cierto('xy = 1 girada: hipérbola equilátera, e = √2', tipo([0, 1, 0, 0, 0, -1]) === `hipérbola ${+Math.SQRT2.toFixed(6)}`, tipo([0, 1, 0, 0, 0, -1]))
+  }
   const A = o('A', 'libre', '', -3, -1.5)
   const B = o('B', 'libre', '', 3, -2)
   const C = o('C', 'libre', '', 0.7, 2.6)
