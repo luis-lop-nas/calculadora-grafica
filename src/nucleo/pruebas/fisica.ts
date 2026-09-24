@@ -5,6 +5,8 @@ import { brewster, campoPolarizado, critico, elipse, fase, fresnel, picoEnvolven
 import { airy, anillosOscuros, fraunhofer2D, intensidadMichelson, intensidadNumerica, intensidadRendijas, J11, reflectanciaAiry, reflectanciaMatriz, rendijas } from '../../lib/optica'
 import { besselJx, gauss20 } from '../../lib/especiales'
 import { cauchy, corteEje, reflejoEsferico, desviacionMinima, desviacionPrisma, det, focales, imagen, matrizLentes, matrizSistema, trazar } from '../../lib/rayos'
+import { camino, ciclo, critico as criticoVdW, entropia, espinodal, gibbsVdW, maxwell, pVdW, rendimientoTeorico, resumen, SUSTANCIAS, type Gas, type ParamCiclo, type TipoCiclo } from '../../lib/termo'
+import termodinamica, { latenteVdW, type EstadoTermo } from '../../modulos/fisica/termodinamica'
 import { cerca, cierto, parecido, seccion } from './comun'
 
 export function pruebasFisica() {
@@ -288,5 +290,84 @@ export function pruebasFisica() {
     cerca('prisma: desviación mínima numérica = fórmula', desviacionPrisma(A, n, t)!, desviacionMinima(A, n), 1e-14)
     cerca('prisma: en el mínimo el paso es simétrico, θ₁′ = A/2', Math.asin(Math.sin(t) / n), A / 2, 1e-7)
     cierto('prisma: el azul se desvía más que el rojo', desviacionMinima(A, cauchy(450)) > desviacionMinima(A, cauchy(650)))
+  }
+
+  seccion('Física · termodinámica')
+  {
+    const PARES: Array<[TipoCiclo, number, number]> = [['carnot', 3, 0.5], ['otto', 8, 2.5], ['diesel', 18, 2], ['brayton', 10, 2.4], ['stirling', 3, 2.5]]
+    for (const gamma of [5 / 3, 7 / 5]) {
+      const gas: Gas = { n: 1, gamma }
+      for (const [tipo, a, b] of PARES) {
+        const p: ParamCiclo = { tipo, V1: 20, P1: 150, a, b }
+        const r = resumen(gas, p)
+        const et = `${tipo}, γ = ${gamma.toFixed(3)}`
+        cerca(`${et}: η del balance = fórmula del libro`, r.eta, rendimientoTeorico(gas, p), 1e-12)
+        cerca(`${et}: primer principio, ΣQ = ΣW en el ciclo`, r.tramos.reduce((x, t) => x + t.Q - t.W, 0), 0, 1e-9)
+        cerca(`${et}: la entropía vuelve a su valor (Clausius)`, r.tramos.reduce((x, t) => x + t.dS, 0), 0, 1e-12)
+        cierto(`${et}: η no pasa de Carnot entre sus temperaturas extremas`, r.eta <= 1 - r.Tmin / r.Tmax + 1e-12)
+        // segundo método: recorrer el camino e integrar P dV y T dS por trapecios
+        const c = ciclo(gas, p)
+        let W = 0
+        let Qabs = 0
+        let S = 0
+        for (const t of c.tramos) {
+          const pts = camino(gas, c.estados[t.de], c.estados[t.a], t.tipo, 4000)
+          for (let i = 1; i < pts.length; i++) {
+            const [u, v] = [pts[i - 1], pts[i]]
+            W += ((u.P + v.P) / 2) * (v.V - u.V)
+            const dS = entropia(gas, v.V, v.T, u.V, u.T)
+            const dQ = ((u.T + v.T) / 2) * dS
+            S += dS
+            if (dQ > 0) Qabs += dQ
+          }
+        }
+        parecido(`${et}: ∮P dV trazado = W de las fórmulas`, W, r.W, 1e-6)
+        parecido(`${et}: η = ∮P dV / Σ(T dS > 0) sobre el camino`, W / Qabs, rendimientoTeorico(gas, p), 1e-6)
+        cerca(`${et}: ∮dS sobre el camino = 0`, S, 0, 1e-10)
+        if (tipo === 'carnot') cerca(`${et}: Carnot, η = 1 − T_c/T_h`, r.eta, 1 - r.Tmin / r.Tmax, 1e-12)
+      }
+      const st: ParamCiclo = { tipo: 'stirling', V1: 20, P1: 150, a: 3, b: 2.5, regenerador: true }
+      cerca(`Stirling con regenerador ideal = Carnot (γ = ${gamma.toFixed(3)})`, resumen(gas, st).eta, 1 - 1 / 2.5, 1e-12)
+    }
+    cierto('Otto: más compresión, más rendimiento', rendimientoTeorico({ n: 1, gamma: 1.4 }, { tipo: 'otto', V1: 1, P1: 1, a: 10, b: 2 }) > rendimientoTeorico({ n: 1, gamma: 1.4 }, { tipo: 'otto', V1: 1, P1: 1, a: 8, b: 2 }))
+    cierto('Diesel frente a Otto a igual r: el Otto rinde más', rendimientoTeorico({ n: 1, gamma: 1.4 }, { tipo: 'otto', V1: 1, P1: 1, a: 16, b: 2 }) > rendimientoTeorico({ n: 1, gamma: 1.4 }, { tipo: 'diesel', V1: 1, P1: 1, a: 16, b: 2 }))
+
+    // van der Waals: la tabla clásica a T_r = 0.9 es p = 0.647, v_l = 0.6034, v_g = 2.3488
+    const m9 = maxwell(0.9)!
+    cerca('vdW, T_r = 0.9: presión de vapor 0.6470', m9.p, 0.647, 5e-4)
+    cerca('vdW, T_r = 0.9: v_l = 0.6034', m9.vl, 0.6034, 5e-5)
+    cerca('vdW, T_r = 0.9: v_g = 2.3488', m9.vg, 2.3488, 5e-5)
+    for (const T of [0.55, 0.7, 0.85, 0.95, 0.99]) {
+      const m = maxwell(T)!
+      cerca(`vdW, T_r = ${T}: la isoterma pasa por p_s en v_l y en v_g`, Math.max(Math.abs(pVdW(m.vl, T) - m.p), Math.abs(pVdW(m.vg, T) - m.p)), 0, 1e-10)
+      cerca(`vdW, T_r = ${T}: áreas iguales ⇔ g(v_l) = g(v_g)`, gibbsVdW(m.vl, T) - gibbsVdW(m.vg, T), 0, 1e-9)
+      const sp = espinodal(T)!
+      const dp = (v: number) => (pVdW(v + 1e-6, T) - pVdW(v - 1e-6, T)) / 2e-6
+      cerca(`vdW, T_r = ${T}: dp/dv = 0 en la espinodal`, Math.max(Math.abs(dp(sp[0])), Math.abs(dp(sp[1]))), 0, 1e-5)
+      cierto(`vdW, T_r = ${T}: v_l < espinodal < v_g`, m.vl < sp[0] && sp[1] < m.vg)
+      // Clapeyron: L = T Δv dp_s/dT, con la derivada numérica de la presión de vapor
+      const h = 1e-5
+      const dps = (maxwell(T + h)!.p - maxwell(T - h)!.p) / (2 * h)
+      parecido(`vdW, T_r = ${T}: Clapeyron, L = T Δv dp_s/dT`, T * (m.vg - m.vl) * dps, latenteVdW(T), 1e-6)
+    }
+    parecido('vdW: pendiente de la curva de vapor en el punto crítico = 4', (1 - maxwell(0.999)!.p) / 0.001, 4, 2e-3)
+    const co2 = criticoVdW(SUSTANCIAS[0])
+    cerca('vdW, CO₂: T_c = 8a/27Rb ≈ 304 K', co2.T, 304.1, 1)
+    cerca('vdW, CO₂: p_c = a/27b² ≈ 74 bar', co2.p / 1e5, 74, 1)
+
+    // las asas de todos los ciclos y de van der Waals vuelven a su sitio
+    const m0 = termodinamica.inicial as EstadoTermo
+    const inter = (st: EstadoTermo) => {
+      const v = typeof termodinamica.vista === 'function' ? termodinamica.vista(st) : termodinamica.vista
+      return v.tipo === '2d' ? v.interaccion! : null
+    }
+    for (const est of [...PARES.map(([ciclo]) => ({ ...m0, ciclo })), { ...m0, ciclo: 'stirling' as TipoCiclo, gas: 'mono' as const }, { ...m0, modo: 'vdw' as const }]) {
+      const it = inter(est)!
+      for (const asa of it.asas(est)) {
+        const s2 = { ...est, ...(it.mover(asa.id, { p: asa.p, mayus: false }, est) ?? {}) }
+        const otra = it.asas(s2).find((q) => q.id === asa.id)!
+        cerca(`termodinámica (${est.modo === 'vdw' ? 'vdW' : est.ciclo}): el asa ${asa.id} vuelve a su sitio`, Math.hypot(otra.p[0] - asa.p[0], otra.p[1] - asa.p[1]) / Math.max(1, Math.abs(asa.p[1])), 0, 1e-9)
+      }
+    }
   }
 }

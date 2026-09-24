@@ -29,7 +29,7 @@ npm run app:empaquetar  # genera release/mac-arm64/Calculadora.app (arrástrala 
 ```
 
 Menús: **Archivo** (nueva ventana ⌘N, abrir ⌘O, recientes, guardar ⌘S / como ⇧⌘S, exportar PNG ⌘E y
-CSV), **Edición**, **Módulo** (los 25, ⌘1…⌘7 por área, ⌘[ ⌘] anterior/siguiente, ⌘K buscar), **Vista**
+CSV), **Edición**, **Módulo** (todos, ⌘1…⌘7 por área, ⌘[ ⌘] anterior/siguiente, ⌘K buscar), **Vista**
 (Comparar ⌘D, autogiro, zoom, pantalla completa). Las sesiones se guardan como documentos `.calc`
 (el mismo JSON del autoguardado; también abre los `.json` del botón JSON) y Finder los abre con
 doble clic. El autoguardado sigue funcionando, pero es **aparte del del navegador**.
@@ -140,6 +140,14 @@ propiedad de la media en Laplace y una sonda de |ψ|² en los orbitales.
 - Oscilaciones — cadena de N masas o M y K escritas: modos normales (problema generalizado), superposición y dispersión; oscilador forzado amortiguado con amplitud, fase y transitorio exacto.
 - Sólido rígido — tensor de inercia de piezas (`caja m=1 a=… b=… c=… en (x, y, z)`, cilindro, esfera, cáscara, varilla, cono, punto) con Steiner, ejes principales y elipsoide; rotación libre de Euler (raqueta, periodo 4K(k)/λ); peonza pesada con nutación entre las raíces de la cúbica y precesión uniforme.
 - Relatividad especial — diagrama de Minkowski con sucesos y el eje t′ arrastrables, intervalos, simultaneidad, gemelos (con Doppler), contracción y composición de velocidades.
+
+**Física**
+- Electrostática — cargas arrastrables con líneas de campo y equipotenciales, flujo de Gauss por una superficie y método de las imágenes (plano y esfera a tierra).
+- Magnetostática — Biot–Savart sobre curvas escritas (hilo, espira, Helmholtz, solenoide, nudo de trébol), líneas de B y circulación de Ampère.
+- Ondas — polarización con parámetros de Stokes, Fresnel con Brewster y reflexión total, y velocidades de fase y de grupo.
+- Óptica ondulatoria — rendijas y redes, Fraunhofer por FFT 2D de una abertura, películas delgadas y Michelson.
+- Óptica geométrica — sistemas de lentes con matrices ABCD (objeto y lentes arrastrables), aberración esférica de un espejo cóncavo con su cáustica y dispersión en un prisma.
+- Termodinámica — ciclos de Carnot, Otto, Diesel, Brayton y Stirling (con o sin regenerador) en P–V y T–S con los estados arrastrables: calor y trabajo tramo a tramo, y el rendimiento del balance contrastado con la fórmula del libro y con Carnot entre las mismas temperaturas. Gas de van der Waals en variables reducidas: isotermas, construcción de Maxwell con las dos áreas, campana de coexistencia y espinodal, presión de vapor, calor latente y fase del estado (metaestable, inestable…), con los puntos críticos de CO₂, H₂O, N₂, Ar y He.
 
 ## Cómo añadir un módulo
 
