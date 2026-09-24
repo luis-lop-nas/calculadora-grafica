@@ -12,6 +12,7 @@ import * as K from '../lib/complejo'
 import { compilarC as compilarCExpr } from '../lib/expresion'
 import { contorno, equilibrios, jacobiano } from '../lib/contorno'
 import fases, { separatrices as separatricesFases } from '../modulos/edo/fases'
+import { lineaDeFase } from '../modulos/edo/campo'
 import { abeliano, centro, diedral, inverso, orden, simetrico, subgrupos, zn } from '../lib/grupos'
 
 import { caja, hidrogeno, oscilador } from '../modulos/cuantica/orbitales'
@@ -1111,6 +1112,13 @@ seccion('Superficies paramétricas')
 
 seccion('Sistemas dinámicos')
 {
+  // línea de fase de y′ = f(y)
+  {
+    const tipos = (f: (y: number) => number) => lineaDeFase(f, -6, 6).map((e) => `${+e.y.toFixed(9)}:${e.tipo}`).join(' ')
+    cierto('logística: 0 inestable, 1 estable', tipos((y) => y * (1 - y)) === '0:inestable 1:estable', tipos((y) => y * (1 - y)))
+    cierto('y²(1 − y): 0 semiestable', tipos((y) => y * y * (1 - y)) === '0:semiestable 1:estable', tipos((y) => y * y * (1 - y)))
+    cierto('efecto Allee: 0 estable, 1 umbral inestable, 2 estable', tipos((y) => y * (1 - y) * (y - 2)) === '0:estable 1:inestable 2:estable')
+  }
   // separatrices: en la silla lineal x′ = x, y′ = −y la estable es el eje y y la inestable el eje x
   {
     const st = { ...(fases.inicial as Record<string, unknown>), modo: 'lineal', A: [[1, 0], [0, -1]] } as never

@@ -2,6 +2,33 @@ import { definir, type PropsPanel } from '../../nucleo/tipos'
 import { Atajos, Boton, Expresion, Grupo, Interruptor, Muestra, Rango, Segmentado, Resultado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { euler, rk2, rk4 } from '../../lib/numerico'
+import { contorno } from '../../lib/contorno'
+import { ceros } from '../../lib/objetos2d'
+
+/** ¿f no depende de x? Se mira en unos cuantos puntos. */
+function esAutonoma(f: (x: number, y: number) => number): boolean {
+  const ys = [-2.3, -0.7, 0.4, 1.3, 2.9]
+  return ys.every((y) => {
+    const a = f(-1.7, y)
+    const b = f(2.6, y)
+    return !Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a - b) < 1e-12 * Math.max(1, Math.abs(a))
+  })
+}
+
+export interface Equilibrio {
+  y: number
+  tipo: 'estable' | 'inestable' | 'semiestable'
+}
+
+/** Línea de fase de y′ = f(y): los ceros de f y el signo a cada lado. */
+export function lineaDeFase(f: (y: number) => number, a: number, b: number): Equilibrio[] {
+  return ceros(f, a, b, 1200).map((y) => {
+    const h = 1e-4 * Math.max(1, Math.abs(y))
+    const [izq, der] = [Math.sign(f(y - h)), Math.sign(f(y + h))]
+    const tipo = izq > 0 && der < 0 ? 'estable' : izq < 0 && der > 0 ? 'inestable' : 'semiestable'
+    return { y, tipo }
+  })
+}
 
 type Metodo = 'rk4' | 'rk2' | 'euler' | 'comparar'
 
@@ -21,6 +48,8 @@ const EJEMPLOS = [
   { e: '-x/y', t: "y' = −x/y" },
   { e: 'sin(x)-y', t: "y' = sen x − y" },
   { e: 'x*x-y', t: "y' = x² − y" },
+  { e: 'y^2*(1-y)', t: "y' = y²(1 − y): semiestable" },
+  { e: 'y*(1-y)*(y-2)', t: 'con umbral (Allee)' },
 ]
 
 function Panel({ s, set }: PropsPanel<S>) {
@@ -125,6 +154,11 @@ export default definir<S>({
       ['Paso h', s.h.toFixed(3)],
       ['Semillas', `${s.semillas.length}`],
     ]
+    if (f && esAutonoma(f)) {
+      const eq = lineaDeFase((y) => f(0, y), -6, 6)
+      filas.push(['Autónoma: equilibrios en [−6, 6]', `${eq.length}`])
+      for (const e of eq.slice(0, 5)) filas.push([`y = ${+e.y.toFixed(4)}`, e.tipo === 'estable' ? 'estable (atrae)' : e.tipo === 'inestable' ? 'inestable (repele)' : 'semiestable'])
+    }
     if (f && s.semillas.length) {
       const [x0, y0] = s.semillas[s.semillas.length - 1]
       filas.push(['Última semilla', `(${x0.toFixed(2)}, ${y0.toFixed(2)})`])
@@ -157,6 +191,8 @@ export default definir<S>({
       <>
         <Muestra color="var(--ink-soft)">campo de direcciones</Muestra>
         <Muestra color="var(--accent)">soluciones</Muestra>
+        <Muestra color="var(--aux)">equilibrio estable</Muestra>
+        <Muestra color="var(--rosa)">inestable</Muestra>
       </>
     ),
   pista: 'Pulsa para lanzar una solución · arrastra para mover · rueda para zoom',
@@ -194,32 +230,22 @@ export default definir<S>({
       }
 
       if (s.verIsoclinas) {
+        // curvas de nivel f(x, y) = c por marching squares: con varias ramas (y(1 − y) = c tiene dos) salen todas
         const neg = g.color('--neg')
+        const marco = { x: [xa, xb] as [number, number], y: [ya, yb] as [number, number] }
         for (const c of [-2, -1, -0.5, 0, 0.5, 1, 2]) {
-          const pts: Array<[number, number]> = []
-          const N = 300
-          for (let i = 0; i <= N; i++) {
-            const x = xa + ((xb - xa) * i) / N
-            // busca y con f(x,y) = c por bisección en la ventana
-            let lo = ya
-            let hi = yb
-            const F = (y: number) => f(x, y) - c
-            if (!Number.isFinite(F(lo)) || !Number.isFinite(F(hi)) || F(lo) * F(hi) > 0) {
-              if (pts.length > 1) g.curva(pts, neg, 1, true)
-              pts.length = 0
-              continue
-            }
-            for (let j = 0; j < 40; j++) {
-              const m = (lo + hi) / 2
-              if (F(lo) * F(m) <= 0) hi = m
-              else lo = m
-            }
-            pts.push([x, (lo + hi) / 2])
-          }
-          if (pts.length > 1) {
-            g.curva(pts, neg, 1, true)
-            g.texto(`f = ${c}`, pts[0][0], pts[0][1], neg, { dx: 4, dy: -8 })
-          }
+          const segs = contorno(f, marco, c, 140, 100)
+          for (const [p, q] of segs) g.curva([p, q], neg, 1)
+          if (segs.length) g.texto(`f = ${c}`, segs[0][0][0], segs[0][0][1], neg, { dx: 4, dy: -8 })
+        }
+      }
+
+      // ecuación autónoma: las soluciones de equilibrio y su estabilidad
+      if (esAutonoma(f)) {
+        for (const e of lineaDeFase((y) => f(0, y), ya, yb)) {
+          const color = g.color(e.tipo === 'estable' ? '--aux' : e.tipo === 'inestable' ? '--rosa' : '--ocre')
+          g.curva([[xa, e.y], [xb, e.y]], color, 1.8, e.tipo !== 'estable')
+          g.texto(`y = ${+e.y.toFixed(3)} ${e.tipo}`, xa, e.y, color, { dx: 8, dy: -9 })
         }
       }
 
