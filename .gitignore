@@ -4,3 +4,4 @@ comprobar/tiros
 tsconfig.tsbuildinfo
 release
 comprobar/tiros-app
+comprobar/*.tmp.*

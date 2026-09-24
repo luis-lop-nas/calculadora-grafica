@@ -34,6 +34,9 @@ import fourier from '../modulos/senales/fourier'
 import transformadaF from '../modulos/senales/transformada'
 import convolucionM from '../modulos/senales/convolucion'
 import laplaceT from '../modulos/senales/laplace'
+import control from '../modulos/senales/control'
+import circuito from '../modulos/senales/circuito'
+import filtros from '../modulos/senales/filtros'
 
 /** El orden de esta lista es el orden del menú. */
 export const MODULOS: ModuloAny[] = [
@@ -44,5 +47,5 @@ export const MODULOS: ModuloAny[] = [
   resolver, campo, segundoorden, fases,
   superficies, parametricas, vectorial,
   aplicaciones, subespacios, hilbert, estructuras, espacios, unidades,
-  fourier, transformadaF, convolucionM, laplaceT,
+  fourier, transformadaF, convolucionM, laplaceT, control, circuito, filtros,
 ]

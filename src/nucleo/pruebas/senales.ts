@@ -8,6 +8,11 @@ import { convolucionEn, convolucionRejilla } from '../../modulos/senales/convolu
 import { edoPorLaplace, laplace, laplaceInversa, leerExpr } from '../../lib/cas/laplace'
 import { evaluar } from '../../lib/cas/expr'
 import { ejecutar } from '../../lib/cas/cas'
+import { asintotasLugar, bode, lazoCerrado, margenes, metricas, mulP, nyquist, polos, respuesta, routh, type FT } from '../../lib/control'
+import { raicesPolinomio } from '../../lib/matrices'
+import circuito, { estadoEn, fasores, parametros, respuestaAmplitud, type EstadoCircuito } from '../../modulos/senales/circuito'
+import { rk4 } from '../../lib/numerico'
+import filtros, { butterworth, coeficientes, filtrar, polosCerosZ, respuestaFrecuencia, type Coefs, type EstadoFiltro } from '../../modulos/senales/filtros'
 import { cerca, cierto, lectura, parecido, seccion } from './comun'
 
 export function pruebasSenales() {
@@ -220,5 +225,156 @@ export function pruebasSenales() {
     const filas = ejecutar(['laplace(t*exp(-2t))', 'ilaplace(1/(s^2+4))'])
     cierto('CAS: orden laplace', filas[0].salida === String.raw`\frac{1}{\left(s + 2\right)^{2}}`, filas[0].salida ?? filas[0].error ?? '')
     cierto('CAS: orden ilaplace', !!filas[1].salida && filas[1].salida.includes(String.raw`\sin`), filas[1].salida ?? filas[1].error ?? '')
+  }
+
+  seccion('Señales · control')
+  {
+    const G1: FT = { num: [1], den: [1, 1] }
+    const b1 = bode(G1, [1])[0]
+    cerca('1/(s+1) en ω = 1: −3,0103 dB', b1.mag, -10 * Math.log10(2), 1e-12)
+    cerca('1/(s+1) en ω = 1: −45°', b1.fase, -45, 1e-12)
+    // 2.º orden: sobreoscilación e^{−ζπ/√(1−ζ²)} y t_p = π/(ωₙ√(1−ζ²)), con ζ = 0,3 y ωₙ = 2
+    const z = 0.3
+    const wn = 2
+    const T2: FT = { num: [wn * wn], den: [wn * wn, 2 * z * wn, 1] }
+    const y2 = respuesta(T2, 10, 40000)
+    const m2 = metricas(y2, 1)
+    cerca('sobreoscilación del 2.º orden', m2.sobreoscilacion, 100 * Math.exp((-z * Math.PI) / Math.sqrt(1 - z * z)), 1e-6)
+    cerca('tiempo de pico del 2.º orden', m2.tPico, Math.PI / (wn * Math.sqrt(1 - z * z)), 10 / 40000)
+    // L = 10/(s(s+2)(s+5)): ω₁₈₀ = √10, MG = 20·log 7; ω_c de ω²(ω²+4)(ω²+25) = 100 por bisección aparte
+    const L: FT = { num: [10], den: mulP(mulP([0, 1], [2, 1]), [5, 1]) }
+    const mg = margenes(L)
+    cerca('ω₁₈₀ = √10', mg.w180!, Math.sqrt(10), 1e-10)
+    cerca('MG = 20·log₁₀ 7', mg.mg!, 20 * Math.log10(7), 1e-9)
+    let lo = 0
+    let hi = 4
+    for (let i = 0; i < 200; i++) {
+      const x = (lo + hi) / 2
+      if (x * (x + 4) * (x + 25) > 100) hi = x
+      else lo = x
+    }
+    const wc = Math.sqrt(lo)
+    cerca('ω_c: |L(iω_c)| = 1', mg.wc!, wc, 1e-10)
+    cerca('MF = 90° − atan(ω/2) − atan(ω/5)', mg.mf!, 90 - (Math.atan(wc / 2) * 180) / Math.PI - (Math.atan(wc / 5) * 180) / Math.PI, 1e-8)
+    // Nyquist contra los polos del lazo cerrado, con plantas estables e inestables en lazo abierto
+    const casos: Array<[FT, number]> = [
+      [L, 1], [L, 5], [L, 10], [L, 100],
+      [{ num: [1], den: mulP([-1, 1], [4, 1]) }, 2],
+      [{ num: [1], den: mulP([-1, 1], [4, 1]) }, 10],
+      [{ num: [1, 3], den: mulP(mulP([0, 1], [1, 1]), [6, 1]) }, 30],
+      [{ num: [1, -1], den: mulP([1, 1], [2, 1]) }, 4],
+    ]
+    for (const [G, K] of casos) {
+      const LK: FT = { num: G.num.map((v) => v * K), den: G.den }
+      const n = nyquist(LK)
+      const rhp = polos(lazoCerrado(LK)).filter(([a]) => a > 1e-9).length
+      cierto(`Nyquist Z = N + P = ${rhp} (K = ${K}, den ${G.den.join(',')})`, n.Z === rhp, `N=${n.N} P=${n.P}`)
+      cierto(`Routh cuenta ${rhp} raíces con Re > 0 (K = ${K})`, routh(lazoCerrado(LK).den).cambios === rhp)
+    }
+    // Routh en casos especiales: pivote nulo (s⁴+s³+2s²+2s+3, dos raíces con Re > 0) y fila de ceros
+    const p1 = [3, 2, 2, 1, 1]
+    cierto('Routh con pivote nulo: 2 raíces inestables', routh(p1).cambios === 2 && raicesPolinomio(p1).filter(([a]) => a > 0).length === 2)
+    const p2 = [1, 1, 2, 1, 1] // (s²+1)(s²+s+1): raíces en el eje, ninguna con Re > 0
+    const r2 = routh(p2)
+    cierto('Routh con fila de ceros: 0 cambios y avisa', r2.cambios === 0 && r2.especial !== null)
+    const p3 = mulP([-2, 0, 1], [3, 1]) // (s² − 2)(s + 3): una raíz positiva, fila de ceros
+    cierto('Routh con fila de ceros y raíz real positiva: 1 cambio', routh(p3).cambios === 1)
+    // asíntotas del lugar
+    const as = asintotasLugar(L)!
+    cerca('centroide del lugar = −7/3', as.centroide, -7 / 3, 1e-12)
+    cierto('ángulos 60°, 180°, 300°', as.angulos.join() === '60,180,300')
+    // escalón en lazo cerrado frente a la inversa exacta de T(s)/s
+    const exacta = laplaceInversa(leerExpr('10/(s*(s^3+7s^2+10s+10))', 's'))
+    const yNum = respuesta(lazoCerrado(L), 8, 800)
+    let peor = 0
+    for (const [t, v] of yNum) peor = Math.max(peor, Math.abs(v - evaluar(exacta.resultado, { t })))
+    cierto('escalón por espacio de estados = L⁻¹{T(s)/s} exacta', peor < 1e-9, String(peor))
+    // error en régimen permanente de tipo 0: 1/(s+1) con K = 4 → T(0) = 4/5
+    const mT = metricas(respuesta(lazoCerrado({ num: [4], den: [1, 1] }), 10, 2000), 4 / 5)
+    cerca('tipo 0: valor final 4/5', mT.final, 0.8, 1e-15)
+    const fin = respuesta(lazoCerrado({ num: [4], den: [1, 1] }), 10, 2000).at(-1)![1]
+    cerca('la respuesta llega a 4/5', fin, 0.8, 1e-9)
+  }
+
+  seccion('Señales · circuitos RLC')
+  {
+    // transitorio en forma cerrada contra RK4 de la EDO del circuito, en los tres regímenes y los dos montajes
+    const base = circuito.inicial as EstadoCircuito
+    for (const [tipo, R] of [['serie', 1], ['serie', 4], ['serie', 7], ['paralelo', 0.8], ['paralelo', 1], ['paralelo', 5]] as Array<[EstadoCircuito['tipo'], number]>) {
+      const s: EstadoCircuito = { ...base, tipo, R, L: 1, C: 0.25, A: 3, x0: 1.2, y0: -0.7 }
+      // serie: estado (v_C, i): v_C′ = i/C, i′ = (V − R i − v_C)/L. paralelo: (v, i_L): v′ = (I − v/R − i_L)/C, i_L′ = v/L
+      const f = tipo === 'serie'
+        ? (_t: number, y: number[]) => [y[1] / s.C, (s.A - s.R * y[1] - y[0]) / s.L]
+        : (_t: number, y: number[]) => [(s.A - y[0] / s.R - y[1]) / s.C, y[0] / s.L]
+      let y = [s.x0, s.y0]
+      const h = 1e-4
+      let peor = 0
+      for (let k = 1; k <= 50000; k++) {
+        y = rk4(f, (k - 1) * h, y, h)
+        if (k % 5000 === 0) {
+          const e = estadoEn(s, k * h)
+          peor = Math.max(peor, Math.abs(e.vC - y[0]), Math.abs((tipo === 'serie' ? e.i : e.u) - y[1]))
+        }
+      }
+      cierto(`${tipo} R = ${R} (${parametros(s).regimen}): forma cerrada = RK4`, peor < 1e-9, String(peor))
+    }
+    // alterna: leyes de Kirchhoff con fasores y resonancia
+    const s: EstadoCircuito = { ...base, modo: 'alterna', tipo: 'serie', R: 0.8, L: 0.5, C: 0.2, A: 4, w: 1.7 }
+    const fz = fasores(s)
+    cierto('serie: V_R + V_L + V_C = V', Math.hypot(fz.VR[0] + fz.VL[0] + fz.VC[0] - 4, fz.VR[1] + fz.VL[1] + fz.VC[1]) < 1e-12)
+    const w0 = 1 / Math.sqrt(0.5 * 0.2)
+    cerca('serie: en ω₀ la corriente es V/R', respuestaAmplitud(s, w0), 4 / 0.8, 1e-12)
+    // puntos de media potencia ω₂ − ω₁ = R/L exactamente en el serie
+    const mitad = 4 / 0.8 / Math.SQRT2
+    const bis = (a: number, b: number) => {
+      for (let i = 0; i < 200; i++) {
+        const m = (a + b) / 2
+        if ((respuestaAmplitud(s, m) - mitad) * (respuestaAmplitud(s, a) - mitad) <= 0) b = m
+        else a = m
+      }
+      return (a + b) / 2
+    }
+    cerca('serie: ancho de banda = R/L = ω₀/Q', bis(w0, 50) - bis(0.01, w0), 0.8 / 0.5, 1e-10)
+    const sp: EstadoCircuito = { ...s, tipo: 'paralelo', R: 7 }
+    const fp = fasores(sp)
+    cierto('paralelo: I_R + I_L + I_C = I', Math.hypot(fp.IR![0] + fp.IL![0] + fp.IC![0] - 4, fp.IR![1] + fp.IL![1] + fp.IC![1]) < 1e-12)
+    cerca('paralelo: Q = R√(C/L)', parametros(sp).Q, 7 * Math.sqrt(0.2 / 0.5), 1e-14)
+  }
+
+  seccion('Señales · filtros digitales')
+  {
+    const base = filtros.inicial as EstadoFiltro
+    const coef = (p: Partial<EstadoFiltro>) => coeficientes({ ...base, ...p }) as Coefs
+    // media móvil de M: |H| = |sin(Mω/2)/(M sin(ω/2))| (núcleo de Dirichlet)
+    const mm = coef({ diseno: 'media', M: 7 })
+    cierto('media móvil = núcleo de Dirichlet', [0.3, 1.1, 2.9].every((w) => Math.abs(Math.hypot(...respuestaFrecuencia(mm, w)) - Math.abs(Math.sin(3.5 * w) / (7 * Math.sin(w / 2)))) < 1e-14))
+    // IIR de 1.er orden: H = α/(1 − (1−α)e^{−iω}) y h[n] = α(1−α)ⁿ
+    const al = 0.3
+    const i1 = coef({ diseno: 'iir1', alfa: al })
+    cierto('IIR 1.er orden: |H| cerrada', [0.2, 1.4, 3].every((w) => Math.abs(Math.hypot(...respuestaFrecuencia(i1, w)) - al / Math.hypot(1 - (1 - al) * Math.cos(w), (1 - al) * Math.sin(w))) < 1e-14))
+    const h1 = filtrar(i1, Array.from({ length: 30 }, (_, n) => (n === 0 ? 1 : 0)))
+    cierto('IIR 1.er orden: h[n] = α(1−α)ⁿ', h1.every((v, n) => Math.abs(v - al * (1 - al) ** n) < 1e-15))
+    // Butterworth: |H(e^{iω})|² = 1/(1 + (Ω/Ωc)^{2N}) con Ω = 2 tan(ω/2): la bilineal transporta la respuesta analógica exacta
+    for (const [N, wc] of [[2, 0.5], [4, 0.8], [7, 1.9]]) {
+      const bw = butterworth(N, wc)
+      const Wc = 2 * Math.tan(wc / 2)
+      let peor = 0
+      for (const w of [0.05, 0.4, 0.8, 1.3, 2.2, 3]) {
+        const m2 = Math.hypot(...respuestaFrecuencia(bw, w)) ** 2
+        peor = Math.max(peor, Math.abs(m2 - 1 / (1 + (2 * Math.tan(w / 2) / Wc) ** (2 * N))))
+      }
+      cierto(`Butterworth N = ${N}: |H|² = respuesta analógica transportada`, peor < 1e-12, String(peor))
+      cerca(`Butterworth N = ${N}: |H(e^{iωc})| = 1/√2`, Math.hypot(...respuestaFrecuencia(bw, wc)), Math.SQRT1_2, 1e-12)
+      cierto(`Butterworth N = ${N}: polos dentro del círculo unidad`, polosCerosZ(bw).polos.every(([a, b]) => Math.hypot(a, b) < 1))
+    }
+    // FIR: la respuesta al impulso son los propios coeficientes; el peine anula las raíces M-ésimas de la unidad
+    const fir = coef({ diseno: 'propio', b: '0.5, -1, 2, 0.25', a: '1' })
+    cierto('FIR: h[n] = bₙ', filtrar(fir, [1, 0, 0, 0, 0]).every((v, n) => Math.abs(v - [0.5, -1, 2, 0.25, 0][n]) < 1e-15))
+    const pe = coef({ diseno: 'peine', M: 6 })
+    cierto('peine: H(e^{2πik/M}) = 0', [0, 1, 2, 3].every((k) => Math.hypot(...respuestaFrecuencia(pe, (2 * Math.PI * k) / 6)) < 1e-12))
+    // resonador: polos exactamente en r·e^{±iθ}
+    const rs = coef({ diseno: 'resonador', r: 0.9, theta: 1.2 })
+    const pr = polosCerosZ(rs).polos
+    cierto('resonador: polos en r·e^{±iθ}', pr.every(([a, b]) => Math.abs(Math.hypot(a, b) - 0.9) < 1e-12 && Math.abs(Math.abs(Math.atan2(b, a)) - 1.2) < 1e-12))
   }
 }

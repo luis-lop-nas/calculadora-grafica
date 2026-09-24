@@ -11,8 +11,12 @@ npm run dev     # abre http://localhost:5173
 ```
 
 `npm run build` genera `dist/` si alguna vez quieres subirlo a algún sitio.
-`npm run pruebas` comprueba el evaluador de expresiones; `npm run comprobar` abre los 24 módulos en
-un Chromium de verdad, captura cada uno en `comprobar/tiros/` y falla si alguno suelta un error.
+`npm run pruebas` comprueba el evaluador de expresiones y `npm run mate` contrasta cada cálculo con
+su forma cerrada o con un segundo método independiente. `npm run comprobar` abre todos los módulos
+(la lista sale de la propia paleta) en un Chromium de verdad, captura cada uno en `comprobar/tiros/`
+y falla si alguno suelta un error; `SOLO=fourier,control` recorre solo esos.
+`npm run comprobar:app` hace lo mismo en la app de Mac desde su menú Módulo, y además guarda y
+reabre un `.calc` y exporta PNG y CSV.
 
 ## App de Mac
 
@@ -121,6 +125,15 @@ propiedad de la media en Laplace y una sonda de |ψ|² en los orbitales.
 - Espacios y métricas — distancias euclídea, ponderada, Manhattan, Minkowski y Poincaré, con bolas unidad y comparación.
 - Unidades — conversiones dimensionales de longitud, masa, tiempo, velocidad, fuerza, energía, presión y temperatura.
 
+**Señales y sistemas**
+- Series de Fourier — f escrita en un periodo; suma parcial, espectro, Gibbs (tiende a 8,949 %), Fejér y Parseval. Los coeficientes se reconocen en forma exacta cuando la tienen (4/(3π)…).
+- Transformada y muestreo — espectro continuo, muestreo con aliasing y reconstrucción de Shannon, y DFT con ventanas (rectangular, Hann, Hamming, Blackman).
+- Convolución — x(τ)·h(t − τ) deslizándose, el área que se acumula y la salida.
+- Laplace — directa, inversa (fracciones simples, retardos e^{−τs}, δ) y **EDO lineales con condiciones en 0**, con pasos. Cada resultado se comprueba con ∫₀^∞ f e^{−st} dt; en el CAS, `laplace(…)` e `ilaplace(…)`. Escalón: `heaviside(t−a)`; delta: `dirac(t−a)`.
+- Control — G(s) escrita, ganancia, lazo cerrado y PID; escalón con sus métricas, Bode con asíntotas y márgenes, Nyquist (Z = N + P), lugar de las raíces y Routh–Hurwitz.
+- Circuitos RLC — serie y paralelo: transitorio exacto en los tres regímenes, fasores girando, impedancia, potencia y curva de resonancia.
+- Filtros digitales — media móvil, IIR, resonador, peine, Butterworth (bilineal) o coeficientes propios: plano z, |H(e^{iω})| y h[n].
+
 ## Cómo añadir un módulo
 
 Un módulo es un fichero que exporta `definir<S>({...})`:
@@ -160,7 +173,12 @@ dependen del tiempo.
 
 ## Piezas compartidas
 
-- `src/lib/especiales.ts` — Laguerre, Legendre, Hermite, Bessel y sus ceros.
+- `src/lib/especiales.ts` — Laguerre, Legendre, Hermite, Bessel (también para x grande), K(k), Si(x), gamma y beta incompletas, erf y su inversa.
+- `src/lib/fft.ts` — FFT de cualquier longitud (radix-2 y Bluestein), 2D y convolución.
+- `src/lib/azar.ts` — generador con semilla y once distribuciones con pdf, cdf, cuantil y muestreo.
+- `src/lib/senales.ts` — saltos de una función, integrales partidas en ellos, coeficientes de Fourier y transformada continua.
+- `src/lib/control.ts` — respuesta temporal, Bode, márgenes, Nyquist, lugar de las raíces y Routh.
+- `src/lib/cas/laplace.ts` — Laplace directa, inversa y EDO lineales, con su comprobación numérica.
 - `src/lib/expresion.ts` — evaluador de expresiones sin `eval`: descenso recursivo a un árbol
   público (`analizar`, `Nodo`) que se compila a cierres; `aLatex` para la vista previa y `compilarC`
   para evaluar la misma expresión sobre los complejos (con `i`).
@@ -173,7 +191,7 @@ dependen del tiempo.
   extremos, inflexiones, asíntotas, cortes).
   Pruebas: `npm run pruebas`.
 - `src/lib/numerico.ts` — Euler, RK2, RK4 y trayectorias.
-- `src/lib/matrices.ts` — rref, rango, núcleo, autovalores, Gram-Schmidt, clasificación de equilibrios.
+- `src/lib/matrices.ts` — rref, rango, núcleo, autovalores (Jacobi, generalizado, tridiagonal), raíces de polinomios, mínimos cuadrados por QR, Gram-Schmidt, clasificación de equilibrios.
 - `src/lib/contorno.ts` — marching squares, equilibrios y jacobiano numérico.
 - `src/lib/mallado.ts` — rejilla volumétrica, marching tetrahedra y nube por |ψ|².
 - `src/lib/grupos.ts` — Zₙ, Sₙ, Dₙ, órdenes, centro y subgrupos.
