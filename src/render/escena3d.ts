@@ -29,6 +29,8 @@ export class Escena3D {
   private objs: THREE.Object3D[] = []
   private luzCam: THREE.DirectionalLight
   private capaAsas = new THREE.Group()
+  /** Guías de selección, movimiento y giro: no las borra `limpiar`. */
+  private capaGuias = new THREE.Group()
   private asas: Array<{ id: string; sprite: THREE.Sprite; halo: THREE.Sprite }> = []
   private rayo = new THREE.Raycaster()
 
@@ -47,11 +49,16 @@ export class Escena3D {
     this.scene.add(this.camera)
     this.scene.add(this.root)
     this.root.add(this.capaAsas)
+    this.root.add(this.capaGuias)
     this.zArriba(true)
   }
 
   zArriba(si: boolean) {
     this.root.rotation.set(si ? -Math.PI / 2 : 0, 0, 0)
+  }
+  /** ¿El eje z de la física apunta hacia arriba en pantalla? */
+  get conZArriba() {
+    return this.root.rotation.x !== 0
   }
 
   color(n: string) {
@@ -149,6 +156,35 @@ export class Escena3D {
       }
     }
     return mejor
+  }
+
+  /** Punto de física → píxeles del canvas; null si queda detrás de la cámara. */
+  aPantalla(p: number[]): { x: number; y: number } | null {
+    const c = this.renderer.domElement
+    this.camera.updateMatrixWorld()
+    this.root.updateMatrixWorld()
+    const q = this.root.localToWorld(new THREE.Vector3(p[0], p[1], p[2] ?? 0)).project(this.camera)
+    if (q.z > 1) return null
+    return { x: ((q.x + 1) / 2) * c.clientWidth, y: ((1 - q.y) / 2) * c.clientHeight }
+  }
+
+  /** Sustituye las guías: polilíneas finas y translúcidas, encima de todo. */
+  ponerGuias(lineas: Array<{ pts: number[][]; color: THREE.Color; opacidad?: number; discontinua?: boolean }>) {
+    for (const o of [...this.capaGuias.children]) {
+      this.capaGuias.remove(o)
+      ;(o as THREE.Line).geometry.dispose()
+      ;((o as THREE.Line).material as THREE.Material).dispose()
+    }
+    for (const l of lineas) {
+      const g = new THREE.BufferGeometry().setFromPoints(l.pts.map((q) => new THREE.Vector3(q[0], q[1], q[2] ?? 0)))
+      const mat = l.discontinua
+        ? new THREE.LineDashedMaterial({ color: l.color, transparent: true, opacity: l.opacidad ?? 0.7, dashSize: 0.06, gapSize: 0.05, depthTest: false })
+        : new THREE.LineBasicMaterial({ color: l.color, transparent: true, opacity: l.opacidad ?? 0.7, depthTest: false })
+      const linea = new THREE.Line(g, mat)
+      if (l.discontinua) linea.computeLineDistances()
+      linea.renderOrder = 9
+      this.capaGuias.add(linea)
+    }
   }
 
   /** Rayo del puntero, ya en coordenadas de física (las de `root`). */
@@ -466,6 +502,7 @@ export class Escena3D {
 
   destruir() {
     this.ponerAsas([], null)
+    this.ponerGuias([])
     this.limpiar()
     this.renderer.dispose()
   }

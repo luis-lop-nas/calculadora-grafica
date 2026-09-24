@@ -277,7 +277,7 @@ function PanelFocos({ s, set }: PropsPanel<EstadoCalor>) {
       <Rango etiqueta="Anchura σ de los focos" valor={s.ancho} min={0.03} max={0.2} paso={0.005} formato={(v) => v.toFixed(3)} onChange={(ancho) => set({ ancho })} />
       <Nota>
         Columnas: {cols.map((c) => ['x', 'y', 'z', 'amplitud'][c]).join(', ')}. Amplitud negativa = foco frío.
-        Arrástralos en el lienzo {s.dim === 1 ? '(la altura es la amplitud)' : s.dim === 2 ? '(con Mayús cambias la amplitud)' : '(con Mayús suben o bajan)'};
+        Arrástralos en el lienzo {s.dim === 1 ? '(la altura es la amplitud)' : s.dim === 2 ? '(con ⌥ cambias la amplitud)' : '(con ⌥ suben o bajan)'};
         doble clic pone uno nuevo.
       </Nota>
     </>
@@ -475,7 +475,7 @@ function interaccionFocos(dim: Dim): Interaccion<EstadoCalor> {
         f[0] = recorta01(t.p[0])
         f[3] = recortaA(t.p[1])
       } else if (dim === 2) {
-        // Mayús sube o baja el asa: en la placa eso es cambiar la amplitud
+        // ⌥ sube o baja el asa: en la placa eso es cambiar la amplitud
         if (t.mayus) f[3] = recortaA(t.p[2] / 0.7)
         else {
           f[0] = desdeMundo(t.p[0])
@@ -503,8 +503,8 @@ function interaccionFocos(dim: Dim): Interaccion<EstadoCalor> {
       dim === 1
         ? 'Arrastra los focos (la altura es la amplitud) · doble clic: foco nuevo · doble clic o Supr: quitarlo'
         : dim === 2
-          ? 'Arrastra los focos por la placa · Mayús: amplitud · doble clic: foco nuevo · Supr: quitarlo'
-          : 'Arrastra los focos · Mayús: en vertical · doble clic: foco nuevo · Supr: quitarlo',
+          ? 'Arrastra los focos por la placa · ⌥: amplitud · doble clic: foco nuevo · Supr: quitarlo'
+          : 'Arrastra los focos · ⌥: en vertical · doble clic: foco nuevo · Supr: quitarlo',
   }
 }
 

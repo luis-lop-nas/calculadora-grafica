@@ -108,7 +108,7 @@ function Panel({ s, set }: PropsPanel<S>) {
             rot F
           </Interruptor>
         </div>
-        <Nota>Arrastra las sondas por el espacio (Mayús: en vertical). Doble clic en el suelo pone otra.</Nota>
+        <Nota>Arrastra las sondas por el espacio (⌥: en vertical). Doble clic en el suelo pone otra.</Nota>
       </Grupo>
 
       <Grupo titulo="Dibujo">

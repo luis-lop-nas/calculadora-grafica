@@ -314,7 +314,7 @@ export default definir<S>({
         const L = rejilla(s).L
         return { sonda: t.p.map((c) => Math.round(Math.max(-1, Math.min(1, c / L)) * 1000) / 1000) }
       },
-      pista: 'Arrastra la sonda (Mayús: en vertical) y lee ψ en ese punto',
+      pista: 'Arrastra la sonda (⌥: en vertical) y lee ψ en ese punto',
     },
   },
 })

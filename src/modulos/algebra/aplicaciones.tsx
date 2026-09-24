@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
+import { definir, type Asa, type ObjetoMovible, type PropsPanel } from '../../nucleo/tipos'
 import { Atajos, Boton, Grupo, Interruptor, Matriz, Muestra, Nota, Rango, Segmentado } from '../../nucleo/controles'
 import { aplicar, autovalores3, autovector, det, nucleo, raicesPolinomio, rango, traza } from '../../lib/matrices'
 import { FIGURAS, lineasDe, type Figura } from '../../lib/figuras3d'
@@ -10,6 +10,9 @@ interface S {
   A: number[][]
   B: number[][]
   objeto: Objeto
+  /** Posición y giro de la figura en el dominio (antes de aplicar A): v ↦ figRot·v + figPos. */
+  figPos?: number[]
+  figRot?: number[][]
   t: number
   verComparacion: boolean
   verAutovectores: boolean
@@ -73,9 +76,57 @@ function mover(id: string, p: number[], s: S): Partial<S> | void {
   if (x) return { X: s.X.map((v, i) => (i === k ? redondo(x) : v)) }
 }
 
-/** La figura en alambre, con cada punto pasado por M: así se ven todas como el cubo. */
-function dibujarObjeto(e: any, M: number[][], objeto: Objeto, color: THREE.Color, opacidad = 1) {
-  for (const l of lineasDe(objeto)) e.linea(l.map((v) => aplicar(M, v) as [number, number, number]), color, opacidad)
+const I3 = () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+const pos = (s: S) => s.figPos ?? [0, 0, 0]
+const rot = (s: S) => s.figRot ?? I3()
+const producto = (P: number[][], Q: number[][]) => P.map((f) => [0, 1, 2].map((j) => f[0] * Q[0][j] + f[1] * Q[1][j] + f[2] * Q[2][j]))
+/** Giro de ángulo a alrededor del eje k (0 x, 1 y, 2 z). */
+function giro(k: number, a: number): number[][] {
+  const [c, n] = [Math.cos(a), Math.sin(a)]
+  const [i, j] = [0, 1, 2].filter((m) => m !== k)
+  const R = I3()
+  R[i][i] = c
+  R[i][j] = -n
+  R[j][i] = n
+  R[j][j] = c
+  return R
+}
+/** Punto de la figura colocado en el dominio: figRot·v + figPos. */
+const colocar = (s: S, v: number[]) => {
+  const [R, p] = [rot(s), pos(s)]
+  return [0, 1, 2].map((i) => R[i][0] * v[0] + R[i][1] * v[1] + R[i][2] * v[2] + p[i])
+}
+
+/** La figura en alambre, colocada y con cada punto pasado por M: así se ven todas como el cubo. */
+function dibujarObjeto(e: any, M: number[][], s: S, color: THREE.Color, opacidad = 1) {
+  for (const l of lineasDe(s.objeto)) e.linea(l.map((v) => aplicar(M, colocar(s, v)) as [number, number, number]), color, opacidad)
+}
+
+/** La figura se agarra entera: ⌘+arrastrar la mueve y R la gira (en el dominio, antes de deformarla). */
+const objetoMovible: ObjetoMovible<S> = {
+  nombre: 'figura',
+  caja(s) {
+    const M = mezcla(s.A, s.t)
+    const min = [Infinity, Infinity, Infinity]
+    const max = [-Infinity, -Infinity, -Infinity]
+    for (const l of lineasDe(s.objeto))
+      for (const v of l) {
+        const q = aplicar(M, colocar(s, v))
+        for (let i = 0; i < 3; i++) {
+          if (q[i] < min[i]) min[i] = q[i]
+          if (q[i] > max[i]) max[i] = q[i]
+        }
+      }
+    return Number.isFinite(min[0]) ? { min, max } : null
+  },
+  centro: (s) => aplicar(mezcla(s.A, s.t), pos(s)),
+  trasladar(d, s) {
+    // lo que se ve se desplaza d: en el dominio es M⁻¹·d (si M aplasta, se mueve lo que se pueda)
+    const M = mezcla(s.A, s.t)
+    const D = resolver(M, d) ?? d
+    return { figPos: pos(s).map((c, i) => Math.round((c + D[i]) * 1e4) / 1e4) }
+  },
+  girar: (eje, a, s) => ({ figRot: producto(giro('xyz'.indexOf(eje), a), rot(s)) }),
 }
 
 function Panel({ s, set }: PropsPanel<S>) {
@@ -119,6 +170,11 @@ function Panel({ s, set }: PropsPanel<S>) {
           opciones={(Object.keys(FIGURAS) as Figura[]).map((v) => ({ v, t: FIGURAS[v].t }))}
           onChange={(objeto) => set({ objeto })}
         />
+        {(s.figPos || s.figRot) && (
+          <div className="interruptores">
+            <Boton onClick={() => set({ figPos: undefined, figRot: undefined })}>Recolocar la figura</Boton>
+          </div>
+        )}
         <Rango
           etiqueta="Deformación"
           valor={s.t}
@@ -221,7 +277,8 @@ export default definir<S>({
       mover: (id, t, s) => mover(id, t.p, s),
       anadir: (t, s) => ({ X: [...s.X, redondo(t.p)] }),
       quitar: (id, s) => (id[0] === 'E' ? undefined : { X: s.X.filter((_, i) => i !== +id.slice(1)) }),
-      pista: 'Arrastra las columnas de A o los puntos · Mayús: en vertical · doble clic: punto nuevo',
+      objeto: objetoMovible,
+      pista: 'Arrastra las columnas de A o los puntos (⌥: en vertical) · ⌘+arrastrar mueve la figura · R la gira · Mayús: ejes y pasos · X/Y/Z/0: vista',
     },
     construir(e, s) {
       e.zArriba(true)
@@ -230,9 +287,9 @@ export default definir<S>({
       const T = (v: number[]) => aplicar(M, v) as [number, number, number]
       const acento = e.color('--accent')
 
-      dibujarObjeto(e, M, s.objeto, acento)
+      dibujarObjeto(e, M, s, acento)
 
-      if (s.verComparacion) dibujarObjeto(e, mezcla(s.B, s.t), s.objeto, e.color('--neg'))
+      if (s.verComparacion) dibujarObjeto(e, mezcla(s.B, s.t), s, e.color('--neg'))
 
       if (s.verBase) {
         const pos = e.color('--pos')

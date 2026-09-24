@@ -307,7 +307,7 @@ export default definir<S>({
     interaccion: {
       asas,
       mover,
-      pista: 'Arrastra los puntos libres; con Mayús, en vertical',
+      pista: 'Arrastra los puntos libres; con ⌥, en vertical',
     },
   },
 })

@@ -18,6 +18,30 @@ function escribiendo(ev: KeyboardEvent) {
   return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
 }
 
+/** Paso de la rejilla al mover con Mayús y del giro con Mayús. */
+const PASO = 0.5
+const PASO_GIRO = Math.PI / 12
+
+/** Con Mayús: solo cambia la coordenada que más se ha movido, y cae en la rejilla de 0,5. */
+function aEjes(p0: number[], q: number[]): { p: number[]; eje: number } {
+  const d = q.map((c, i) => c - (p0[i] ?? 0))
+  let k = 0
+  for (let i = 1; i < d.length; i++) if (Math.abs(d[i]) > Math.abs(d[k])) k = i
+  const p = p0.slice()
+  p[k] = Math.round(q[k] / PASO) * PASO
+  return { p, eje: k }
+}
+
+const COLOR_EJE = ['--rosa', '--aux', '--accent']
+
+const ATAJOS_3D = [
+  'X / Y / Z: mirar desde ese eje · 0: vista de partida',
+  'Arrastrar un punto: moverlo · ⌥: en vertical · Mayús: por un eje y a pasos de 0,5',
+  'Clic en una figura movible: seleccionarla · Esc: soltarla',
+  '⌘ (Ctrl) + arrastrar: mover la figura · Mayús: por un eje y a pasos de 0,5',
+  'R: girarla con el ratón · X / Y / Z: eje de giro · Mayús: a pasos de 15° · clic o Intro: vale · Esc: deshacer',
+].join('\n')
+
 function descargarCanvas(canvas: HTMLCanvasElement, nombre: string) {
   const a = document.createElement('a')
   a.href = canvas.toDataURL('image/png')
@@ -55,6 +79,22 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
   const [plano, setPlano] = useState<'3d' | 'x' | 'y' | 'z'>('3d')
   const [rejillaCompleta, setRejillaCompleta] = useState(false)
   const [calculando, setCalculando] = useState(false)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const alinear = (modo: '3d' | 'x' | 'y' | 'z') => {
+    setPlano(modo)
+    const cam = escena.current
+    if (!cam) return
+    // la órbita va en el marco de three (y arriba); con z arriba, el eje y de la física es −z de three
+    const { r } = cam.orb
+    const zArr = cam.conZArriba
+    if (modo === 'x') cam.orb = { theta: 0, phi: Math.PI / 2, r }
+    if (modo === (zArr ? 'z' : 'y')) cam.orb = { theta: Math.PI / 2, phi: 0.08, r }
+    if (modo === (zArr ? 'y' : 'z')) cam.orb = { theta: Math.PI / 2, phi: Math.PI / 2, r }
+    if (modo === '3d' && vista.camara) cam.orb = { ...vista.camara }
+    sucio.current = true
+  }
+  const alinearRef = useRef(alinear)
+  alinearRef.current = alinear
 
   useEffect(() => {
     const canvas = ref.current!
@@ -82,7 +122,13 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     // Asas: la lista vigente, la que está bajo el ratón y la que se arrastra.
     let asas: Asa[] = []
     let encima: string | null = null
-    let mano: { id: string; desfase: number[] } | null = null
+    let mano: { id: string; desfase: number[]; p0: number[] } | null = null
+    // objeto entero: seleccionado, moviéndose (⌘ + arrastrar) o girando (R)
+    let seleccionado = false
+    let movObj: { s0: any; c0: number[]; desfase: number[]; eje: number | null } | null = null
+    let girando: { s0: any; x0: number; eje: 'x' | 'y' | 'z'; ang: number } | null = null
+    let bajoEn: { x: number; y: number } | null = null
+    let ultimo = { x: 0, y: 0, mayus: false }
     const local = (ev: { clientX: number; clientY: number }) => {
       const r = canvas.getBoundingClientRect()
       return { x: ev.clientX - r.left, y: ev.clientY - r.top }
@@ -97,25 +143,122 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     const aplicar = (parche: any) => {
       if (parche) estado.current.set(parche)
     }
+    const objeto = () => estado.current.vista.interaccion?.objeto ?? null
+    /** ¿Cae el punto dentro del marco del objeto en pantalla? */
+    const sobreObjeto = (x: number, y: number) => {
+      const o = objeto()
+      const caja = o?.caja(estado.current.s)
+      if (!caja) return false
+      const pts: Array<{ x: number; y: number }> = []
+      for (const a of [caja.min[0], caja.max[0]]) for (const b of [caja.min[1], caja.max[1]]) for (const c of [caja.min[2], caja.max[2]]) {
+        const q = e.aPantalla([a, b, c])
+        if (q) pts.push(q)
+      }
+      if (!pts.length) return false
+      const m = 6
+      return x >= Math.min(...pts.map((q) => q.x)) - m && x <= Math.max(...pts.map((q) => q.x)) + m && y >= Math.min(...pts.map((q) => q.y)) - m && y <= Math.max(...pts.map((q) => q.y)) + m
+    }
+    /** Marco fino del objeto seleccionado y, al moverlo o girarlo, la guía del eje. */
+    const guias = () => {
+      const o = objeto()
+      const caja = o && seleccionado ? o.caja(estado.current.s) : null
+      setAviso(
+        !o || !seleccionado
+          ? null
+          : girando
+            ? `Girando en ${girando.eje.toUpperCase()} · ${Math.round((girando.ang * 180) / Math.PI)}° · X/Y/Z: eje · Mayús: 15° · clic: vale · Esc: deshacer`
+            : movObj
+              ? movObj.eje !== null ? `Moviendo por el eje ${'XYZ'[movObj.eje]} · pasos de 0,5` : 'Moviendo · Mayús: por un eje y a pasos de 0,5 · ⌥: en vertical'
+              : `${o.nombre[0].toUpperCase()}${o.nombre.slice(1)} seleccionada · ⌘+arrastrar: mover · R: girar · Esc: soltar`,
+      )
+      if (!o || !caja) {
+        e.ponerGuias([])
+        pedir = true
+        return
+      }
+      const [a, b] = [caja.min, caja.max]
+      const V = (i: number, j: number, k: number) => [i ? b[0] : a[0], j ? b[1] : a[1], k ? b[2] : a[2]]
+      const suave = e.color('--ink-soft')
+      const lineas: Array<{ pts: number[][]; color: THREE.Color; opacidad?: number; discontinua?: boolean }> = []
+      for (const [p, q] of [
+        [V(0, 0, 0), V(1, 0, 0)], [V(0, 1, 0), V(1, 1, 0)], [V(0, 0, 1), V(1, 0, 1)], [V(0, 1, 1), V(1, 1, 1)],
+        [V(0, 0, 0), V(0, 1, 0)], [V(1, 0, 0), V(1, 1, 0)], [V(0, 0, 1), V(0, 1, 1)], [V(1, 0, 1), V(1, 1, 1)],
+        [V(0, 0, 0), V(0, 0, 1)], [V(1, 0, 0), V(1, 0, 1)], [V(0, 1, 0), V(0, 1, 1)], [V(1, 1, 0), V(1, 1, 1)],
+      ])
+        lineas.push({ pts: [p, q], color: suave, opacidad: 0.55, discontinua: true })
+      const c = o.centro(estado.current.s)
+      const R = 0.55 * Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) || 1
+      const recta = (k: number) => {
+        const u = [0, 0, 0]
+        u[k] = 1
+        return { pts: [c.map((v, i) => v - 1.6 * R * u[i]), c.map((v, i) => v + 1.6 * R * u[i])], color: e.color(COLOR_EJE[k]), opacidad: 0.9 }
+      }
+      if (movObj && movObj.eje !== null) lineas.push(recta(movObj.eje))
+      if (girando) {
+        const k = 'xyz'.indexOf(girando.eje)
+        const [i, j] = [0, 1, 2].filter((m) => m !== k)
+        const circ: number[][] = []
+        for (let n = 0; n <= 96; n++) {
+          const t = (2 * Math.PI * n) / 96
+          const p = c.slice()
+          p[i] += R * Math.cos(t)
+          p[j] += R * Math.sin(t)
+          circ.push(p)
+        }
+        lineas.push({ pts: circ, color: e.color(COLOR_EJE[k]), opacidad: 0.9 }, recta(k))
+      }
+      e.ponerGuias(lineas)
+      pedir = true
+    }
+    const girarA = (x: number, mayus: boolean) => {
+      const o = objeto()
+      if (!o || !girando) return
+      let ang = (x - girando.x0) * 0.01
+      if (mayus) ang = Math.round(ang / PASO_GIRO) * PASO_GIRO
+      girando.ang = ang
+      aplicar(o.girar(girando.eje, ang, girando.s0))
+      guias()
+    }
     const cursor = () => {
       canvas.style.cursor = mano ? 'grabbing' : encima ? 'pointer' : ''
     }
+    void cursor
 
     const abajo = (ev: PointerEvent) => {
+      // un clic mientras se gira confirma el giro
+      if (girando) {
+        girando = null
+        guias()
+        return
+      }
       canvas.setPointerCapture(ev.pointerId)
       punteros.set(ev.pointerId, { x: ev.clientX, y: ev.clientY })
       const inter = estado.current.vista.interaccion
       if (punteros.size === 1 && inter) {
         const { x, y } = local(ev)
+        bajoEn = { x, y }
         const id = e.asaEn(x, y)
         const asa = id ? asas.find((a) => a.id === id) : null
         if (asa) {
           // se guarda el desfase para que el punto no salte al agarrarlo por el borde
-          const bajo = asa.sobre === 'superficie' ? null : e.puntoEnPlano(x, y, asa.p, ev.shiftKey)
-          mano = { id: asa.id, desfase: bajo ? asa.p.map((c, i) => c - bajo[i]) : [0, 0, 0] }
+          const bajo = asa.sobre === 'superficie' ? null : e.puntoEnPlano(x, y, asa.p, ev.altKey)
+          mano = { id: asa.id, desfase: bajo ? asa.p.map((c, i) => c - bajo[i]) : [0, 0, 0], p0: asa.p.slice() }
           repintarAsas()
           cursor()
           return
+        }
+        const o = objeto()
+        if (o && sobreObjeto(x, y)) {
+          seleccionado = true
+          if (ev.metaKey || ev.ctrlKey) {
+            const c0 = o.centro(estado.current.s)
+            const bajo = e.puntoEnPlano(x, y, c0, ev.altKey)
+            movObj = { s0: estado.current.s, c0, desfase: bajo ? c0.map((c, i) => c - bajo[i]) : [0, 0, 0], eje: null }
+            canvas.style.cursor = 'grabbing'
+            guias()
+            return
+          }
+          guias()
         }
       }
       if (punteros.size === 2) {
@@ -127,16 +270,39 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     const mover = (ev: PointerEvent) => {
       const inter = estado.current.vista.interaccion
       const { x, y } = local(ev)
+      ultimo = { x, y, mayus: ev.shiftKey }
+      if (girando) {
+        girarA(x, ev.shiftKey)
+        return
+      }
+      if (movObj) {
+        const o = objeto()
+        if (!o) return
+        const q = e.puntoEnPlano(x, y, movObj.c0, ev.altKey)
+        if (!q) return
+        let destino = q.map((c, i) => c + (ev.altKey && i < 2 ? 0 : movObj!.desfase[i] ?? 0))
+        movObj.eje = null
+        if (ev.shiftKey) {
+          const r = aEjes(movObj.c0, destino)
+          destino = r.p
+          movObj.eje = r.eje
+        }
+        aplicar(o.trasladar(destino.map((c, i) => c - movObj!.c0[i]), movObj.s0))
+        guias()
+        return
+      }
       if (mano && inter) {
         const asa = asas.find((a) => a.id === mano!.id)
         if (!asa) return
         let toque: { p: number[]; uv?: [number, number] } | null = null
-        if (asa.sobre === 'superficie' && !ev.shiftKey) toque = e.puntoEnMalla(x, y)
+        if (asa.sobre === 'superficie' && !ev.altKey && !ev.shiftKey) toque = e.puntoEnMalla(x, y)
         if (!toque) {
-          const q = e.puntoEnPlano(x, y, asa.p, ev.shiftKey)
-          if (q) toque = { p: q.map((c, i) => c + (ev.shiftKey && i < 2 ? 0 : mano!.desfase[i] ?? 0)) }
+          const q = e.puntoEnPlano(x, y, asa.p, ev.altKey)
+          if (q) toque = { p: q.map((c, i) => c + (ev.altKey && i < 2 ? 0 : mano!.desfase[i] ?? 0)) }
         }
-        if (toque) aplicar(inter.mover(asa.id, { ...toque, mayus: ev.shiftKey }, estado.current.s))
+        // Mayús: por el eje en que más se ha movido, y a escalones de 0,5
+        if (toque && ev.shiftKey) toque = { p: aEjes(mano.p0, toque.p).p }
+        if (toque) aplicar(inter.mover(asa.id, { ...toque, mayus: ev.altKey }, estado.current.s))
         return
       }
       const p = punteros.get(ev.pointerId)
@@ -168,6 +334,18 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     const arriba = (ev: PointerEvent) => {
       punteros.delete(ev.pointerId)
       pellizco = 0
+      if (movObj) {
+        movObj = null
+        cursor()
+        guias()
+      }
+      // un clic (sin arrastrar) fuera del objeto lo deselecciona
+      const { x, y } = local(ev)
+      if (bajoEn && Math.hypot(x - bajoEn.x, y - bajoEn.y) < 4 && seleccionado && !mano && !sobreObjeto(x, y)) {
+        seleccionado = false
+        guias()
+      }
+      bajoEn = null
       if (mano) {
         mano = null
         repintarAsas()
@@ -189,11 +367,56 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
         const q = e.puntoEnPlano(x, y, [0, 0, inter.suelo ?? 0], false)
         if (q) toque = { p: q }
       }
-      if (toque) aplicar(inter.anadir({ ...toque, mayus: ev.shiftKey }, estado.current.s))
+      if (toque) aplicar(inter.anadir({ ...toque, mayus: ev.altKey }, estado.current.s))
     }
     const tecla = (ev: KeyboardEvent) => {
+      if (escribiendo(ev) || ev.metaKey || ev.ctrlKey) return
       const inter = estado.current.vista.interaccion
-      if (!encima || !inter?.quitar || escribiendo(ev)) return
+      const k = ev.key.toLowerCase()
+      const o = objeto()
+      // girando: X, Y, Z eligen el eje; Mayús, a pasos de 15°; Esc deshace; Intro confirma
+      if (girando && o) {
+        if (k === 'x' || k === 'y' || k === 'z') {
+          ev.preventDefault()
+          // se vuelve al estado de partida y se gira alrededor del eje nuevo
+          aplicar(o.girar(girando.eje, 0, girando.s0))
+          girando.eje = k
+          girarA(ultimo.x, ev.shiftKey || ultimo.mayus)
+          return
+        }
+        if (k === 'escape') {
+          ev.preventDefault()
+          aplicar(o.girar(girando.eje, 0, girando.s0))
+          girando = null
+          guias()
+          return
+        }
+        if (k === 'enter') {
+          girando = null
+          guias()
+          return
+        }
+        if (k === 'shift') girarA(ultimo.x, true)
+        return
+      }
+      if (k === 'r' && o && seleccionado && !ev.altKey) {
+        ev.preventDefault()
+        girando = { s0: estado.current.s, x0: ultimo.x, eje: 'z', ang: 0 }
+        guias()
+        return
+      }
+      if (k === 'escape' && seleccionado) {
+        seleccionado = false
+        guias()
+        return
+      }
+      // X, Y, Z alinean la cámara con ese eje; 0 vuelve a la vista de partida (solo el lienzo principal)
+      if (!secundario && !ev.altKey && (k === 'x' || k === 'y' || k === 'z' || k === '0')) {
+        ev.preventDefault()
+        alinearRef.current(k === '0' ? '3d' : k)
+        return
+      }
+      if (!encima || !inter?.quitar) return
       if (ev.key !== 'Delete' && ev.key !== 'Backspace') return
       ev.preventDefault()
       aplicar(inter.quitar(encima, estado.current.s))
@@ -245,6 +468,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
           asas = v.interaccion?.asas(st) ?? []
           if (encima && !asas.some((a) => a.id === encima)) encima = null
           repintarAsas()
+          guias()
           construyendo.current = false
           setCalculando(false)
         }
@@ -293,6 +517,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
       window.removeEventListener('keydown', tecla)
       e.destruir()
       escena.current = null
+      setAviso(null)
       // una construcción diferida que no llegó a correr no puede dejar el lienzo nuevo bloqueado
       construyendo.current = false
       sucio.current = true
@@ -308,6 +533,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     <>
       <canvas ref={ref} className="arrastrable" />
       {calculando && <div className="calculando" role="status">Calculando…</div>}
+      {aviso && <div className="aviso-3d" role="status">{aviso}</div>}
       {!secundario && <div className="controles-3d" role="group" aria-label="Orientación de la escena">
         {(['3d', 'x', 'y', 'z'] as const).map((modo) => (
           <button
@@ -315,16 +541,8 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
             type="button"
             className={plano === modo ? 'activo' : undefined}
             aria-pressed={plano === modo}
-            onClick={() => {
-              setPlano(modo)
-              const cam = escena.current
-              if (!cam) return
-              if (modo === 'x') cam.orb = { theta: 0, phi: Math.PI / 2, r: cam.orb.r }
-              if (modo === 'y') cam.orb = { theta: 0, phi: 0.08, r: cam.orb.r }
-              if (modo === 'z') cam.orb = { theta: Math.PI / 2, phi: Math.PI / 2, r: cam.orb.r }
-              if (modo === '3d' && vista.camara) cam.orb = { ...vista.camara }
-              sucio.current = true
-            }}
+            title={modo === '3d' ? 'Vista de partida (tecla 0)' : `Mirar desde el eje ${modo} (tecla ${modo.toUpperCase()})`}
+            onClick={() => alinear(modo)}
           >
             {modo === '3d' ? '3D' : modo.toUpperCase()}
           </button>
@@ -347,6 +565,9 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
         </button>
         <button type="button" title="Descargar imagen PNG" onClick={() => ref.current && descargarCanvas(ref.current, 'calculadora-3d')}>
           PNG
+        </button>
+        <button type="button" className="ayuda-atajos" aria-label="Atajos de teclado" title={ATAJOS_3D}>
+          ?
         </button>
       </div>}
     </>

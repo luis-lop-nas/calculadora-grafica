@@ -57,7 +57,7 @@ export interface Asa {
   nombre?: string
   /**
    * Solo 3D. `plano` (por defecto): se desliza en horizontal y en vertical con
-   * Mayús. `superficie`: sigue al ratón sobre las mallas de `e.agarre`, y si
+   * ⌥ (con Mayús, por el eje dominante y a escalones de 0,5). `superficie`: sigue al ratón sobre las mallas de `e.agarre`, y si
    * no hay ninguna debajo cae al plano.
    */
   sobre?: 'plano' | 'superficie'
@@ -69,7 +69,25 @@ export interface Asa {
 export interface Toque {
   p: number[]
   uv?: [number, number]
+  /** En 2D, Mayús; en 3D, ⌥ (subir o bajar en vertical: Mayús ahí es alinear a ejes y escalones). */
   mayus: boolean
+}
+
+/**
+ * Un objeto entero que se selecciona con un clic, se mueve con ⌘ + arrastrar y
+ * se gira con R. Las funciones reciben el estado de cuando empezó el gesto y
+ * devuelven el parche completo desde ahí, así que no acumulan error.
+ */
+export interface ObjetoMovible<S> {
+  nombre: string
+  /** Caja del objeto tal como se ve (coordenadas de física); para acertar el clic y dibujar su marco. */
+  caja: (s: S) => { min: number[]; max: number[] } | null
+  /** Centro de giro y punto que sigue al ratón al moverlo. */
+  centro: (s: S) => number[]
+  /** Desplazar lo que se ve un vector d. */
+  trasladar: (d: number[], s: S) => Partial<S>
+  /** Girar un ángulo (radianes) alrededor del eje dado, que pasa por el centro. */
+  girar: (eje: 'x' | 'y' | 'z', angulo: number, s: S) => Partial<S>
 }
 
 export interface Interaccion<S> {
@@ -80,6 +98,8 @@ export interface Interaccion<S> {
   /** Doble clic sobre un asa, o Supr con el ratón encima. */
   quitar?: (id: string, s: S) => Partial<S> | void
   suelo?: number
+  /** Solo 3D: objeto que se puede seleccionar, mover y girar entero. */
+  objeto?: ObjetoMovible<S>
   /** Frase para la pista del lienzo; si falta, se compone según lo que admita. */
   pista?: string
 }

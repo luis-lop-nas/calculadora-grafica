@@ -80,7 +80,7 @@ function Panel({ s, set }: PropsPanel<S>) {
             </div>
           </>
         ) : (
-          <Nota>Doble clic en el suelo del lienzo pone un punto; con Mayús lo subes o bajas.</Nota>
+          <Nota>Doble clic en el suelo del lienzo pone un punto; con ⌥ lo subes o bajas.</Nota>
         )}
       </Grupo>
 
@@ -224,7 +224,7 @@ export default definir<S>({
       mover: (id, t, s) => mover(id, t.p, s),
       anadir: (t, s) => ({ P: [...s.P, redondo(t.p)] }),
       quitar: (id, s) => (id[0] === 'P' ? { P: s.P.filter((_, i) => i !== +id.slice(1)) } : undefined),
-      pista: 'Arrastra las puntas · Mayús: en vertical · doble clic: punto nuevo · doble clic o Supr: quitarlo',
+      pista: 'Arrastra las puntas · ⌥: en vertical · doble clic: punto nuevo · doble clic o Supr: quitarlo',
     },
     construir(e, s) {
       e.zArriba(true)

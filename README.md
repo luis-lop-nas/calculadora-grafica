@@ -61,13 +61,27 @@ compleja y en Aplicaciones lineales, y **otra métrica** en Espacios y métricas
 ## Mover con el ratón
 
 Casi todos los lienzos tienen **asas**: puntos que se arrastran y cambian el problema. Doble clic en
-un hueco añade (donde tiene sentido), doble clic o Supr sobre un asa la quita, y en 3D Mayús mueve
+un hueco añade (donde tiene sentido), doble clic o Supr sobre un asa la quita, y en 3D ⌥ mueve
 en vertical. Además de las de Gráficas, Geometría, Superficies, Paramétricas, Campos, Aplicaciones,
 Subespacios y Calor: los puntos p y q en Espacios y métricas, la sonda z₀ en Variable compleja, las
 semillas de las trayectorias en Campo de direcciones y Retrato de fase, y(0) y la pendiente y′(0) en
 Resolver y en Segundo orden (α y β en el problema de contorno), el punto donde se pulsa la cuerda en
 la onda 1D, la energía E en la barrera, un punto x₀ de lectura en Bases de Hilbert, una sonda con la
 propiedad de la media en Laplace y una sonda de |ψ|² en los orbitales.
+
+Atajos en los lienzos 3D (el botón **?** de la barra los recuerda):
+
+| Tecla / gesto | Qué hace |
+|---|---|
+| **X**, **Y**, **Z** | mirar desde ese eje; **0** vuelve a la vista de partida |
+| arrastrar un asa + **⌥** | en vertical |
+| arrastrar un asa + **Mayús** | solo por el eje en que más se mueve, a pasos de 0,5 |
+| clic en la figura (Aplicaciones) | seleccionarla (marco discontinuo); **Esc** la suelta |
+| **⌘** (Ctrl) + arrastrar | mover la figura; con **Mayús**, por un eje y a pasos de 0,5 |
+| **R** | girarla con el ratón; **X/Y/Z** eligen el eje, **Mayús** a pasos de 15°, clic o Intro confirma, Esc deshace |
+
+El giro y el desplazamiento se hacen en el dominio, antes de aplicar A: se ve cómo la matriz deforma
+la figura ya colocada. «Recolocar la figura» la devuelve al origen.
 
 ## Meter los datos
 
