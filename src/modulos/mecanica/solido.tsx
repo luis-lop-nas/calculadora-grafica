@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { definir, type PropsPanel, type Vista3D } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, casilla, radios, submenu } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { interpolarHermite } from '../../lib/numerico'
 import { integrar, type Trayectoria } from '../../lib/mecanica'
@@ -408,6 +409,18 @@ export default definir<EstadoSolido>({
     tMax: 30, velocidad: 1,
   },
   Panel,
+  capas: (s) => (s.modo === 'tensor' ? [capaFija<EstadoSolido>('e1', 'Eje 1 (I menor)', '--pos'), capaFija<EstadoSolido>('e2', 'Eje 2', '--aux'), capaFija<EstadoSolido>('e3', 'Eje 3 (I mayor)', '--rosa'), capaVer(s, 'elipsoide', 'Elipsoide de inercia', '--ocre')] : []),
+  menu: (s) => ({
+    ejemplos: [
+      submenu<EstadoSolido>('Piezas (tensor)', PIEZAS.map((p) => accion<EstadoSolido>(p.t, () => ({ modo: 'tensor', piezas: p.src })))),
+      submenu<EstadoSolido>('Rotación libre', EULER.map((p) => accion<EstadoSolido>(p.t, () => ({ modo: 'euler', ...p.v })))),
+      submenu<EstadoSolido>('Peonza', PEONZA.map((p) => accion<EstadoSolido>(p.t, () => ({ modo: 'peonza', ...p.v })))),
+    ],
+    acciones: [
+      radios<EstadoSolido, Modo>('Qué mirar', [{ v: 'tensor', t: 'Tensor de inercia' }, { v: 'euler', t: 'Rotación libre (Euler)' }, { v: 'peonza', t: 'Peonza pesada' }], s.modo, (modo) => ({ modo })),
+      casilla<EstadoSolido>('Elipsoide de inercia', s.elipsoide, (elipsoide) => ({ elipsoide })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: s.modo === 'tensor' ? 'I = Σ (I_cm + m(|d|²𝟙 − d dᵀ))' : s.modo === 'euler' ? 'I ω̇ + ω × I ω = 0' : 'peonza simétrica pesada', apunte: s.modo }),
   formula: (s) =>

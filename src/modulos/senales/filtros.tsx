@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { capaFija, casilla, radios } from '../../nucleo/menu'
 import { Expresion, Grupo, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { raicesPolinomio } from '../../lib/matrices'
 import type { Pintor2D } from '../../render/pintor2d'
@@ -205,6 +206,13 @@ export default definir<EstadoFiltro>({
   entradilla: 'y[n] = Σ bₖ x[n−k] − Σ aₖ y[n−k]: dónde caen sus polos y ceros y qué deja pasar.',
   inicial: { diseno: 'butter', M: 8, alfa: 0.2, r: 0.95, theta: 1, orden: 4, corte: 0.8, b: '1, 2, 1', a: '1, -0.5, 0.25', dB: false },
   Panel,
+  capas: () => [capaFija<EstadoFiltro>('p', 'Polos', '--neg'), capaFija<EstadoFiltro>('c', 'Ceros', '--pos'), capaFija<EstadoFiltro>('h', '|H| y h[n]', '--accent')],
+  menu: (s) => ({
+    acciones: [
+      radios<EstadoFiltro, Diseno>('Diseño', [{ v: 'media', t: 'Media móvil' }, { v: 'iir1', t: 'IIR de primer orden' }, { v: 'resonador', t: 'Resonador' }, { v: 'peine', t: 'Peine' }, { v: 'butter', t: 'Butterworth' }, { v: 'propio', t: 'Coeficientes propios' }], s.diseno, (diseno) => ({ diseno })),
+      casilla<EstadoFiltro>('Magnitud en dB', s.dB, (dB) => ({ dB })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: 'H(e^iω)', apunte: s.diseno }),
   formula: () => [String.raw`H(z)=\frac{\sum_k b_k z^{-k}}{\sum_k a_k z^{-k}},\qquad H(e^{i\omega})\ \ \omega\in[0,\pi]`],

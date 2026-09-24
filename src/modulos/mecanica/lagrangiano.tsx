@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { radios } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { tex } from '../../lib/cas/tex'
 import type { E } from '../../lib/cas/expr'
@@ -283,6 +284,13 @@ export default definir<EstadoLagrangiano>({
   entradilla: 'Escribe L(q, q̇) con q′ para las velocidades: sale todo lo demás.',
   inicial: { ...PRESETS[1], vista: 'animacion', velocidad: 1 },
   Panel,
+  menu: (s) => ({
+    ejemplos: PRESETS.map((p) => ({ t: p.t, tipo: 'radio' as const, activo: s.L === p.L, hacer: () => ({ coords: p.coords, L: p.L, params: p.params, ci: p.ci, puntos: p.puntos, tMax: p.tMax }) })),
+    acciones: [
+      radios<EstadoLagrangiano, Vista>('Qué mirar', [{ v: 'animacion', t: 'Animación' }, { v: 'tiempo', t: 'Coordenadas en el tiempo' }, { v: 'fases', t: 'Plano de fases' }, { v: 'energia', t: 'Energía' }, { v: 'poincare', t: 'Sección de Poincaré' }], s.vista, (vista) => ({ vista })),
+      radios<EstadoLagrangiano, number>('Velocidad', [0.25, 0.5, 1, 2, 4].map((v) => ({ v, t: `${String(v).replace('.', ',')}×` })), s.velocidad, (velocidad) => ({ velocidad })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: 'L = T − V', apunte: s.vista }),
   formula: (s) => {

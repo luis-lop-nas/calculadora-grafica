@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { radios } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { transformada, VENTANAS, integrarTrozos } from '../../lib/senales'
@@ -296,6 +297,14 @@ export default definir<EstadoTransformada>({
   entradilla: 'Espectro continuo de una señal escrita, qué le hace el muestreo y cómo lo ve la DFT.',
   inicial: { expr: 'cos(2*pi*3*t)*exp(-t^2)', L: 5, modo: 'espectro', nuMax: 5, fs: 5, ventana: 'hann', Nd: 64, ver: 'modulo' },
   Panel,
+  menu: (s) => ({
+    ejemplos: EJEMPLOS.map((e) => ({ t: e.t, tipo: 'radio' as const, activo: s.expr === e.e, hacer: () => ({ expr: e.e, L: e.L }) })),
+    acciones: [
+      radios<EstadoTransformada, Modo>('Qué mirar', [{ v: 'espectro', t: 'Espectro continuo' }, { v: 'muestreo', t: 'Muestreo y aliasing' }, { v: 'dft', t: 'DFT con ventana' }], s.modo, (modo) => ({ modo })),
+      radios<EstadoTransformada, EstadoTransformada['ventana']>('Ventana', [{ v: 'rectangular', t: 'Rectangular' }, { v: 'hann', t: 'Hann' }, { v: 'hamming', t: 'Hamming' }, { v: 'blackman', t: 'Blackman' }], s.ventana, (ventana) => ({ ventana })),
+      radios<EstadoTransformada, EstadoTransformada['ver']>('Espectro', [{ v: 'modulo', t: 'Módulo' }, { v: 'fase', t: 'Fase' }, { v: 'reim', t: 'Re e Im' }], s.ver, (ver) => ({ ver })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: s.modo === 'muestreo' ? `fₛ = ${s.fs}` : s.modo === 'dft' ? `N = ${s.Nd}` : 'X(ν)', apunte: s.modo }),
   formula: (s) => {

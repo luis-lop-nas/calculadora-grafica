@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, radios } from '../../nucleo/menu'
 import { Eleccion, Grupo, Nota } from '../../nucleo/controles'
 import { convertir, formato, unidad, unidadesDe, type Dimension } from '../../lib/unidades'
 
@@ -59,6 +60,17 @@ export default definir<S>({
   entradilla: 'Convierte magnitudes físicas sin mezclar dimensiones incompatibles.',
   inicial: { familia: 'longitud', desde: 'm', hasta: 'km', valor: 1500 },
   Panel,
+  menu: (s) => ({
+    acciones: [
+      radios<S, Familia>(
+        'Magnitud',
+        (Object.keys(FAMILIAS) as Familia[]).map((v) => ({ v, t: FAMILIAS[v].nombre })),
+        s.familia,
+        (familia) => ({ familia, desde: FAMILIAS[familia].base, hasta: FAMILIAS[familia].destino }),
+      ),
+      accion<S>('Intercambiar unidades', (t) => ({ desde: t.hasta, hasta: t.desde })),
+    ],
+  }),
   rotulo: (s) => ({ nombre: FAMILIAS[s.familia].nombre, apunte: `${unidad(s.desde).simbolo} → ${unidad(s.hasta).simbolo}` }),
   lecturas: (s) => {
     try {

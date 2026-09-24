@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, casilla, radios } from '../../nucleo/menu'
 import { Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { dormandPrince, interpolarHermite } from '../../lib/numerico'
 import type { Pintor2D } from '../../render/pintor2d'
@@ -265,6 +266,14 @@ export default definir<EstadoOrbitas>({
   entradilla: 'Lanza un cuerpo alrededor de una masa central y compara con la cónica de Kepler.',
   inicial: { modo: 'orbita', mu: 1, r0: 1, v0: 1.2, gamma: 0, eps: 0, vueltas: 3, areas: true, r1: 1, r2: 2.5 },
   Panel,
+  capas: (s) => (s.modo === 'orbita' ? [capaFija<EstadoOrbitas>('o', 'Órbita y U_ef', '--accent'), capaFija<EstadoOrbitas>('p', 'Periapsides', '--neg'), capaVer(s, 'areas', 'Áreas iguales (2.ª ley)', '--pos')] : []),
+  menu: (s) => ({
+    acciones: [
+      radios<EstadoOrbitas, Modo>('Qué mirar', [{ v: 'orbita', t: 'Órbita en un campo central' }, { v: 'hohmann', t: 'Transferencia de Hohmann' }], s.modo, (modo) => ({ modo })),
+      casilla<EstadoOrbitas>('Áreas iguales', s.areas, (areas) => ({ areas })),
+      accion<EstadoOrbitas>('Órbita circular', (t) => ({ modo: 'orbita', v0: Math.sqrt(t.mu / t.r0), eps: 0 })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: s.modo === 'orbita' ? 'r̈ = −∇V' : 'Hohmann', apunte: s.eps ? `ε = ${s.eps}` : 'Kepler' }),
   formula: (s) =>

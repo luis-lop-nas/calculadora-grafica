@@ -216,9 +216,9 @@ else {
   if ((await filas()).some((f) => /= \(1, 1\)/.test(f.src))) errores.push('[capas] «Eliminar» no quita la capa')
   else console.log(`capas: ${capas.length} en Gráficas; añadir, esconder y eliminar funcionan`)
 }
-// cada módulo de las cinco áreas grandes declara capas o entradas propias
+// cada módulo declara capas o entradas propias
 const sinMenu = []
-for (const id of ['matrices', 'aplicaciones', 'subespacios', 'hilbert', 'estructuras', 'espacios', 'geometria', 'espacio', 'grafica', 'complejos', 'cas', 'resolver', 'campo', 'segundoorden', 'fases', 'edp-propia', 'onda', 'calor', 'laplace']) {
+for (const id of paleta) {
   const i = paleta.indexOf(id)
   if (i < 0) continue
   await pulsar(menu.rutas[i])

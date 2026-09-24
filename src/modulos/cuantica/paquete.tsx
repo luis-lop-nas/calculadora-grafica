@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, casilla, radios } from '../../nucleo/menu'
 import { Boton, Grupo, Interruptor, Rango } from '../../nucleo/controles'
 
 interface S {
@@ -78,6 +79,13 @@ export default definir<S>({
   entradilla: 'Partícula libre en 1D: la hélice es ψ compleja y la curva gris su densidad.',
   inicial: { sigma: 2.5, k: 1.5, jugando: true, reinicios: 0 },
   Panel,
+  menu: (s) => ({
+    acciones: [
+      casilla<S>('Reproducir', s.jugando, (jugando) => ({ jugando })),
+      accion<S>('Reiniciar', (t) => ({ reinicios: t.reinicios + 1 })),
+      radios<S, number>('Anchura σ', [0.5, 1, 1.5, 2, 3].map((v) => ({ v, t: String(v).replace('.', ',') })), s.sigma, (sigma) => ({ sigma })),
+    ],
+  }),
   lecturasVivas: true,
   rotulo: () => ({ nombre: 'Paquete gaussiano', apunte: 'partícula libre, ħ = m = 1' }),
   formula: () => [

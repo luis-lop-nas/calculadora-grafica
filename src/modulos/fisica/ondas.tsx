@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { definir, type PropsPanel, type Vista } from '../../nucleo/tipos'
+import { accion, casilla, radios } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { brewster, critico, dispersion, elipse, fase, fresnel, paquete } from '../../lib/ondas'
 import type { Pintor2D } from '../../render/pintor2d'
@@ -328,6 +329,15 @@ export default definir<EstadoOndas>({
   entradilla: 'La elipse de polarización, lo que refleja y transmite una interfaz, y por qué el grupo no va a la velocidad de las crestas.',
   inicial: { modo: 'polarizacion', a: 1, b: 0.6, delta: 1.1, n1: 1, n2: 1.52, theta: 0.9, omega: 'sqrt(9.8*k)', k0: 2, sk: 0.25, dos: false, velocidad: 1 },
   Panel,
+  menu: (s) => ({
+    ejemplos: DISPERSIONES.map((p) => ({ t: `Dispersión · ${p.t}`, tipo: 'radio' as const, activo: s.modo === 'grupo' && s.omega === p.w, hacer: () => ({ modo: 'grupo' as Modo, omega: p.w }) })),
+    acciones: [
+      radios<EstadoOndas, Modo>('Fenómeno', [{ v: 'polarizacion', t: 'Polarización' }, { v: 'fresnel', t: 'Fresnel (reflexión y refracción)' }, { v: 'grupo', t: 'Velocidad de fase y de grupo' }], s.modo, (modo) => ({ modo })),
+      accion<EstadoOndas>('Polarización lineal', () => ({ modo: 'polarizacion', a: 1, b: 1, delta: 0 })),
+      accion<EstadoOndas>('Polarización circular', () => ({ modo: 'polarizacion', a: 1, b: 1, delta: Math.PI / 2 })),
+      casilla<EstadoOndas>('Dos ondas (batidos)', s.dos, (dos) => ({ dos })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: { polarizacion: 'Polarización', fresnel: 'Fresnel', grupo: 'Fase y grupo' }[s.modo], apunte: s.modo === 'grupo' ? `ω = ${s.omega}` : '' }),
   formula: (s) =>

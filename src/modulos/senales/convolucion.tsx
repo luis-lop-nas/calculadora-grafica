@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaFija, casilla } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Muestra, Rango, Resultado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { integrarTrozos, rupturas } from '../../lib/senales'
@@ -86,6 +87,11 @@ export default definir<EstadoConvolucion>({
   entradilla: 'Da la vuelta a h, deslízala y mira cómo el área del producto dibuja la salida.',
   inicial: { x: 'rect(t)', h: 'exp(-t)*heaviside(t)', L: 4, t0: 0.4, animar: false },
   Panel,
+  capas: () => [capaFija<EstadoConvolucion>('x', 'x(τ)', '--ink'), capaFija<EstadoConvolucion>('h', 'h(t − τ)', '--neg'), capaFija<EstadoConvolucion>('p', 'Producto (área = y(t))', '--pos'), capaFija<EstadoConvolucion>('y', 'y(t)', '--accent')],
+  menu: (s) => ({
+    ejemplos: EJEMPLOS.map((e) => ({ t: e.t, tipo: 'radio' as const, activo: s.x === e.x && s.h === e.h, hacer: () => ({ x: e.x, h: e.h, L: e.L }) })),
+    acciones: [casilla<EstadoConvolucion>('Recorrer t solo', s.animar, (animar) => ({ animar })), accion<EstadoConvolucion>('t = 0', () => ({ t0: 0 }))],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: 'y = x ∗ h', apunte: s.animar ? 'animando' : `t = ${s.t0.toFixed(2)}` }),
   formula: () => [String.raw`y(t)=(x*h)(t)=\int_{-\infty}^{\infty}x(\tau)\,h(t-\tau)\,d\tau`, String.raw`\mathcal F\{x*h\}=X(\nu)\,H(\nu)`],

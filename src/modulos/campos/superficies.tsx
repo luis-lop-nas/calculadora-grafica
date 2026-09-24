@@ -1,4 +1,5 @@
 import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, coords } from '../../nucleo/menu'
 import { Atajos, Boton, Expresion, Grupo, Interruptor, Muestra, Nota, Rango, Segmentado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { contorno } from '../../lib/contorno'
@@ -195,6 +196,24 @@ export default definir<S>({
     puntos: [], otras: [],
   },
   Panel,
+  capas: (s) => [
+    capaFija<S>('sup', `z = ${s.expr}`, '--accent'),
+    capaVer(s, 'verTangente', 'Plano tangente', '--accent'),
+    capaVer(s, 'verCortes', 'Curvas x = a, y = b', '--pos'),
+    capaVer(s, 'verNivel', 'Curvas de nivel', '--ink-soft'),
+    capaVer(s, 'verGradiente', '∇f en la base', '--aux'),
+    capaVer(s, 'alambre', 'Malla de alambre', '--ink-soft'),
+    ...s.otras.map((o, i) => ({ id: `O${i}`, nombre: `z = ${o}`, color: '--aux', quitar: (t: S) => ({ otras: t.otras.filter((_, k) => k !== i) }) })),
+    ...s.puntos.map((q, i) => ({ id: `P${i}`, nombre: `Punto ${coords(q)}`, color: '--ink', quitar: (t: S) => ({ puntos: t.puntos.filter((_, k) => k !== i) }) })),
+  ],
+  menu: (s) => ({
+    anadir: [accion<S>('Otra superficie z = g(x, y)', (t) => ({ otras: [...t.otras, 'x*y/2'] }))],
+    ejemplos: EJEMPLOS.map((e) => ({ t: e.t, tipo: 'radio' as const, activo: s.expr === e.e, hacer: () => ({ expr: e.e }) })),
+    acciones: [
+      accion<S>('Punto de tangencia al origen', () => ({ a: 0, b: 0 })),
+      accion<S>('Quitar los puntos', () => ({ puntos: [] }), !s.puntos.length),
+    ],
+  }),
   rotulo: (s) => {
     const { f } = compilarSuave(s.expr, ['x', 'y'])
     if (!f) return { nombre: 'Expresión no válida' }

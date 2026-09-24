@@ -1,4 +1,5 @@
 import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, coords } from '../../nucleo/menu'
 import { Atajos, Boton, Expresion, Grupo, Interruptor, Matriz, Muestra, Nota, Rango, Segmentado } from '../../nucleo/controles'
 import { aLatex, compilarSuave } from '../../lib/expresion'
 import { mapa, type NombreMapa } from '../../render/tema'
@@ -198,6 +199,23 @@ export default definir<S>({
     puntos: [[0.8, 0.4]], verMarco: true,
   },
   Panel,
+  capas: (s) => [
+    capaFija<S>('sup', 'Superficie r(u, v)', '--accent'),
+    capaVer(s, 'verCurvas', 'Curvas u, v constantes', '--pos'),
+    capaVer(s, 'verMarco', 'Marco rᵤ, rᵥ, n', '--aux'),
+    capaVer(s, 'alambre', 'Malla de alambre', '--ink-soft'),
+    ...s.puntos.map((q, i) => ({ id: `P${i}`, nombre: `Punto (u, v) = ${coords(q)}`, color: '--ink', quitar: (t: S) => ({ puntos: t.puntos.filter((_, k) => k !== i) }) })),
+  ],
+  menu: (s) => ({
+    anadir: [accion<S>('Punto en el centro del dominio', (t) => ({ puntos: [...t.puntos, t.rango.map(([a, b]) => (a + b) / 2)] }))],
+    ejemplos: PRESETS.map((p) => ({
+      t: p.t,
+      tipo: 'radio' as const,
+      activo: s.x === p.x && s.y === p.y && s.z === p.z,
+      hacer: (t: S) => ({ x: p.x, y: p.y, z: p.z, rango: p.r.map((f) => f.slice()), puntos: t.puntos.map((q) => q.map((c, k) => Math.max(p.r[k][0], Math.min(p.r[k][1], c)))) }),
+    })),
+    acciones: [accion<S>('Quitar los puntos', () => ({ puntos: [] }), !s.puntos.length)],
+  }),
   rotulo: (s) => {
     const p = PRESETS.find((q) => q.x === s.x && q.y === s.y && q.z === s.z)
     return { nombre: p?.t ?? 'Superficie propia', apunte: 'r(u, v) ⊂ R³' }

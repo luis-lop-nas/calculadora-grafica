@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { casilla, radios } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { leerExpr } from '../../lib/cas/laplace'
 import { racional } from '../../lib/cas/algebra'
@@ -260,6 +261,15 @@ export default definir<EstadoControl>({
   entradilla: 'Escribe G(s), cierra el lazo, añade un PID y mira estabilidad, márgenes y respuesta.',
   inicial: { G: '10/(s*(s+2)*(s+5))', K: 1, cerrado: true, pid: false, Kp: 1, Ki: 0, Kd: 0, vista: 'escalon', tMax: 12 },
   Panel,
+  menu: (s) => ({
+    ejemplos: EJEMPLOS.map((e) => ({ t: `${e.t}   G = ${e.G}`, tipo: 'radio' as const, activo: s.G === e.G, hacer: () => ({ G: e.G }) })),
+    acciones: [
+      radios<EstadoControl, Vista>('Qué mirar', [{ v: 'escalon', t: 'Respuesta al escalón' }, { v: 'bode', t: 'Diagrama de Bode' }, { v: 'nyquist', t: 'Diagrama de Nyquist' }, { v: 'lugar', t: 'Lugar de las raíces' }], s.vista, (vista) => ({ vista })),
+      casilla<EstadoControl>('Lazo cerrado', s.cerrado, (cerrado) => ({ cerrado })),
+      casilla<EstadoControl>('Controlador PID', s.pid, (pid) => ({ pid })),
+      radios<EstadoControl, number>('Ganancia K', [0.1, 0.5, 1, 2, 5, 10, 50].map((v) => ({ v, t: String(v).replace('.', ',') })), s.K, (K) => ({ K })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: s.cerrado ? 'T(s) = L/(1 + L)' : 'L(s)', apunte: s.vista }),
   formula: (s) => {

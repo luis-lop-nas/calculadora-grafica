@@ -1,4 +1,5 @@
 import { definir, type PropsPanel, type Vista } from '../../nucleo/tipos'
+import { accion, capaFija, casilla, radios } from '../../nucleo/menu'
 import { Atajos, Boton, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { cauchy, corteEje, desviacionMinima, desviacionPrisma, focales, imagen, matrizLentes, reflejoEsferico, trazar, type Lente } from '../../lib/rayos'
 import { colorLongitud } from '../../lib/optica'
@@ -312,6 +313,27 @@ export default definir<EstadoGeometrica>({
   entradilla: 'Arrastra objeto y lentes: la imagen sale de la matriz ABCD y los rayos, de trazarlos.',
   inicial: { modo: 'lentes', lentes: PRESETS[1].lentes, z0: PRESETS[1].z0, h: 4, R: 16, rayos: 21, hmax: 0.8, A: Math.PI / 3, t1: 0.85, blanca: true },
   Panel,
+  capas: (s) =>
+    s.modo === 'lentes'
+      ? [
+          capaFija<EstadoGeometrica>('obj', 'Objeto e imagen', '--pos'),
+          ...s.lentes.map((l, i) => ({
+            id: `L${i}`,
+            nombre: `Lente ${i + 1}`,
+            color: '--accent',
+            detalle: `f = ${String(l.f).replace('.', ',')} en z = ${String(Math.round(l.z * 100) / 100).replace('.', ',')}`,
+            quitar: s.lentes.length > 1 ? (t: EstadoGeometrica) => ({ lentes: t.lentes.filter((_, k) => k !== i) }) : undefined,
+          })),
+        ]
+      : [],
+  menu: (s) => ({
+    anadir: s.modo === 'lentes' ? [accion<EstadoGeometrica>('Lente convergente f = 10', (t) => ({ lentes: [...t.lentes, { z: (t.lentes.at(-1)?.z ?? 0) + 15, f: 10 }] }), s.lentes.length >= 3)] : [],
+    ejemplos: PRESETS.map((p) => accion<EstadoGeometrica>(p.t, () => ({ modo: 'lentes', lentes: p.lentes, z0: p.z0 }))),
+    acciones: [
+      radios<EstadoGeometrica, Modo>('Experimento', [{ v: 'lentes', t: 'Sistema de lentes (ABCD)' }, { v: 'espejo', t: 'Espejo esférico' }, { v: 'prisma', t: 'Prisma' }], s.modo, (modo) => ({ modo })),
+      casilla<EstadoGeometrica>('Luz blanca en el prisma', s.blanca, (blanca) => ({ blanca })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: { lentes: `${s.lentes.length} lente${s.lentes.length > 1 ? 's' : ''}`, espejo: 'Espejo esférico', prisma: 'Prisma' }[s.modo], apunte: '' }),
   formula: (s) =>

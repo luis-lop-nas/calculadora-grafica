@@ -1,4 +1,5 @@
 import { definir, type PropsPanel, type Vista } from '../../nucleo/tipos'
+import { casilla, radios } from '../../nucleo/menu'
 import { Atajos, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import {
   camino, ciclo, critico, entropia, espinodal, fase, maxwell, pVdW, R, rendimientoTeorico, resumen, SUSTANCIAS, TVdW, volumenesVdW,
@@ -440,6 +441,15 @@ export default definir<EstadoTermo>({
     ideal: false,
   },
   Panel,
+  menu: (s) => ({
+    acciones: [
+      radios<EstadoTermo, Modo>('Tema', [{ v: 'ciclos', t: 'Ciclos térmicos' }, { v: 'vdw', t: 'Gas de van der Waals' }], s.modo, (modo) => ({ modo })),
+      radios<EstadoTermo, TipoCiclo>('Ciclo', (Object.keys(NOMBRES) as TipoCiclo[]).map((v) => ({ v, t: NOMBRES[v] })), s.ciclo, (ciclo) => ({ ciclo, modo: 'ciclos' })),
+      radios<EstadoTermo, 'mono' | 'di'>('Gas', [{ v: 'mono', t: 'Monoatómico (γ = 5/3)' }, { v: 'di', t: 'Diatómico (γ = 7/5)' }], s.gas, (gas) => ({ gas })),
+      casilla<EstadoTermo>('Regenerador (Stirling)', s.regenerador, (regenerador) => ({ regenerador })),
+      casilla<EstadoTermo>('Comparar con el gas ideal', s.ideal, (ideal) => ({ ideal })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) =>
     s.modo === 'ciclos'

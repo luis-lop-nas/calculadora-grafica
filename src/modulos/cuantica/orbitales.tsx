@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, casilla, coords, radios } from '../../nucleo/menu'
 import { Grupo, Interruptor, Muestra, Numero, Rango, Segmentado } from '../../nucleo/controles'
 import { hermite, laguerre, legendre } from '../../lib/especiales'
 import { construirRejilla, isoParaProbabilidad, marching, nubeDeProbabilidad, type Rejilla } from '../../lib/mallado'
@@ -208,6 +209,20 @@ export default definir<S>({
   entradilla: 'Funciones de onda en 3D: arrastra para girar, rueda o pellizco para acercar.',
   inicial: { sistema: 'h', n: 3, l: 2, m: 0, nx: 2, ny: 1, nz: 3, modo: 'ambas', prob: 0.8, puntos: 50000, corte: false, sonda: [0.3, 0, 0.3] },
   Panel,
+  capas: (s) => [
+    capaFija<S>('pos', 'ψ > 0', '--pos'),
+    capaFija<S>('neg', 'ψ < 0', '--neg'),
+    capaFija<S>('sonda', 'Sonda', '--ink', coords(s.sonda)),
+    capaVer(s, 'corte', 'Corte por el plano', '--ink-soft'),
+  ],
+  menu: (s) => ({
+    acciones: [
+      radios<S, Sistema>('Sistema', [{ v: 'h', t: 'Átomo de hidrógeno' }, { v: 'caja', t: 'Caja cúbica' }, { v: 'osc', t: 'Oscilador isótropo' }], s.sistema, (sistema) => ({ sistema })),
+      radios<S, Modo>('Representación', [{ v: 'nube', t: 'Nube |ψ|²' }, { v: 'iso', t: 'Isosuperficie' }, { v: 'ambas', t: 'Las dos' }], s.modo, (modo) => ({ modo })),
+      casilla<S>('Corte por el plano', s.corte, (corte) => ({ corte })),
+      accion<S>('Sonda al origen', () => ({ sonda: [0, 0, 0] })),
+    ],
+  }),
   rotulo: (s) => {
     if (s.sistema === 'h')
       return { nombre: `${s.n}${ORB[s.l]?.[String(s.m)] ?? 's'}`, apunte: 'orbital real, átomo de H' }

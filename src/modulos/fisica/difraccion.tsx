@@ -1,4 +1,5 @@
 import { definir, type PropsPanel, type Vista } from '../../nucleo/tipos'
+import { casilla, radios } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import {
@@ -302,6 +303,14 @@ export default definir<EstadoDifraccion>({
   entradilla: 'Interferencia y difracción: de Young a la red, la figura de Fraunhofer de cualquier abertura y los colores de una capa fina.',
   inicial: { modo: 'rendijas', lambda: 550, N: 2, a: 2, d: 8, abertura: ABERTURAS[0].f, zoom: 0.5, log: true, nf: 1.38, ns: 1.52, e: 100, dm: 12 },
   Panel,
+  menu: (s) => ({
+    ejemplos: ABERTURAS.map((a) => ({ t: `Abertura · ${a.t}`, tipo: 'radio' as const, activo: s.modo === 'abertura' && s.abertura === a.f, hacer: () => ({ modo: 'abertura' as Modo, abertura: a.f }) })),
+    acciones: [
+      radios<EstadoDifraccion, Modo>('Experimento', [{ v: 'rendijas', t: 'Rendijas y redes' }, { v: 'abertura', t: 'Abertura (Fraunhofer por FFT)' }, { v: 'pelicula', t: 'Película delgada' }, { v: 'michelson', t: 'Interferómetro de Michelson' }], s.modo, (modo) => ({ modo })),
+      radios<EstadoDifraccion, number>('Rendijas N', [1, 2, 3, 5, 10, 20].map((v) => ({ v, t: String(v) })), s.N, (N) => ({ N, modo: 'rendijas' })),
+      casilla<EstadoDifraccion>('Intensidad en escala logarítmica', s.log, (log) => ({ log })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: { rendijas: `${s.N} rendija${s.N > 1 ? 's' : ''}`, abertura: 'Fraunhofer por FFT', pelicula: 'Película delgada', michelson: 'Michelson' }[s.modo], apunte: s.modo === 'pelicula' ? '' : `λ = ${s.lambda.toFixed(0)} nm` }),
   formula: (s) =>

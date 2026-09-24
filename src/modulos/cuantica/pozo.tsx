@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { capaFija, capaVer, casilla, radios } from '../../nucleo/menu'
 import { Grupo, Interruptor, Muestra, Rango, Segmentado } from '../../nucleo/controles'
 import { hermite, factorial } from '../../lib/especiales'
 import * as K from '../../lib/complejo'
@@ -257,6 +258,19 @@ export default definir<EstadoPozo>({
   entradilla: 'Estados ligados en 1D y transmisión a través de una barrera.',
   inicial: { sistema: 'finito', n: 1, V0: 8, a: 2, omega: 1, E: 4, densidad: false, transmision: false },
   Panel,
+  capas: (s) => [
+    capaFija<EstadoPozo>('V', 'Potencial V(x)', '--ink-soft'),
+    capaFija<EstadoPozo>('E', `Nivel n = ${s.n}`, '--pos'),
+    capaVer(s, 'densidad', 'Densidad |ψ|²', '--accent'),
+    capaVer(s, 'transmision', 'Transmisión T(E)', '--accent'),
+  ],
+  menu: (s) => ({
+    acciones: [
+      radios<EstadoPozo, Sistema>('Sistema', [{ v: 'infinito', t: 'Pozo infinito' }, { v: 'finito', t: 'Pozo finito' }, { v: 'armonico', t: 'Oscilador armónico' }, { v: 'barrera', t: 'Barrera (efecto túnel)' }], s.sistema, (sistema) => ({ sistema })),
+      radios<EstadoPozo, number>('Nivel n', [1, 2, 3, 4, 5, 6, 7, 8].map((v) => ({ v, t: String(v) })), s.n, (n) => ({ n })),
+      casilla<EstadoPozo>('Densidad |ψ|²', s.densidad, (densidad) => ({ densidad })),
+    ],
+  }),
   rotulo: (s) => {
     const nombres: Record<Sistema, string> = {
       infinito: 'Pozo infinito',

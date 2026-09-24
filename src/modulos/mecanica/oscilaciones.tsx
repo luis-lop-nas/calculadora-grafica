@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { radios } from '../../nucleo/menu'
 import { Expresion, Grupo, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { autoGeneralizado, type Mat } from '../../lib/matrices'
 import type { Pintor2D } from '../../render/pintor2d'
@@ -278,6 +279,13 @@ export default definir<EstadoOsc>({
   entradilla: 'Masas y muelles: sus modos, cómo se superponen, y qué pasa cuando se les empuja.',
   inicial: { modo: 'cadena', N: 3, m: 1, k: 1, extremos: 'fijos', Mtxt: '1, 0; 0, 2', Ktxt: '3, -1; -1, 2', ver: 0, x0: '1, 0, 0', mf: 1, kf: 4, c: 0.2, F0: 1, W: 1.9, tMax: 60 },
   Panel,
+  menu: (s) => ({
+    acciones: [
+      radios<EstadoOsc, Modo>('Sistema', [{ v: 'cadena', t: 'Cadena de N masas' }, { v: 'matrices', t: 'M y K escritas' }, { v: 'forzado', t: 'Oscilador forzado' }], s.modo, (modo) => ({ modo })),
+      radios<EstadoOsc, number>('Masas N', [1, 2, 3, 4, 5, 6, 8].map((v) => ({ v, t: String(v) })), s.N, (N) => ({ N, modo: 'cadena' })),
+      radios<EstadoOsc, 'fijos' | 'libres'>('Extremos', [{ v: 'fijos', t: 'Fijos' }, { v: 'libres', t: 'Libres' }], s.extremos, (extremos) => ({ extremos })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: s.modo === 'forzado' ? 'm ẍ + c ẋ + k x = F₀ cos Ωt' : 'M ẍ + K x = 0', apunte: s.modo }),
   formula: (s) =>

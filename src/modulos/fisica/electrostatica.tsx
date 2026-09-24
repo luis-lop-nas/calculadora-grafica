@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, casilla, coords, radios } from '../../nucleo/menu'
 import { Atajos, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { contorno } from '../../lib/contorno'
 import { campo, dentro, flujoEsfera, imagenes, lineaDeCampo, momentoDipolar, potencial, type Carga, type Conductor } from '../../lib/electro'
@@ -168,6 +169,31 @@ export default definir<EstadoElectro>({
     rho: 0.6,
   },
   Panel,
+  capas: (s) => [
+    ...s.cargas.map((c, i) => ({
+      id: `q${i}`,
+      nombre: `Carga ${c.q > 0 ? '+' : c.q < 0 ? '−' : ''}${Math.abs(c.q)}`,
+      color: c.q >= 0 ? '--pos' : '--neg',
+      detalle: coords([c.x, c.y]),
+      quitar: s.cargas.length > 1 ? (t: EstadoElectro) => ({ cargas: t.cargas.filter((_, k) => k !== i) }) : undefined,
+    })),
+    capaFija<EstadoElectro>('lineas', 'Líneas de campo', '--ink-soft'),
+    capaVer(s, 'equipotenciales', 'Equipotenciales', '--pos'),
+    capaVer(s, 'verImagenes', 'Cargas imagen', '--aux'),
+    capaFija<EstadoElectro>('sonda', 'Sonda y esfera de Gauss', '--aux', coords([s.sonda.x, s.sonda.y])),
+  ],
+  menu: (s) => ({
+    anadir: [
+      accion<EstadoElectro>('Carga +1', (t) => ({ cargas: [...t.cargas, { q: 1, x: 0, y: 1.5 }] }), s.cargas.length >= 8),
+      accion<EstadoElectro>('Carga −1', (t) => ({ cargas: [...t.cargas, { q: -1, x: 0, y: -1.5 }] }), s.cargas.length >= 8),
+    ],
+    ejemplos: PRESETS.map((p) => accion<EstadoElectro>(p.t, () => p.v)),
+    acciones: [
+      radios<EstadoElectro, Conductor>('Conductor a tierra', [{ v: 'ninguno', t: 'Ninguno' }, { v: 'plano', t: 'Plano' }, { v: 'esfera', t: 'Esfera' }], s.conductor, (conductor) => ({ conductor })),
+      casilla<EstadoElectro>('Equipotenciales', s.equipotenciales, (equipotenciales) => ({ equipotenciales })),
+      accion<EstadoElectro>('Invertir todas las cargas', (t) => ({ cargas: t.cargas.map((c) => ({ ...c, q: -c.q })) })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: `${s.cargas.length} carga${s.cargas.length === 1 ? '' : 's'}`, apunte: s.conductor === 'ninguno' ? 'vacío' : `${s.conductor} a tierra` }),
   formula: () => [

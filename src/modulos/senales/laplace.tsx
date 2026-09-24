@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, radios, submenu } from '../../nucleo/menu'
 import katex from 'katex'
 import { Atajos, Expresion, Grupo, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { edoPorLaplace, laplace, laplaceInversa, leerExpr, type ResultadoEdoL, type ResultadoL } from '../../lib/cas/laplace'
@@ -246,6 +247,14 @@ export default definir<EstadoLaplaceT>({
   entradilla: 'Con pasos. Cada resultado se comprueba con la integral ∫₀^∞ f e^{−st} dt.',
   inicial: { modo: 'edo', f: 't*exp(-2t)', F: '(s+3)/(s^2+2s+5)', edo: "y''+3y'+2y=exp(-t)", ci: "y(0)=1, y'(0)=0", tMax: 10 },
   Panel,
+  menu: (s) => ({
+    ejemplos: [
+      submenu<EstadoLaplaceT>('Transformada directa', EJ_F.map((e) => accion<EstadoLaplaceT>(e, () => ({ modo: 'directa', f: e })))),
+      submenu<EstadoLaplaceT>('Inversa', EJ_S.map((e) => accion<EstadoLaplaceT>(e, () => ({ modo: 'inversa', F: e })))),
+      submenu<EstadoLaplaceT>('EDO con condiciones', EJ_EDO.map((e) => accion<EstadoLaplaceT>(`${e.t}   ${e.e}`, () => ({ modo: 'edo', edo: e.e, ci: e.ci })))),
+    ],
+    acciones: [radios<EstadoLaplaceT, Modo>('Qué calcular', [{ v: 'directa', t: 'Transformada directa' }, { v: 'inversa', t: 'Transformada inversa' }, { v: 'edo', t: 'EDO lineal con condiciones' }], s.modo, (modo) => ({ modo }))],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: s.modo === 'directa' ? 'F(s) = L{f}' : s.modo === 'inversa' ? 'f(t) = L⁻¹{F}' : 'y(t)', apunte: s.modo }),
   formula: (s) => {

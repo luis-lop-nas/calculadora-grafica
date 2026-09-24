@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { capaFija, casilla, radios } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { coeficientesFourier, sumaParcial, type Coeficientes } from '../../lib/senales'
@@ -210,6 +211,15 @@ export default definir<EstadoFourier>({
   entradilla: 'Escribe f en un periodo; se extiende periódicamente y se aproxima con N armónicos.',
   inicial: { expr: 'sgn(t)', periodoPi: 2, N: 9, fejer: false, espectro: 'amplitud', sonda: 0.6 },
   Panel,
+  capas: () => [capaFija<EstadoFourier>('f', 'f periódica', '--ink-soft'), capaFija<EstadoFourier>('a', 'aₙ', '--pos'), capaFija<EstadoFourier>('b', 'bₙ', '--neg')],
+  menu: (s) => ({
+    ejemplos: EJEMPLOS.map((e) => ({ t: e.t, tipo: 'radio' as const, activo: s.expr === e.e && s.periodoPi === e.T, hacer: () => ({ expr: e.e, periodoPi: e.T }) })),
+    acciones: [
+      radios<EstadoFourier, number>('Términos N', [1, 3, 5, 10, 20, 50, 100].map((v) => ({ v, t: String(v) })), s.N, (N) => ({ N })),
+      casilla<EstadoFourier>('Suma de Fejér (sin Gibbs)', s.fejer, (fejer) => ({ fejer })),
+      radios<EstadoFourier, 'amplitud' | 'coeficientes'>('Espectro', [{ v: 'amplitud', t: 'Amplitud' }, { v: 'coeficientes', t: 'Coeficientes aₙ, bₙ' }], s.espectro, (espectro) => ({ espectro })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: s.fejer ? 'σ_N(t)' : 'S_N(t)', apunte: `N = ${s.N}` }),
   formula: (s) => {

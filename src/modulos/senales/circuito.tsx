@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, radios } from '../../nucleo/menu'
 import { Grupo, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import type { Pintor2D } from '../../render/pintor2d'
 
@@ -236,6 +237,14 @@ export default definir<EstadoCircuito>({
   entradilla: 'Carga y descarga con continua, o régimen permanente en alterna con sus fasores girando.',
   inicial: { tipo: 'serie', modo: 'transitorio', R: 1, L: 1, C: 0.25, A: 5, w: 2, x0: 0, y0: 0, tMax: 12 },
   Panel,
+  menu: (s) => ({
+    acciones: [
+      radios<EstadoCircuito, Tipo>('Conexión', [{ v: 'serie', t: 'RLC serie' }, { v: 'paralelo', t: 'RLC paralelo' }], s.tipo, (tipo) => ({ tipo })),
+      radios<EstadoCircuito, Modo>('Régimen', [{ v: 'transitorio', t: 'Transitorio' }, { v: 'alterna', t: 'Corriente alterna (fasores)' }], s.modo, (modo) => ({ modo })),
+      accion<EstadoCircuito>('Amortiguamiento crítico', (t) => (t.tipo === 'serie' ? { R: 2 * Math.sqrt(t.L / t.C) } : { R: 0.5 * Math.sqrt(t.L / t.C) })),
+      accion<EstadoCircuito>('A la frecuencia de resonancia', (t) => ({ w: 1 / Math.sqrt(t.L * t.C), modo: 'alterna' })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: s.tipo === 'serie' ? 'RLC serie' : 'RLC paralelo', apunte: s.modo }),
   formula: (s) =>

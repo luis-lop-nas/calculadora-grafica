@@ -54,6 +54,13 @@ Menús, al estilo de Illustrator o Blender:
   **Comparar ▸** activar ⌥⌘D, lado a lado / superpuestos, cámaras enlazadas, copiar A en B;
   autogiro; **modo presentación** ⌘\ (solo el lienzo); **Tema ▸** sistema, claro, oscuro; tamaño
   de la interfaz ⌥⌘0 / ⌥⌘+ / ⌥⌘−.
+- **Animación** (todos los módulos que se mueven): **reproducir/pausa ⌥⌘P**, avanzar un fotograma
+  ⌥⌘→, volver al instante 0 ⌥⌘←, **velocidad** 0,25×–4× y **grabar vídeo del lienzo** en WebM
+  ⌥⇧⌘R (se para con la misma orden o al minuto).
+- **Objeto ▸ Transformar**: mover a pasos de la rejilla y girar ±15° / ±90° en X, Y o Z las figuras
+  que se agarran enteras (Aplicaciones lineales).
+- **Clic derecho** en un lienzo: Añadir, Capas, Transformar, punto de vista, encuadrar,
+  superposiciones, reproducir, copiar y exportar la imagen, deshacer.
 - **Ayuda**: **atajos de teclado ⌘/** (también en la web) y esta guía. El buscador de Ayuda de
   macOS encuentra cualquier entrada de los menús.
 
@@ -64,8 +71,7 @@ sesiones se guardan como documentos `.calc` (el mismo JSON del autoguardado; tam
 
 Un módulo entra en esos menús declarando `capas(s)` (nombre, color, visible, `alternar`,
 `quitar`) y `menu(s)` (`anadir`, `ejemplos`, `acciones`), con las ayudas de `src/nucleo/menu.ts`
-(`capaVer`, `casilla`, `radios`…). Hoy los declaran los 19 módulos de Álgebra, Geometría,
-Funciones, EDO y EDP.
+(`capaVer`, `casilla`, `radios`…). Los declaran los 45 módulos.
 
 Piezas: `electron/main.cjs` (ventanas, menú, diálogos), `electron/preload.cjs` (el puente que la
 página ve como `window.escritorio`) y `src/nucleo/escritorio.ts` (sus tipos; en la web no existe).

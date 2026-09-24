@@ -1,4 +1,5 @@
 import { definir, type PropsPanel, type Vista } from '../../nucleo/tipos'
+import { accion, radios, submenu } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Muestra, Resultado, Segmentado } from '../../nucleo/controles'
 import { compilar } from '../../lib/expresion'
 import { tex } from '../../lib/cas/tex'
@@ -373,6 +374,16 @@ export default definir<EstadoTeoremas>({
     volR: SOLIDOS[0].volR,
   },
   Panel,
+  menu: (s) => ({
+    ejemplos: [
+      submenu<EstadoTeoremas>('Curvas (Green y flujo)', CURVAS.map((p) => accion<EstadoTeoremas>(p.t, (t) => ({ cx: p.cx, cy: p.cy, t0: '0', t1: '2*pi', modo: t.modo === 'flujo' ? 'flujo' : 'green' })))),
+      submenu<EstadoTeoremas>('Superficies (Stokes)', SUPERFICIES.map((p) => accion<EstadoTeoremas>(p.t, () => ({ sup: p.sup, supR: p.supR, modo: 'stokes' })))),
+      submenu<EstadoTeoremas>('Sólidos (Gauss)', SOLIDOS.map((p) => accion<EstadoTeoremas>(p.t, () => ({ vol: p.vol, volR: p.volR, modo: 'gauss' })))),
+    ],
+    acciones: [
+      radios<EstadoTeoremas, Modo>('Teorema', [{ v: 'green', t: 'Green' }, { v: 'flujo', t: 'Divergencia en el plano' }, { v: 'stokes', t: 'Stokes' }, { v: 'gauss', t: 'Gauss' }], s.modo, (modo) => ({ modo })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: { green: 'Green', flujo: 'Divergencia en el plano', stokes: 'Stokes', gauss: 'Gauss' }[s.modo], apunte: 'borde = interior' }),
   formula: (s) => {

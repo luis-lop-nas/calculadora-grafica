@@ -136,7 +136,9 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     let miMarca = -1
 
     const ro = new ResizeObserver(() => {
-      const p = canvas.parentElement!
+      // React quita el canvas del DOM antes de limpiar el efecto: en ese hueco puede llegar un aviso
+      const p = canvas.parentElement
+      if (!p) return
       e.dimensionar(p.clientWidth, p.clientHeight)
       pedir = true
     })
@@ -657,7 +659,9 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
     let primeraVez = true
 
     const medir = () => {
-      const p = canvas.parentElement!
+      // React quita el canvas del DOM antes de limpiar el efecto: en ese hueco puede llegar un aviso
+      const p = canvas.parentElement
+      if (!p) return
       const dpr = Math.min(2, window.devicePixelRatio || 1)
       g.ancho = p.clientWidth
       g.alto = p.clientHeight

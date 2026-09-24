@@ -1,4 +1,5 @@
 import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaVer, coords } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Matriz, Muestra, Nota, Rango } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { altura } from '../../render/tema'
@@ -140,6 +141,17 @@ export default definir<S>({
     verLineaSonda: true, verRot: true,
   },
   Panel,
+  capas: (s) => [
+    capaVer(s, 'verFlechas', 'Flechas coloreadas por ‖F‖', '--accent'),
+    capaVer(s, 'verLineas', 'Líneas de campo', '--accent'),
+    capaVer(s, 'verLineaSonda', 'Línea por la sonda', '--accent'),
+    capaVer(s, 'verRot', 'rot F en la sonda', '--neg'),
+    ...s.sonda.map((q, i) => ({ id: `S${i}`, nombre: `Sonda ${i + 1}`, color: '--ink', detalle: coords(q), quitar: s.sonda.length > 1 ? (t: S) => ({ sonda: t.sonda.filter((_, k) => k !== i) }) : undefined })),
+  ],
+  menu: (s) => ({
+    anadir: [accion<S>('Sonda', (t) => ({ sonda: [...t.sonda, [0.5, 0.5, 0.5]] }))],
+    ejemplos: PRESETS.map((p) => ({ t: p.t, tipo: 'radio' as const, activo: s.P === p.P && s.Q === p.Q && s.R === p.R, hacer: () => ({ P: p.P, Q: p.Q, R: p.R }) })),
+  }),
   rotulo: (s) => {
     const p = PRESETS.find((q) => q.P === s.P && q.Q === s.Q && q.R === s.R)
     return { nombre: p?.t ?? 'Campo propio', apunte: 'F = (P, Q, R)' }

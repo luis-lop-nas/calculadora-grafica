@@ -1,4 +1,5 @@
 import { definir, type PropsPanel } from '../../nucleo/tipos'
+import { accion, capaFija, capaVer, casilla, coords } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Muestra, Rango, Resultado } from '../../nucleo/controles'
 import { compilar } from '../../lib/expresion'
 import { campoPoligonal, circulacion, lineaB, poligonal, type P3 } from '../../lib/magneto'
@@ -231,6 +232,20 @@ export default definir<EstadoMagneto>({
   entradilla: 'Escribe la curva por la que pasa la corriente: sale su campo por Biot–Savart, con μ₀ = 1.',
   inicial: { preset: 'espira', curvas: PRESETS[0].curvas, I: 1, P: { x: 1, y: 0, z: 0.3 }, rho: 0.6, lineas: true, flechas: true },
   Panel,
+  capas: (s) => [
+    ...s.curvas.map((_, i) => capaFija<EstadoMagneto>(`C${i}`, `Corriente ${i + 1}`, '--pos')),
+    capaVer(s, 'flechas', 'B en el plano xz', '--accent'),
+    capaVer(s, 'lineas', 'Líneas de B', '--aux'),
+    capaFija<EstadoMagneto>('P', 'Punto de medida', '--ink', coords([s.P.x, s.P.y, s.P.z])),
+  ],
+  menu: (s) => ({
+    ejemplos: PRESETS.map((p) => ({ t: p.t, tipo: 'radio' as const, activo: JSON.stringify(s.curvas) === JSON.stringify(p.curvas), hacer: () => ({ preset: p.v, curvas: p.curvas }) })),
+    acciones: [
+      casilla<EstadoMagneto>('Líneas de B', s.lineas, (lineas) => ({ lineas })),
+      casilla<EstadoMagneto>('Flechas de B', s.flechas, (flechas) => ({ flechas })),
+      accion<EstadoMagneto>('Invertir la corriente', (t) => ({ I: -t.I })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: `I = ${s.I.toFixed(1)}`, apunte: s.preset }),
   formula: () => [

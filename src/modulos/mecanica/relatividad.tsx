@@ -1,4 +1,5 @@
 import { definir, type PropsPanel, type Vista2D } from '../../nucleo/tipos'
+import { accion, capaVer, coords, radios } from '../../nucleo/menu'
 import { Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { boost, clase, componer, doppler, gamma, gemelos, intervalo, rapidez, type Suceso } from '../../lib/relatividad'
 import type { Pintor2D } from '../../render/pintor2d'
@@ -262,6 +263,20 @@ export default definir<EstadoRelatividad>({
     up: 0.7,
   },
   Panel,
+  capas: (s) =>
+    s.modo === 'diagrama'
+      ? [
+          capaVer(s, 'rejillaPrima', 'Rejilla de S′', '--accent'),
+          ...s.eventos.map((e, i) => ({ id: `e${i}`, nombre: `Suceso ${NOMBRES[i]}`, color: '--ink', detalle: `(t, x) = ${coords([e.t, e.x])}`, quitar: (t: EstadoRelatividad) => ({ eventos: t.eventos.filter((_, k) => k !== i) }) })),
+        ]
+      : [],
+  menu: (s) => ({
+    anadir: s.modo === 'diagrama' ? [accion<EstadoRelatividad>('Suceso', (t) => ({ eventos: [...t.eventos, { t: 1, x: 0.5 }] }), s.eventos.length >= NOMBRES.length)] : [],
+    acciones: [
+      radios<EstadoRelatividad, Modo>('Qué mirar', [{ v: 'diagrama', t: 'Diagrama de Minkowski' }, { v: 'gemelos', t: 'Paradoja de los gemelos' }, { v: 'contraccion', t: 'Contracción de longitudes' }, { v: 'velocidades', t: 'Composición de velocidades' }], s.modo, (modo) => ({ modo })),
+      radios<EstadoRelatividad, number>('β = v/c', [0, 0.25, 0.5, 0.6, 0.8, 0.9, 0.99].map((v) => ({ v, t: String(v).replace('.', ',') })), s.beta, (beta) => ({ beta })),
+    ],
+  }),
   resultadoEnPanel: true,
   rotulo: (s) => ({ nombre: `β = ${s.beta.toFixed(2)}`, apunte: s.modo }),
   formula: (s) =>
