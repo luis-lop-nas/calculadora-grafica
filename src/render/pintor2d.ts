@@ -14,6 +14,10 @@ export class Pintor2D {
   ancho = 0
   alto = 0
   ventana: Ventana = { x: [-1, 1], y: [-1, 1] }
+  /** Superposiciones del menú Vista: las respeta `ejes()`. */
+  mostrarEjes = true
+  mostrarNombres = true
+  mostrarRejilla = true
   /** Trozo del lienzo en el que se está dibujando, en píxeles. */
   private vx = 0
   private vy = 0
@@ -110,7 +114,7 @@ export class Pintor2D {
   /** Rejilla y ejes con números. `paso` automático si no se da. */
   ejes(opts: { etiquetaX?: string; etiquetaY?: string; rejilla?: boolean; paso?: number } = {}) {
     const { ctx } = this
-    const { rejilla = true } = opts
+    const rejilla = (opts.rejilla ?? true) && this.mostrarRejilla
     // un paso por eje: si no, una ventana alta y estrecha se llena de números
     const pasoX = opts.paso ?? pasoBonito((this.ventana.x[1] - this.ventana.x[0]) / 8)
     const pasoY = opts.paso ?? pasoBonito((this.ventana.y[1] - this.ventana.y[0]) / 6)
@@ -138,6 +142,10 @@ export class Pintor2D {
     // ejes, pegados al borde si el cero queda fuera de la ventana
     const x0 = Math.max(this.vx + 24, Math.min(this.vx + this.vw - 24, this.X(0)))
     const y0 = Math.max(this.vy + 18, Math.min(this.vy + this.vh - 18, this.Y(0)))
+    if (!this.mostrarEjes) {
+      ctx.restore()
+      return
+    }
     ctx.strokeStyle = this.color('--ink-soft')
     ctx.globalAlpha = 0.75
     ctx.beginPath()
@@ -161,7 +169,7 @@ export class Pintor2D {
       ctx.fillText(rotula(v, pasoY), x0 - 6, this.Y(v))
     }
 
-    if (opts.etiquetaX || opts.etiquetaY) {
+    if (this.mostrarNombres && (opts.etiquetaX || opts.etiquetaY)) {
       ctx.font = `italic 19px ${varCss('--serif') || 'serif'}`
       ctx.fillStyle = this.color('--ink-soft')
       if (opts.etiquetaX) {

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { Escena3D } from '../render/escena3d'
+import { ContextoVista, alOrdenVista, type PrefsVista } from './vista'
 import { Pintor2D } from '../render/pintor2d'
 import { alCambiarTema } from '../render/tema'
 import * as THREE from 'three'
@@ -18,21 +19,30 @@ function escribiendo(ev: KeyboardEvent) {
   return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
 }
 
-/** Paso de la rejilla al mover con Mayús y del giro con Mayús. */
-const PASO = 0.5
+/** Paso del giro con Mayús; el de la rejilla sale de las preferencias de vista (0,5 por defecto). */
 const PASO_GIRO = Math.PI / 12
 
-/** Con Mayús: solo cambia la coordenada que más se ha movido, y cae en la rejilla de 0,5. */
-function aEjes(p0: number[], q: number[]): { p: number[]; eje: number } {
+/** Con Mayús: solo cambia la coordenada que más se ha movido, y cae en la rejilla. */
+function aEjes(p0: number[], q: number[], paso: number): { p: number[]; eje: number } {
   const d = q.map((c, i) => c - (p0[i] ?? 0))
   let k = 0
   for (let i = 1; i < d.length; i++) if (Math.abs(d[i]) > Math.abs(d[k])) k = i
   const p = p0.slice()
-  p[k] = Math.round(q[k] / PASO) * PASO
+  p[k] = Math.round(q[k] / paso) * paso
   return { p, eje: k }
 }
+/** «Ajustar a la rejilla»: todas las coordenadas al paso. */
+const aRejilla = (q: number[], paso: number) => q.map((c) => Math.round(c / paso) * paso)
 
 const COLOR_EJE = ['--rosa', '--aux', '--accent']
+
+function ponerPrefs3D(e: Escena3D, p: PrefsVista) {
+  e.rejillaCompleta = p.planos
+  e.mostrarEjes = p.ejes
+  e.mostrarNombres = p.nombres
+  e.mostrarRejilla = p.rejilla
+  e.ortografica = p.ortografica
+}
 
 const ATAJOS_3D = [
   'X / Y / Z: mirar desde ese eje · 0: vista de partida',
@@ -66,30 +76,37 @@ interface Extras {
   transparente?: boolean
   /** Sin botones propios (el de debajo ya los tiene). */
   secundario?: boolean
+  /** Lado en el modo Comparar (A por defecto): para las capturas del menú. */
+  lado?: 'A' | 'B'
 }
 
 /** Lienzo WebGL con cámara en órbita. */
-export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario }: { vista: Vista3D<any>; s: any; set: (p: any) => void; giro: boolean } & Extras) {
+export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario, lado }: { vista: Vista3D<any>; s: any; set: (p: any) => void; giro: boolean } & Extras) {
   const ref = useRef<HTMLCanvasElement>(null)
   const estado = useRef({ vista, s, set, giro, enlace })
   estado.current = { vista, s, set, giro, enlace }
   const escena = useRef<Escena3D | null>(null)
   const sucio = useRef(true)
   const construyendo = useRef(false)
-  const [plano, setPlano] = useState<'3d' | 'x' | 'y' | 'z'>('3d')
-  const [rejillaCompleta, setRejillaCompleta] = useState(false)
+  const [plano, setPlano] = useState<'3d' | 'x' | 'y' | 'z' | 'iso'>('3d')
+  const { prefs, cambiar: cambiarPrefs } = useContext(ContextoVista)
+  const prefsRef = useRef<PrefsVista>(prefs)
+  prefsRef.current = prefs
   const [calculando, setCalculando] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
-  const alinear = (modo: '3d' | 'x' | 'y' | 'z') => {
+  const alinear = (modo: '3d' | 'x' | 'y' | 'z' | 'iso') => {
     setPlano(modo)
     const cam = escena.current
     if (!cam) return
     // la órbita va en el marco de three (y arriba); con z arriba, el eje y de la física es −z de three
     const { r } = cam.orb
     const zArr = cam.conZArriba
+    cam.objetivo.set(0, 0, 0)
     if (modo === 'x') cam.orb = { theta: 0, phi: Math.PI / 2, r }
     if (modo === (zArr ? 'z' : 'y')) cam.orb = { theta: Math.PI / 2, phi: 0.08, r }
     if (modo === (zArr ? 'y' : 'z')) cam.orb = { theta: Math.PI / 2, phi: Math.PI / 2, r }
+    // isométrica: desde (1, 1, 1) de la física
+    if (modo === 'iso') cam.orb = { theta: zArr ? -Math.PI / 4 : Math.PI / 4, phi: Math.acos(1 / Math.sqrt(3)), r }
     if (modo === '3d' && vista.camara) cam.orb = { ...vista.camara }
     sucio.current = true
   }
@@ -99,7 +116,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
   useEffect(() => {
     const canvas = ref.current!
     const e = new Escena3D(canvas, !!transparente)
-    e.rejillaCompleta = rejillaCompleta
+    ponerPrefs3D(e, prefsRef.current)
     escena.current = e
     e.fondo()
     const cam = estado.current.vista.camara
@@ -282,11 +299,12 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
         if (!q) return
         let destino = q.map((c, i) => c + (ev.altKey && i < 2 ? 0 : movObj!.desfase[i] ?? 0))
         movObj.eje = null
+        const paso = prefsRef.current.paso
         if (ev.shiftKey) {
-          const r = aEjes(movObj.c0, destino)
+          const r = aEjes(movObj.c0, destino, paso)
           destino = r.p
           movObj.eje = r.eje
-        }
+        } else if (prefsRef.current.ajustar) destino = aRejilla(destino, paso)
         aplicar(o.trasladar(destino.map((c, i) => c - movObj!.c0[i]), movObj.s0))
         guias()
         return
@@ -300,8 +318,10 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
           const q = e.puntoEnPlano(x, y, asa.p, ev.altKey)
           if (q) toque = { p: q.map((c, i) => c + (ev.altKey && i < 2 ? 0 : mano!.desfase[i] ?? 0)) }
         }
-        // Mayús: por el eje en que más se ha movido, y a escalones de 0,5
-        if (toque && ev.shiftKey) toque = { p: aEjes(mano.p0, toque.p).p }
+        // Mayús: por el eje en que más se ha movido, y a escalones de la rejilla
+        const paso = prefsRef.current.paso
+        if (toque && ev.shiftKey) toque = { p: aEjes(mano.p0, toque.p, paso).p }
+        else if (toque && prefsRef.current.ajustar && !toque.uv) toque = { p: aRejilla(toque.p, paso) }
         if (toque) aplicar(inter.mover(asa.id, { ...toque, mayus: ev.altKey }, estado.current.s))
         return
       }
@@ -496,7 +516,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
           miMarca = enl.marca
         }
       }
-      const camara = `${e.orb.theta}|${e.orb.phi}|${e.orb.r}`
+      const camara = `${e.orb.theta}|${e.orb.phi}|${e.orb.r}|${e.objetivo.x}|${e.objetivo.y}|${e.objetivo.z}|${e.ortografica}`
       if (pedir || camara !== ultimaCamara || v.animar) {
         e.pintar()
         pedir = false
@@ -532,6 +552,35 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     sucio.current = true
   }, [s])
 
+  // Superposiciones y proyección del menú Vista
+  useEffect(() => {
+    const e = escena.current
+    if (!e) return
+    ponerPrefs3D(e, prefs)
+    sucio.current = true
+  }, [prefs])
+
+  // Órdenes del menú Vista: solo el lienzo principal (el superpuesto sigue al enlazado)
+  useEffect(() => {
+    return alOrdenVista((o) => {
+      const e = escena.current
+      if (!e) return
+      if (o.orden === 'captura') {
+        // sin preserveDrawingBuffer el búfer se vacía tras componer: se pinta justo antes de leerlo
+        if (o.lado === (lado ?? 'A')) {
+          e.pintar()
+          o.fn(e.renderer.domElement)
+        }
+        return
+      }
+      if (secundario) return
+      if (o.orden === 'punto') alinearRef.current(o.modo)
+      else if (o.orden === 'encuadrar') e.encuadrar()
+      else if (o.orden === 'acercar') e.acercar(o.factor)
+      sucio.current = true
+    })
+  }, [secundario, lado])
+
   return (
     <>
       <canvas ref={ref} className="arrastrable" />
@@ -552,21 +601,21 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
         ))}
         <button
           type="button"
-          className={rejillaCompleta ? 'activo' : undefined}
-          aria-pressed={rejillaCompleta}
+          className={prefs.planos ? 'activo' : undefined}
+          aria-pressed={prefs.planos}
           title="Mostrar cuadrículas en XY, XZ e YZ"
-          onClick={() => {
-            const cam = escena.current
-            if (!cam) return
-            const siguiente = !cam.rejillaCompleta
-            cam.rejillaCompleta = siguiente
-            setRejillaCompleta(siguiente)
-            sucio.current = true
-          }}
+          onClick={() => cambiarPrefs({ planos: !prefs.planos })}
         >
           Planos
         </button>
-        <button type="button" title="Descargar imagen PNG" onClick={() => ref.current && descargarCanvas(ref.current, 'calculadora-3d')}>
+        <button
+          type="button"
+          title="Descargar imagen PNG"
+          onClick={() => {
+            escena.current?.pintar()
+            if (ref.current) descargarCanvas(ref.current, 'calculadora-3d')
+          }}
+        >
           PNG
         </button>
         <button type="button" className="ayuda-atajos" aria-label="Atajos de teclado" title={ATAJOS_3D}>
@@ -578,11 +627,14 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
 }
 
 /** Lienzo 2D con paneo, zoom y coordenadas del mundo. */
-export function Lienzo2D({ vista, s, set, enlace, secundario }: { vista: Vista2D<any>; s: any; set: (p: any) => void } & Extras) {
+export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: Vista2D<any>; s: any; set: (p: any) => void } & Extras) {
   const ref = useRef<HTMLCanvasElement>(null)
   const estado = useRef({ vista, s, set, enlace })
   estado.current = { vista, s, set, enlace }
   const sucio = useRef(true)
+  const { prefs } = useContext(ContextoVista)
+  const prefsRef = useRef<PrefsVista>(prefs)
+  prefsRef.current = prefs
 
   useEffect(() => {
     const canvas = ref.current!
@@ -659,7 +711,8 @@ export function Lienzo2D({ vista, s, set, enlace, secundario }: { vista: Vista2D
         const asa = asas.find((q) => q.id === mano!.id)
         if (!asa) return
         const m = g.aMundo(x, y)
-        const p = [asa.eje === 'y' ? asa.p[0] : m.x + mano.dx, asa.eje === 'x' ? asa.p[1] : m.y + mano.dy]
+        let p = [asa.eje === 'y' ? asa.p[0] : m.x + mano.dx, asa.eje === 'x' ? asa.p[1] : m.y + mano.dy]
+        if (prefsRef.current.ajustar) p = p.map((c, i) => ((i === 0 && asa.eje === 'y') || (i === 1 && asa.eje === 'x') ? c : Math.round(c / prefsRef.current.paso) * prefsRef.current.paso))
         aplicar(inter.mover(asa.id, { p, mayus: ev.shiftKey }, estado.current.s))
         return
       }
@@ -790,6 +843,9 @@ export function Lienzo2D({ vista, s, set, enlace, secundario }: { vista: Vista2D
       const anima = v.animada?.(st) ?? false
       if (sucio.current || anima) {
         sucio.current = false
+        g.mostrarEjes = prefsRef.current.ejes
+        g.mostrarNombres = prefsRef.current.nombres
+        g.mostrarRejilla = prefsRef.current.rejilla
         g.limpiar()
         v.dibujar(g, st, (ahora - t0) / 1000)
         asas = v.interaccion?.asas(st) ?? []
@@ -800,8 +856,32 @@ export function Lienzo2D({ vista, s, set, enlace, secundario }: { vista: Vista2D
     }
     requestAnimationFrame(bucle)
 
+    // Órdenes del menú Vista: encuadrar vuelve a la ventana de partida; acercar escala desde el centro
+    const quitarOrdenes = alOrdenVista((o) => {
+          if (o.orden === 'captura') {
+            if (o.lado === (lado ?? 'A')) o.fn(canvas)
+            return
+          }
+          if (secundario || !navegable) return
+          const cx = (g.ventana.x[0] + g.ventana.x[1]) / 2
+          const cy = (g.ventana.y[0] + g.ventana.y[1]) / 2
+          if (o.orden === 'encuadrar') {
+            g.ventana = v0.ventana ? { x: [...v0.ventana.x], y: [...v0.ventana.y] } : { x: [-5, 5], y: [-5, 5] }
+            primeraVez = true
+          }
+          else if (o.orden === 'acercar')
+            g.ventana = {
+              x: [cx + (g.ventana.x[0] - cx) * o.factor, cx + (g.ventana.x[1] - cx) * o.factor],
+              y: [cy + (g.ventana.y[0] - cy) * o.factor, cy + (g.ventana.y[1] - cy) * o.factor],
+            }
+          else return
+          medir()
+          sucio.current = true
+        })
+
     return () => {
       vivo = false
+      quitarOrdenes()
       ro.disconnect()
       quitarTema()
       canvas.removeEventListener('pointerdown', abajo)
@@ -816,7 +896,7 @@ export function Lienzo2D({ vista, s, set, enlace, secundario }: { vista: Vista2D
 
   useEffect(() => {
     sucio.current = true
-  }, [s])
+  }, [s, prefs])
 
   return (
     <>

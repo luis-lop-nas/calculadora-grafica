@@ -1,10 +1,34 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MODULOS } from './registro'
 import { Navegacion } from './Navegacion'
 import { Lienzo2D, Lienzo3D, type Enlace } from './lienzos'
 import { Formula, Lecturas, RanuraResultado } from './controles'
 import { AREAS_CORTAS, type ModuloAny, type Vista } from './tipos'
 import { escritorio, type Orden } from './escritorio'
+import { ContextoVista, guardarPrefs, leerPrefs, ordenVista, type OrdenVista, type PrefsVista } from './vista'
+import { HojaAtajos } from './Atajos'
+
+/** ¿El foco está en un campo de texto? Ahí ⌘Z y compañía son los del propio campo. */
+const enCampo = () => !!(document.activeElement as HTMLElement | null)?.matches?.('input, textarea, select, [contenteditable="true"]')
+
+/** Copia al portapapeles el canvas del lado A recién pintado. */
+function copiarImagen() {
+  ordenVista({
+    orden: 'captura',
+    lado: 'A',
+    fn: (canvas) =>
+      canvas.toBlob((b) => {
+        if (b) navigator.clipboard?.write?.([new ClipboardItem({ 'image/png': b })]).catch(() => {})
+      }, 'image/png'),
+  })
+}
+
+interface Historia {
+  pasado: unknown[]
+  futuro: unknown[]
+  ultimo: unknown
+}
+const MAX_HISTORIA = 200
 
 const CLAVE = 'calculadora:estado'
 const VERSION_ESTADO = 1
@@ -116,6 +140,18 @@ export default function App() {
   const [estados, setEstados] = useState<Record<string, any>>(() => estadosDe(guardado))
   const [giro, setGiro] = useState(false)
   const [, tic] = useState(0)
+  const [atajos, setAtajos] = useState(false)
+
+  // Preferencias de vista (menú Vista): de quien usa la app, no del documento
+  const [prefs, setPrefs] = useState<PrefsVista>(leerPrefs)
+  const cambiarPrefs = useCallback((p: Partial<PrefsVista>) => setPrefs((v) => ({ ...v, ...p })), [])
+  useEffect(() => {
+    guardarPrefs(prefs)
+    const raiz = document.documentElement
+    if (prefs.tema === 'sistema') raiz.removeAttribute('data-theme')
+    else raiz.setAttribute('data-theme', prefs.tema === 'oscuro' ? 'dark' : 'light')
+  }, [prefs])
+  const contextoVista = useMemo(() => ({ prefs, cambiar: cambiarPrefs }), [prefs, cambiarPrefs])
 
   // Comparar: un segundo lienzo (B) con su propio módulo y su propio estado
   const [cmp, setCmp] = useState<Comparar>(() => compararDe(guardado))
@@ -134,6 +170,62 @@ export default function App() {
   const moduloP = editandoB ? moduloB : modulo
   const s = editandoB ? sB : sA
   const set = editandoB ? setB : setA
+
+  // Historial por módulo: cada gesto (un arrastre, una tecla) se agrupa en un paso cuando el
+  // estado lleva 400 ms quieto. Deshacer actúa sobre el módulo abierto (lado A).
+  const historial = useRef<Record<string, Historia>>({})
+  const pendiente = useRef<{ id: string; t: number } | null>(null)
+  const restaurando = useRef(false)
+  const estadosRef = useRef(estados)
+  estadosRef.current = estados
+  const [, versionHistoria] = useState(0)
+  const historiaDe = (m: string) => (historial.current[m] ??= { pasado: [], futuro: [], ultimo: estadosRef.current[m] })
+  const confirmar = () => {
+    const p = pendiente.current
+    if (!p) return
+    clearTimeout(p.t)
+    pendiente.current = null
+    const h = historiaDe(p.id)
+    const actual = estadosRef.current[p.id]
+    if (actual === h.ultimo) return
+    h.pasado.push(h.ultimo)
+    if (h.pasado.length > MAX_HISTORIA) h.pasado.shift()
+    h.ultimo = actual
+    h.futuro = []
+    versionHistoria((v) => v + 1)
+  }
+  useEffect(() => {
+    historiaDe(id)
+  }, [id])
+  useEffect(() => {
+    if (restaurando.current) {
+      restaurando.current = false
+      return
+    }
+    const h = historiaDe(id)
+    if (estados[id] === h.ultimo) return
+    if (pendiente.current && pendiente.current.id !== id) confirmar()
+    if (pendiente.current) clearTimeout(pendiente.current.t)
+    pendiente.current = { id, t: window.setTimeout(confirmar, 400) }
+  }, [estados])
+  const viajar = (atras: boolean) => {
+    confirmar()
+    const h = historiaDe(id)
+    const origen = atras ? h.pasado : h.futuro
+    if (!origen.length) return
+    const destino = origen.pop()
+    ;(atras ? h.futuro : h.pasado).push(estadosRef.current[id])
+    h.ultimo = destino
+    restaurando.current = true
+    setEstados((e) => ({ ...e, [id]: destino }))
+    versionHistoria((v) => v + 1)
+  }
+  const deshacer = () => viajar(true)
+  const rehacer = () => viajar(false)
+  const hist = historial.current[id]
+  const puedeDeshacer = !!hist?.pasado.length || (!!pendiente.current && pendiente.current.id === id)
+  const puedeRehacer = !!hist?.futuro.length
+  const restablecer = () => setEstados((e) => ({ ...e, [id]: structuredClone(modulo.inicial) }))
 
   const empezarComparar = () => {
     // la primera vez, B es una copia de A: el modo «mismo módulo con otros parámetros»
@@ -164,6 +256,30 @@ export default function App() {
     return () => clearInterval(h)
   }, [id])
 
+  // En la web (en la app de Mac los lleva el menú): ⌘Z, ⇧⌘Z y ⌘/
+  const teclasRef = useRef({ deshacer, rehacer })
+  teclasRef.current = { deshacer, rehacer }
+  useEffect(() => {
+    if (escritorio) return
+    const atajo = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      const k = e.key.toLowerCase()
+      if (k === '/') {
+        e.preventDefault()
+        setAtajos((v) => !v)
+        return
+      }
+      if (enCampo()) return
+      if (k === 'z' || k === 'y') {
+        e.preventDefault()
+        if (k === 'y' || e.shiftKey) teclasRef.current.rehacer()
+        else teclasRef.current.deshacer()
+      }
+    }
+    document.addEventListener('keydown', atajo)
+    return () => document.removeEventListener('keydown', atajo)
+  }, [])
+
   useEffect(() => {
     const atajo = (e: KeyboardEvent) => {
       if (e.code !== 'Space') return
@@ -186,6 +302,9 @@ export default function App() {
   const conmutarComparar = () => (cmp.activo ? setCmp((c) => ({ ...c, activo: false, editando: 'A' })) : empezarComparar())
 
   const aplicar = (doc: Guardado) => {
+    historial.current = {}
+    if (pendiente.current) clearTimeout(pendiente.current.t)
+    pendiente.current = null
     limpio.current = null
     enlace.current = { marca: 0, plano: null, orb: null }
     setId(idDe(doc))
@@ -215,8 +334,28 @@ export default function App() {
       const boton = (sel: string) => document.querySelector<HTMLButtonElement>(`${sel} button[title="Descargar imagen PNG"]`)
       ;(boton(`.lado-${cmp.activo ? cmp.editando : 'A'}`) ?? boton('.escenario'))?.click()
     } else if (orden === 'csv') descargarLecturas(id, lecturas)
+    else if (orden === 'json') descargarEstado(estados, id)
     else if (orden === 'comparar') conmutarComparar()
     else if (orden === 'giro') setGiro((v) => !v)
+    else if (orden === 'deshacer' || orden === 'rehacer') {
+      // en un campo de texto, el deshacer del propio campo
+      if (enCampo()) document.execCommand(orden === 'deshacer' ? 'undo' : 'redo')
+      else if (orden === 'deshacer') deshacer()
+      else rehacer()
+    } else if (orden === 'restablecer') restablecer()
+    else if (orden === 'copiar') {
+      if (dato === 'latex' && formula?.length) navigator.clipboard?.writeText(formula.join('\n'))
+      else if (dato === 'lecturas' && lecturas?.length) navigator.clipboard?.writeText(lecturas.map(([a, b]) => `${a}\t${b}`).join('\n'))
+      else if (dato === 'imagen') copiarImagen()
+    } else if (orden === 'prefs' && dato && typeof dato === 'object') cambiarPrefs(dato as Partial<PrefsVista>)
+    else if (orden === 'vista' && dato && typeof dato === 'object') ordenVista(dato as OrdenVista)
+    else if (orden === 'cmp') {
+      if (dato === 'copiarAenB') setEstadosB((e) => ({ ...e, [id]: structuredClone(sA) }))
+      else if (dato && typeof dato === 'object') {
+        if (!cmp.activo) empezarComparar()
+        setCmp((c) => ({ ...c, ...(dato as Partial<Comparar>) }))
+      }
+    } else if (orden === 'atajos') setAtajos((v) => !v)
   }
 
   useEffect(() => {
@@ -230,9 +369,26 @@ export default function App() {
 
   const hayLienzo = vistaA.tipo !== 'html'
   const hayLecturas = !!lecturas?.length
+  const hayFormula = !!formula?.length
   useEffect(() => {
-    escritorio?.estado({ id, comparar: cmp.activo, giro, es3D, hayLienzo, hayLecturas, modificado })
-  }, [id, cmp.activo, giro, es3D, hayLienzo, hayLecturas, modificado])
+    escritorio?.estado({
+      id,
+      comparar: cmp.activo,
+      giro,
+      es3D,
+      hayLienzo,
+      hayLecturas,
+      modificado,
+      tipo: vistaA.tipo,
+      hayFormula,
+      puedeDeshacer,
+      puedeRehacer,
+      prefs,
+      disposicion: cmp.disposicion,
+      enlazar: cmp.enlazar,
+      mismoModulo: cmp.idB === id,
+    })
+  }, [id, cmp.activo, cmp.disposicion, cmp.enlazar, cmp.idB, giro, es3D, hayLienzo, hayLecturas, modificado, vistaA.tipo, hayFormula, puedeDeshacer, puedeRehacer, prefs])
   // superponer solo tiene sentido con dos lienzos del mismo tipo
   const superpuesto = cmp.activo && cmp.disposicion === 'encima' && vistaA.tipo === vistaB.tipo && vistaA.tipo !== 'html'
 
@@ -245,6 +401,7 @@ export default function App() {
     const extras = {
       enlace: cmp.activo && cmp.enlazar ? enlace.current : null,
       secundario: superpuesto && lado === 'B',
+      lado,
     }
     if (v.tipo === 'html')
       return (
@@ -259,24 +416,25 @@ export default function App() {
         ) : (
           <Lienzo2D key={llave} vista={v} s={st} set={fijar} {...extras} />
         )}
-        {m.leyenda && !(superpuesto && lado === 'B') && <div className="leyenda">{m.leyenda(st)}</div>}
+        {prefs.leyenda && m.leyenda && !(superpuesto && lado === 'B') && <div className="leyenda">{m.leyenda(st)}</div>}
       </>
     )
   }
   const resultado =
-    rotulo || formula?.length || lecturas?.length ? (
+    rotulo || (prefs.formula && formula?.length) || (prefs.lecturas && lecturas?.length) ? (
       <div className="grupo resultado">
         {rotulo && (
           <div className="titulo">
             <span dangerouslySetInnerHTML={{ __html: rotulo.nombre }} />
           </div>
         )}
-        {formula && formula.length > 0 && <Formula tex={formula} />}
-        {lecturas && lecturas.length > 0 && <Lecturas filas={lecturas} />}
+        {prefs.formula && formula && formula.length > 0 && <Formula tex={formula} />}
+        {prefs.lecturas && lecturas && lecturas.length > 0 && <Lecturas filas={lecturas} />}
       </div>
     ) : null
 
   return (
+    <ContextoVista.Provider value={contextoVista}>
     <div className="app">
       <Navegacion
         modulos={MODULOS}
@@ -318,7 +476,7 @@ export default function App() {
         }
       />
 
-      <div className="cuerpo">
+      <div className={`cuerpo${prefs.presentacion ? ' presentacion' : ''}`}>
         <aside key={`${moduloP.id}:${editandoB ? 'B' : 'A'}`}>
           <header>
             <h1 dangerouslySetInnerHTML={{ __html: moduloP.titulo }} />
@@ -404,6 +562,8 @@ export default function App() {
           )}
         </div>
       </div>
+      {atajos && <HojaAtajos onCerrar={() => setAtajos(false)} />}
     </div>
+    </ContextoVista.Provider>
   )
 }

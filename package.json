@@ -13,7 +13,8 @@
     "app": "npm run build && env -u ELECTRON_RUN_AS_NODE electron .",
     "app:dev": "node electron/dev.mjs",
     "app:empaquetar": "npm run build && electron-builder --mac dir",
-    "comprobar:app": "npm run build && node comprobar/app.mjs"
+    "comprobar:app": "npm run build && node comprobar/app.mjs",
+    "app:instalar": "npm run app:empaquetar && node electron/instalar.mjs"
   },
   "dependencies": {
     "katex": "^0.16.11",
@@ -36,9 +37,10 @@
   "main": "electron/main.cjs",
   "build": {
     "appId": "es.luichi.calculadora",
-    "productName": "Calculadora",
+    "productName": "Calculadora gráfica",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
@@ -53,7 +55,8 @@
       "target": [
         "dir"
       ],
-      "identity": null
+      "identity": null,
+      "icon": "build/icon.png"
     },
     "fileAssociations": [
       {

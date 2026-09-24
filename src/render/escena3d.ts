@@ -24,6 +24,14 @@ export class Escena3D {
   escala = 1
   rejillaCompleta = false
   giro = false
+  /** Superposiciones del menú Vista: las respeta `ejes()`. */
+  mostrarEjes = true
+  mostrarNombres = true
+  mostrarRejilla = true
+  /** Casi ortográfica: campo de 2° desde lejos, así el rayo, las asas y los rótulos no cambian. */
+  ortografica = false
+  /** Punto al que mira la cámara (marco de three); «Encuadrar» lo mueve. */
+  objetivo = new THREE.Vector3()
   /** Mallas sobre las que se deslizan las asas de tipo `superficie`; `construir` las deja aquí. */
   agarre: THREE.Object3D[] = []
   private objs: THREE.Object3D[] = []
@@ -80,19 +88,46 @@ export class Escena3D {
   }
 
   colocarCamara() {
-    const { theta, phi, r } = this.orb
-    const far = 200 * this.escala
-    if (this.camera.far !== far) {
-      this.camera.near = 0.01 * this.escala
+    const { theta, phi } = this.orb
+    const fov = this.ortografica ? 2 : 40
+    // misma anchura de encuadre en el objetivo: d·tan(fov/2) se conserva
+    const k = this.ortografica ? Math.tan((40 * Math.PI) / 360) / Math.tan((fov * Math.PI) / 360) : 1
+    const r = this.orb.r * k
+    const far = 200 * this.escala * k
+    if (this.camera.far !== far || this.camera.fov !== fov) {
+      this.camera.near = 0.01 * this.escala * k
       this.camera.far = far
+      this.camera.fov = fov
       this.camera.updateProjectionMatrix()
     }
+    const o = this.objetivo
     this.camera.position.set(
-      r * Math.sin(phi) * Math.cos(theta),
-      r * Math.cos(phi),
-      r * Math.sin(phi) * Math.sin(theta),
+      o.x + r * Math.sin(phi) * Math.cos(theta),
+      o.y + r * Math.cos(phi),
+      o.z + r * Math.sin(phi) * Math.sin(theta),
     )
-    this.camera.lookAt(0, 0, 0)
+    this.camera.lookAt(o)
+  }
+
+  /** Mira al centro de lo dibujado y se aleja lo justo para que quepa (sin ejes ni rejillas). */
+  encuadrar() {
+    this.root.updateMatrixWorld(true)
+    const caja = new THREE.Box3()
+    const parcial = new THREE.Box3()
+    for (const o of this.objs) {
+      if (o.userData.referencia || !o.visible) continue
+      parcial.setFromObject(o)
+      if (!parcial.isEmpty() && Number.isFinite(parcial.min.x) && Number.isFinite(parcial.max.x)) caja.union(parcial)
+    }
+    if (caja.isEmpty()) {
+      this.objetivo.set(0, 0, 0)
+      return
+    }
+    const esfera = caja.getBoundingSphere(new THREE.Sphere())
+    this.objetivo.copy(esfera.center)
+    const aspecto = Math.min(1, this.camera.aspect || 1)
+    const r = (esfera.radius * 1.08) / (Math.sin((20 * Math.PI) / 180) * aspecto)
+    this.orb.r = Math.min(40 * this.escala, Math.max(0.3 * this.escala, r))
   }
 
   pintar() {
@@ -286,10 +321,10 @@ export class Escena3D {
     etiquetas: [string, string, string] | null = ['x', 'y', 'z'],
     opts: { caja?: boolean | number; rejilla?: boolean; planos?: Array<'xy' | 'xz' | 'yz'>; infinita?: boolean; paso?: number } = {},
   ) {
-    if (opts.rejilla) {
+    if (opts.rejilla && this.mostrarRejilla) {
       const planos = this.rejillaCompleta ? ['xy', 'xz', 'yz'] as const : opts.planos ?? ['xy']
       const extension = opts.infinita ? 50 : largo
-      for (const plano of planos) this.rejilla(plano, extension, opts.paso ?? largo / 5)
+      for (const plano of planos) this.rejilla(plano, extension, opts.paso ?? largo / 5).userData.referencia = true
     }
     if (opts.caja) {
       const l = typeof opts.caja === 'number' ? opts.caja : largo
@@ -308,11 +343,13 @@ export class Escena3D {
     ])
     const ejes = this.add(new THREE.LineSegments(g, this.matLinea(0.32)))
     ejes.renderOrder = -1
-    if (etiquetas) {
+    ejes.userData.referencia = true
+    ejes.visible = this.mostrarEjes
+    if (etiquetas && this.mostrarNombres) {
       const d = largo + 0.13
-      this.rotulo(etiquetas[0], [d, 0, 0])
-      this.rotulo(etiquetas[1], [0, d, 0])
-      this.rotulo(etiquetas[2], [0, 0, d])
+      this.rotulo(etiquetas[0], [d, 0, 0]).userData.referencia = true
+      this.rotulo(etiquetas[1], [0, d, 0]).userData.referencia = true
+      this.rotulo(etiquetas[2], [0, 0, d]).userData.referencia = true
     }
   }
 

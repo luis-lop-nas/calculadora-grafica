@@ -16,23 +16,44 @@ su forma cerrada o con un segundo método independiente. `npm run comprobar` abr
 (la lista sale de la propia paleta) en un Chromium de verdad, captura cada uno en `comprobar/tiros/`
 y falla si alguno suelta un error; `SOLO=fourier,control` recorre solo esos.
 `npm run comprobar:app` hace lo mismo en la app de Mac desde su menú Módulo, y además guarda y
-reabre un `.calc` y exporta PNG y CSV.
+reabre un `.calc`, exporta PNG y CSV, y prueba una casilla de Vista y deshacer/rehacer.
 
 ## App de Mac
 
 La misma aplicación, también como app nativa (Electron) con barra de menús de macOS. La web no cambia.
 
 ```bash
+npm run app:instalar    # empaqueta «Calculadora gráfica.app», la instala en Aplicaciones y la abre
 npm run app:dev         # en caliente: Vite + ventana de la app
-npm run app             # compila dist/ y abre la app
-npm run app:empaquetar  # genera release/mac-arm64/Calculadora.app (arrástrala a Aplicaciones)
+npm run app             # compila dist/ y abre la app sin empaquetar (en la barra sale «Electron»)
 ```
 
-Menús: **Archivo** (nueva ventana ⌘N, abrir ⌘O, recientes, guardar ⌘S / como ⇧⌘S, exportar PNG ⌘E y
-CSV), **Edición**, **Módulo** (todos, ⌘1…⌘9 por área, ⌘[ ⌘] anterior/siguiente, ⌘K buscar), **Vista**
-(Comparar ⌘D, autogiro, zoom, pantalla completa). Las sesiones se guardan como documentos `.calc`
-(el mismo JSON del autoguardado; también abre los `.json` del botón JSON) y Finder los abre con
-doble clic. El autoguardado sigue funcionando, pero es **aparte del del navegador**.
+Para actualizar la instalada: `git pull && npm run app:instalar`. Se firma «ad hoc» (sin cuenta de
+desarrollador): en Apple Silicon una app sin ninguna firma no arranca.
+
+Menús, al estilo de Illustrator o Blender:
+
+- **Archivo**: nueva ventana ⌘N, abrir ⌘O, recientes, guardar ⌘S / como ⇧⌘S, volver a lo
+  guardado, **Exportar ▸** PNG ⌘E, PDF ⇧⌘E, lecturas CSV, estado JSON; imprimir ⌘P.
+- **Edición**: **deshacer ⌘Z / rehacer ⇧⌘Z** en todos los módulos (cada gesto es un paso; en un
+  campo de texto, el del campo), cortar/copiar/pegar, **Copiar como ▸** imagen del lienzo ⇧⌘C,
+  fórmula en LaTeX, lecturas; **Restablecer el módulo**.
+- **Módulo**: un submenú por área (Álgebra ▸ Matrices…), ⌘1…⌘9 por área, ⌘[ ⌘] anterior/siguiente,
+  ⌘K buscar.
+- **Vista**: **Punto de vista ▸** partida, desde X/Y/Z, isométrica y **proyección ortográfica**
+  ⇧⌘O; **encuadrar todo ⌘0**, acercar ⌘+ / alejar ⌘− (el lienzo); **Superposiciones ▸** ejes,
+  nombres de los ejes, rejilla, rejilla en los tres planos, leyenda, fórmula, lecturas; **ajustar a
+  la rejilla** ⇧⌘' y su **paso** (0,1 · 0,25 · 0,5 · 1, que también usa Mayús al arrastrar);
+  **Comparar ▸** activar ⌥⌘D, lado a lado / superpuestos, cámaras enlazadas, copiar A en B;
+  autogiro; **modo presentación** ⌘\ (solo el lienzo); **Tema ▸** sistema, claro, oscuro; tamaño
+  de la interfaz ⌥⌘0 / ⌥⌘+ / ⌥⌘−.
+- **Ayuda**: **atajos de teclado ⌘/** (también en la web) y esta guía. El buscador de Ayuda de
+  macOS encuentra cualquier entrada de los menús.
+
+Las preferencias de Vista son de quien usa la app (se guardan aparte), no del documento. Las
+sesiones se guardan como documentos `.calc` (el mismo JSON del autoguardado; también abre los
+`.json` exportados) y Finder los abre con doble clic. El autoguardado sigue funcionando, pero es
+**aparte del del navegador**.
 
 Piezas: `electron/main.cjs` (ventanas, menú, diálogos), `electron/preload.cjs` (el puente que la
 página ve como `window.escritorio`) y `src/nucleo/escritorio.ts` (sus tipos; en la web no existe).

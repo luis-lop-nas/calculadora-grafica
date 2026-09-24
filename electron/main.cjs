@@ -3,6 +3,16 @@ const fs = require('node:fs/promises')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 
+// en la app empaquetada el nombre sale del bundle; en desarrollo (Electron.app) esto cubre el resto
+app.setName('Calculadora gráfica')
+// el nombre entra en el User-Agent, y una cabecera con «á» rompe el protocolo app://
+app.userAgentFallback = app.userAgentFallback.replace(/[^\x20-\x7e]/g, (c) => c.normalize('NFD')[0].replace(/[^\x20-\x7e]/, '-'))
+app.setAboutPanelOptions({
+  applicationName: 'Calculadora gráfica',
+  applicationVersion: app.getVersion(),
+  credits: 'Álgebra, geometría, funciones, EDO, EDP y física, con lienzos 2D y 3D.',
+})
+
 const DIST = path.join(__dirname, '..', 'dist')
 // en desarrollo, electron/dev.mjs pasa la URL del servidor de Vite
 const URL_DEV = process.env.CALC_URL
@@ -24,7 +34,7 @@ function crearVentana(documento = null) {
     height: 900,
     minWidth: 900,
     minHeight: 600,
-    title: 'Calculadora',
+    title: 'Calculadora gráfica',
     backgroundColor: '#0e0f12',
     titleBarStyle: 'default',
     webPreferences: {
@@ -124,22 +134,18 @@ function enviar(win, orden, dato) {
 
 const alFoco = (orden, dato) => () => enviar(BrowserWindow.getFocusedWindow(), orden, dato)
 
-function menuModulos() {
-  const items = []
-  let area = null
-  let n = 0
+function menuModulos(e) {
+  // áreas como submenús, al estilo de los menús de Adobe: Álgebra ▸ Matrices…
+  const grupos = []
   for (const m of modulos) {
-    if (m.area !== area) {
-      if (area) items.push({ type: 'separator' })
-      area = m.area
-      n++
-      // ⌘1…⌘7 = las pestañas de área, en el mismo orden
-      items.push({ label: m.nombreArea, enabled: false })
-    }
-    const actual = ventanas.get(BrowserWindow.getFocusedWindow()?.id)?.estado.id
-    items.push({ label: m.nombre, type: 'radio', checked: m.id === actual, click: alFoco('modulo', m.id) })
+    let g = grupos.find((x) => x.area === m.area)
+    if (!g) grupos.push((g = { area: m.area, nombre: m.nombreArea, modulos: [] }))
+    g.modulos.push(m)
   }
-  const areas = [...new Map(modulos.map((m) => [m.area, m])).values()]
+  const porArea = grupos.map((g) => ({
+    label: g.nombre,
+    submenu: g.modulos.map((m) => ({ label: m.nombre, type: 'radio', checked: m.id === e.id, click: alFoco('modulo', m.id) })),
+  }))
   return [
     // la página ya escucha ⌘K por su cuenta (también en la web): el menú solo lo muestra
     { label: 'Buscar módulo…', accelerator: 'CmdOrCtrl+K', registerAccelerator: false, click: alFoco('buscar') },
@@ -148,19 +154,47 @@ function menuModulos() {
     { type: 'separator' },
     {
       label: 'Ir al área',
-      submenu: areas.map((m, i) => ({ label: m.nombreArea, accelerator: i < 9 ? `CmdOrCtrl+${i + 1}` : undefined, click: alFoco('modulo', m.id) })),
+      submenu: grupos.map((g, i) => ({ label: g.nombre, accelerator: i < 9 ? `CmdOrCtrl+${i + 1}` : undefined, click: alFoco('modulo', g.modulos[0].id) })),
     },
     { type: 'separator' },
-    ...(n ? items : [{ label: 'Cargando…', enabled: false }]),
+    ...(grupos.length ? porArea : [{ label: 'Cargando…', enabled: false }]),
   ]
 }
 
 function construirMenu() {
   const win = BrowserWindow.getFocusedWindow()
   const e = (win && ventanas.get(win.id)?.estado) || {}
-  const hayVentana = !!win
+  const hay = !!win
+  const p = e.prefs || {}
+  const lienzo = hay && e.hayLienzo
+  const es3D = lienzo && e.tipo === '3d'
+  const prefs = (dato) => alFoco('prefs', dato)
+  const vista = (dato) => alFoco('vista', dato)
+  /** Casilla ligada a una preferencia de vista. */
+  // la casilla ya cambió al pulsarla: se manda su valor nuevo, no el que había al construir el menú
+  const casilla = (label, clave, extra = {}) => ({
+    label,
+    type: 'checkbox',
+    checked: !!p[clave],
+    enabled: hay,
+    click: (item) => enviar(BrowserWindow.getFocusedWindow(), 'prefs', { [clave]: item.checked }),
+    ...extra,
+  })
   const plantilla = [
-    { role: 'appMenu', label: 'Calculadora' },
+    {
+      label: 'Calculadora gráfica',
+      submenu: [
+        { role: 'about', label: 'Acerca de Calculadora gráfica' },
+        { type: 'separator' },
+        { role: 'services', label: 'Servicios' },
+        { type: 'separator' },
+        { role: 'hide', label: 'Ocultar Calculadora gráfica' },
+        { role: 'hideOthers', label: 'Ocultar otros' },
+        { role: 'unhide', label: 'Mostrar todo' },
+        { type: 'separator' },
+        { role: 'quit', label: 'Salir de Calculadora gráfica' },
+      ],
+    },
     {
       label: 'Archivo',
       submenu: [
@@ -169,41 +203,186 @@ function construirMenu() {
         { role: 'recentDocuments', label: 'Abrir recientes', submenu: [{ role: 'clearRecentDocuments', label: 'Borrar menú' }] },
         { type: 'separator' },
         { label: 'Cerrar ventana', accelerator: 'CmdOrCtrl+W', role: 'close' },
-        { label: 'Guardar', accelerator: 'CmdOrCtrl+S', enabled: hayVentana, click: alFoco('guardar') },
-        { label: 'Guardar como…', accelerator: 'CmdOrCtrl+Shift+S', enabled: hayVentana, click: alFoco('guardarComo') },
+        { label: 'Guardar', accelerator: 'CmdOrCtrl+S', enabled: hay, click: alFoco('guardar') },
+        { label: 'Guardar como…', accelerator: 'CmdOrCtrl+Shift+S', enabled: hay, click: alFoco('guardarComo') },
+        { label: 'Volver a lo guardado', enabled: hay && !!ventanas.get(win.id)?.ruta && !!e.modificado, click: () => volverALoGuardado(win) },
         { type: 'separator' },
-        { label: 'Exportar imagen PNG…', accelerator: 'CmdOrCtrl+E', enabled: hayVentana && e.hayLienzo, click: alFoco('png') },
-        { label: 'Exportar lecturas CSV…', enabled: hayVentana && e.hayLecturas, click: alFoco('csv') },
+        {
+          label: 'Exportar',
+          submenu: [
+            { label: 'Imagen PNG…', accelerator: 'CmdOrCtrl+E', enabled: lienzo, click: alFoco('png') },
+            { label: 'PDF…', accelerator: 'CmdOrCtrl+Shift+E', enabled: hay, click: () => exportarPDF(win) },
+            { type: 'separator' },
+            { label: 'Lecturas (CSV)…', enabled: hay && e.hayLecturas, click: alFoco('csv') },
+            { label: 'Estado del módulo (JSON)…', enabled: hay, click: alFoco('json') },
+          ],
+        },
+        { type: 'separator' },
+        { label: 'Imprimir…', accelerator: 'CmdOrCtrl+P', enabled: hay, click: () => win?.webContents.print() },
       ],
     },
-    { role: 'editMenu', label: 'Edición' },
-    { label: 'Módulo', submenu: menuModulos() },
+    {
+      label: 'Edición',
+      submenu: [
+        // en un campo de texto la página hace el deshacer del campo; fuera, el del módulo
+        { label: 'Deshacer', accelerator: 'CmdOrCtrl+Z', enabled: hay, click: alFoco('deshacer') },
+        { label: 'Rehacer', accelerator: 'Shift+CmdOrCtrl+Z', enabled: hay, click: alFoco('rehacer') },
+        { type: 'separator' },
+        { role: 'cut', label: 'Cortar' },
+        { role: 'copy', label: 'Copiar' },
+        { role: 'paste', label: 'Pegar' },
+        { role: 'selectAll', label: 'Seleccionar todo' },
+        {
+          label: 'Copiar como',
+          submenu: [
+            { label: 'Imagen del lienzo', accelerator: 'Shift+CmdOrCtrl+C', enabled: lienzo, click: alFoco('copiar', 'imagen') },
+            { label: 'Fórmula en LaTeX', enabled: hay && e.hayFormula, click: alFoco('copiar', 'latex') },
+            { label: 'Lecturas (texto con tabuladores)', enabled: hay && e.hayLecturas, click: alFoco('copiar', 'lecturas') },
+          ],
+        },
+        { type: 'separator' },
+        { label: 'Restablecer el módulo', enabled: hay, click: alFoco('restablecer') },
+        { type: 'separator' },
+        { role: 'startSpeaking', label: 'Empezar a leer' },
+        { role: 'stopSpeaking', label: 'Dejar de leer' },
+      ],
+    },
+    { label: 'Módulo', submenu: menuModulos(e) },
     {
       label: 'Vista',
       submenu: [
-        { label: 'Comparar A y B', type: 'checkbox', accelerator: 'CmdOrCtrl+D', checked: !!e.comparar, enabled: hayVentana, click: alFoco('comparar') },
+        {
+          label: 'Punto de vista',
+          enabled: es3D,
+          submenu: [
+            // X, Y, Z y 0 ya los atiende el lienzo: aquí solo se muestran (robarlos rompería los campos)
+            { label: 'Vista de partida', accelerator: '0', registerAccelerator: false, click: vista({ orden: 'punto', modo: '3d' }) },
+            { label: 'Desde el eje X', accelerator: 'X', registerAccelerator: false, click: vista({ orden: 'punto', modo: 'x' }) },
+            { label: 'Desde el eje Y', accelerator: 'Y', registerAccelerator: false, click: vista({ orden: 'punto', modo: 'y' }) },
+            { label: 'Desde el eje Z (planta)', accelerator: 'Z', registerAccelerator: false, click: vista({ orden: 'punto', modo: 'z' }) },
+            { label: 'Isométrica', click: vista({ orden: 'punto', modo: 'iso' }) },
+            { type: 'separator' },
+            casilla('Proyección ortográfica', 'ortografica', { accelerator: 'Shift+CmdOrCtrl+O', enabled: es3D }),
+          ],
+        },
+        { label: 'Encuadrar todo', accelerator: 'CmdOrCtrl+0', enabled: lienzo, click: vista({ orden: 'encuadrar' }) },
+        { label: 'Acercar', accelerator: 'CmdOrCtrl+Plus', enabled: lienzo, click: vista({ orden: 'acercar', factor: 0.8 }) },
+        { label: 'Alejar', accelerator: 'CmdOrCtrl+-', enabled: lienzo, click: vista({ orden: 'acercar', factor: 1.25 }) },
+        { type: 'separator' },
+        {
+          label: 'Superposiciones',
+          submenu: [
+            casilla('Ejes', 'ejes'),
+            casilla('Nombres de los ejes', 'nombres'),
+            casilla('Rejilla', 'rejilla'),
+            casilla('Rejilla en los tres planos (XY, XZ, YZ)', 'planos', { enabled: es3D }),
+            { type: 'separator' },
+            casilla('Leyenda', 'leyenda'),
+            casilla('Fórmula', 'formula'),
+            casilla('Lecturas', 'lecturas'),
+          ],
+        },
+        casilla('Ajustar a la rejilla', 'ajustar', { accelerator: "Shift+CmdOrCtrl+'" }),
+        {
+          label: 'Paso de la rejilla',
+          submenu: [0.1, 0.25, 0.5, 1].map((v) => ({
+            label: String(v).replace('.', ','),
+            type: 'radio',
+            checked: p.paso === v,
+            enabled: hay,
+            click: prefs({ paso: v }),
+          })),
+        },
+        { type: 'separator' },
+        {
+          label: 'Comparar A y B',
+          submenu: [
+            { label: 'Activar', type: 'checkbox', accelerator: 'Alt+CmdOrCtrl+D', checked: !!e.comparar, enabled: hay, click: alFoco('comparar') },
+            { type: 'separator' },
+            { label: 'Lado a lado', type: 'radio', checked: e.disposicion !== 'encima', enabled: hay, click: alFoco('cmp', { disposicion: 'lado' }) },
+            { label: 'Superpuestos', type: 'radio', checked: e.disposicion === 'encima', enabled: hay, click: alFoco('cmp', { disposicion: 'encima' }) },
+            { label: 'Cámaras enlazadas', type: 'checkbox', checked: !!e.enlazar, enabled: hay, click: (item) => enviar(BrowserWindow.getFocusedWindow(), 'cmp', { enlazar: item.checked }) },
+            { type: 'separator' },
+            { label: 'Copiar A en B', enabled: hay && e.comparar && e.mismoModulo, click: alFoco('cmp', 'copiarAenB') },
+          ],
+        },
         // sin atajo en el menú: la barra espaciadora ya lo hace y robarla rompería los campos de texto
-        { label: 'Autogiro (espacio)', type: 'checkbox', checked: !!e.giro, enabled: hayVentana && e.es3D, click: alFoco('giro') },
+        { label: 'Autogiro (espacio)', type: 'checkbox', checked: !!e.giro, enabled: hay && e.es3D, click: alFoco('giro') },
         { type: 'separator' },
-        { role: 'resetZoom', label: 'Tamaño real' },
-        { role: 'zoomIn', label: 'Ampliar' },
-        { role: 'zoomOut', label: 'Reducir' },
-        { type: 'separator' },
+        casilla('Modo presentación', 'presentacion', { accelerator: 'CmdOrCtrl+\\' }),
+        {
+          label: 'Tema',
+          submenu: [
+            ['sistema', 'Como el sistema'],
+            ['claro', 'Claro'],
+            ['oscuro', 'Oscuro'],
+          ].map(([v, t]) => ({ label: t, type: 'radio', checked: (p.tema ?? 'sistema') === v, enabled: hay, click: prefs({ tema: v }) })),
+        },
         { role: 'togglefullscreen', label: 'Pantalla completa' },
         { type: 'separator' },
-        // ⌘R es girar la figura seleccionada en los lienzos 3D: recargar pasa a ⌥⌘R
-        { role: 'reload', label: 'Recargar', accelerator: 'Alt+CmdOrCtrl+R' },
-        { role: 'toggleDevTools', label: 'Herramientas de desarrollo' },
+        {
+          label: 'Tamaño de la interfaz',
+          submenu: [
+            { role: 'resetZoom', label: 'Tamaño real', accelerator: 'Alt+CmdOrCtrl+0' },
+            { role: 'zoomIn', label: 'Más grande', accelerator: 'Alt+CmdOrCtrl+Plus' },
+            { role: 'zoomOut', label: 'Más pequeña', accelerator: 'Alt+CmdOrCtrl+-' },
+          ],
+        },
+        {
+          label: 'Desarrollo',
+          submenu: [
+            // ⌘R es girar la figura seleccionada en los lienzos 3D: recargar pasa a ⌥⌘R
+            { role: 'reload', label: 'Recargar', accelerator: 'Alt+CmdOrCtrl+R' },
+            { role: 'toggleDevTools', label: 'Herramientas de desarrollo' },
+          ],
+        },
       ],
     },
-    { role: 'windowMenu', label: 'Ventana' },
+    {
+      role: 'windowMenu',
+      label: 'Ventana',
+    },
     {
       role: 'help',
       label: 'Ayuda',
-      submenu: [{ label: 'Guía de la calculadora (README)', click: () => shell.openPath(path.join(__dirname, '..', 'README.md').replace('app.asar', 'app.asar.unpacked')) }],
+      submenu: [
+        { label: 'Atajos de teclado', accelerator: 'CmdOrCtrl+/', enabled: hay, click: alFoco('atajos') },
+        { label: 'Guía de la calculadora (README)', click: () => shell.openPath(path.join(__dirname, '..', 'README.md').replace('app.asar', 'app.asar.unpacked')) },
+      ],
     },
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(plantilla))
+}
+
+async function volverALoGuardado(win) {
+  const v = win && ventanas.get(win.id)
+  if (!v?.ruta) return
+  const r = dialog.showMessageBoxSync(win, {
+    type: 'warning',
+    message: `¿Volver a la versión guardada de «${path.basename(v.ruta)}»?`,
+    detail: 'Se pierden los cambios desde la última vez que guardaste.',
+    buttons: ['Volver', 'Cancelar'],
+    defaultId: 0,
+    cancelId: 1,
+  })
+  if (r !== 0) return
+  const documento = await leerDocumento(v.ruta)
+  if (documento) {
+    enviar(win, 'abrir', documento.datos)
+    win.setDocumentEdited(false)
+  }
+}
+
+async function exportarPDF(win) {
+  if (!win) return
+  const v = ventanas.get(win.id)
+  const r = await dialog.showSaveDialog(win, {
+    defaultPath: `${v?.ruta ? path.basename(v.ruta, path.extname(v.ruta)) : `calculadora-${v?.estado?.id ?? 'modulo'}`}.pdf`,
+    filters: [{ name: 'PDF', extensions: ['pdf'] }],
+  })
+  if (r.canceled || !r.filePath) return
+  const pdf = await win.webContents.printToPDF({ landscape: true, printBackground: true, pageSize: 'A4' })
+  await fs.writeFile(r.filePath, pdf)
 }
 
 ipcMain.handle('listo', (ev, lista) => {

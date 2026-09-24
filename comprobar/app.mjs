@@ -1,6 +1,6 @@
 /**
  * Recorre la app de Mac de verdad (Electron sobre `dist/`), no la web:
- *  1. el menú Módulo tiene una entrada por cada módulo de la paleta, con su área;
+ *  1. el menú Módulo tiene un submenú por área y, entre todos, una entrada por módulo de la paleta;
  *  2. cada entrada del menú abre su módulo sin errores de consola ni avisos de React;
  *  3. un documento .calc guardado desde el menú y reabierto devuelve los mismos estados;
  *  4. las órdenes de exportar PNG y CSV del menú escriben un fichero.
@@ -78,10 +78,14 @@ async function pulsar(ruta) {
 // 1. menú frente a paleta
 const menu = await app.evaluate(({ Menu }) => {
   const m = Menu.getApplicationMenu().items.find((i) => i.label === 'Módulo')
-  const out = { modulos: [], areas: [] }
+  const out = { modulos: [], rutas: [], areas: [] }
   for (const i of m.submenu.items) {
-    if (i.type === 'radio') out.modulos.push(i.label)
-    else if (i.type === 'normal' && !i.enabled) out.areas.push(i.label)
+    if (i.type !== 'submenu' || i.label === 'Ir al área') continue
+    out.areas.push(i.label)
+    i.submenu.items.filter((j) => j.type === 'radio').forEach((j, k) => {
+      out.modulos.push(j.label)
+      out.rutas.push(['Módulo', i.label, k])
+    })
   }
   const ir = m.submenu.items.find((i) => i.label === 'Ir al área')
   out.irAlArea = ir.submenu.items.map((i) => i.label)
@@ -102,7 +106,7 @@ const visitados = []
 for (let i = 0; i < menu.modulos.length; i++) {
   if (SOLO && !SOLO.has(paleta[i])) continue
   const antes = errores.length
-  const fallo = await pulsar(['Módulo', i])
+  const fallo = await pulsar(menu.rutas[i])
   if (fallo) errores.push(`[menú] ${fallo}`)
   await win.waitForTimeout(1400)
   const id = await idActual()
@@ -142,14 +146,47 @@ else {
 }
 
 // 4. exportar desde el menú
-await pulsar(['Módulo', paleta.indexOf('grafica')])
+await pulsar(menu.rutas[paleta.indexOf('grafica')])
 await win.waitForTimeout(1000)
-await pulsar(['Archivo', 'Exportar imagen PNG…'])
-await pulsar(['Archivo', 'Exportar lecturas CSV…'])
+await pulsar(['Archivo', 'Exportar', 'Imagen PNG…'])
+await pulsar(['Archivo', 'Exportar', 'Lecturas (CSV)…'])
 await win.waitForTimeout(1500)
 const bajados = readdirSync(tmp)
 if (!bajados.some((f) => f.endsWith('.png'))) errores.push('[exportar] no se escribió el PNG')
 if (!bajados.some((f) => f.endsWith('.csv'))) errores.push('[exportar] no se escribió el CSV')
+
+// 5. Vista y Edición: una casilla de superposición y deshacer/rehacer
+const prefs = () => win.evaluate(() => JSON.parse(localStorage.getItem('calculadora:vista') ?? '{}'))
+await pulsar(['Vista', 'Superposiciones', 'Ejes'])
+await win.waitForTimeout(400)
+if ((await prefs()).ejes !== false) errores.push('[vista] «Superposiciones ▸ Ejes» no quita los ejes')
+await pulsar(['Vista', 'Superposiciones', 'Ejes'])
+await win.waitForTimeout(400)
+if ((await prefs()).ejes !== true) errores.push('[vista] «Superposiciones ▸ Ejes» no los vuelve a poner')
+await pulsar(menu.rutas[paleta.indexOf('aplicaciones')])
+await win.waitForTimeout(1200)
+const estadoDe = (id) => win.evaluate((id) => JSON.parse(localStorage.getItem('calculadora:estado') ?? '{}').estados?.[id], id)
+const antesT = (await estadoDe('aplicaciones'))?.t
+await pulsar(['Edición', 'Restablecer el módulo'])
+await win.evaluate(() => {
+  const r = document.querySelector('input[type="range"]')
+  if (r) {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    set.call(r, '0.3')
+    r.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+  document.activeElement?.blur?.()
+})
+await win.waitForTimeout(700)
+const cambiado = (await estadoDe('aplicaciones'))?.t
+await pulsar(['Edición', 'Deshacer'])
+await win.waitForTimeout(500)
+const deshecho = (await estadoDe('aplicaciones'))?.t
+await pulsar(['Edición', 'Rehacer'])
+await win.waitForTimeout(500)
+const rehecho = (await estadoDe('aplicaciones'))?.t
+if (!(cambiado !== deshecho && rehecho === cambiado)) errores.push(`[edición] deshacer/rehacer: ${antesT} → ${cambiado} → ${deshecho} → ${rehecho}`)
+else console.log(`edición: deshacer ${cambiado} → ${deshecho}, rehacer → ${rehecho}`)
 
 // app.close() se quedaría esperando el «¿guardar cambios?» del documento abierto: se sale sin preguntar
 await app.evaluate(({ app }) => setTimeout(() => app.exit(0), 50)).catch(() => {})
