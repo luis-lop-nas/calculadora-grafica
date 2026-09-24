@@ -7,6 +7,7 @@ import { resolverLineal } from '../../lib/matrices'
 import lagrangiano, { PRESETS, calcular, type EstadoLagrangiano } from '../../modulos/mecanica/lagrangiano'
 import orbitas, { areaBarrida, campoCentral, elementos, estadoInicial, hohmann, invariantes, periapsides, trayectoria, type EstadoOrbitas } from '../../modulos/mecanica/orbitas'
 import { dormandPrince } from '../../lib/numerico'
+import { boost, componer, doppler, gamma, gemelos, intervalo, rapidez, type Suceso } from '../../lib/relatividad'
 import oscilaciones, { amplitudForzada, desfase, evolucion, forzadoExacto, modos, type EstadoOsc, type Modos } from '../../modulos/mecanica/oscilaciones'
 import { cerca, cierto, parecido, seccion } from './comun'
 
@@ -310,5 +311,49 @@ export function pruebasMecanica() {
     parecido('trompo rápido: precesión lenta ≈ mgl/(I₃ω₃)', precesionUniforme({ ...p, w3: 400 })!, p.mgl / (p.ic * 400), 1e-4)
     const R = rotacionEuler(0.7, 1.2, -0.4)
     cierto('rotación z-x-z: tercera columna = (sin θ sin φ, −sin θ cos φ, cos θ)', Math.abs(R[0][2] - Math.sin(0.7) * Math.sin(1.2)) < 1e-15 && Math.abs(R[1][2] + Math.sin(0.7) * Math.cos(1.2)) < 1e-15 && Math.abs(R[2][2] - Math.cos(0.7)) < 1e-15)
+  }
+
+  seccion('Mecánica · relatividad especial')
+  {
+    const b = 0.63
+    const g = gamma(b)
+    const sucesos: Suceso[] = [[1.7, -0.4], [0.3, 2.9], [-1.2, 0.8], [2.6, 2.1]]
+    for (let i = 0; i < 3; i++) cerca(`intervalo invariante (${i + 1}–${i + 2})`, intervalo(boost(b, sucesos[i]), boost(b, sucesos[i + 1])), intervalo(sucesos[i], sucesos[i + 1]), 1e-12)
+    const ida = boost(-b, boost(b, sucesos[1]))
+    cierto('boost(−β) ∘ boost(β) = identidad', Math.abs(ida[0] - sucesos[1][0]) < 1e-13 && Math.abs(ida[1] - sucesos[1][1]) < 1e-13)
+    // un reloj quieto en S′ en x′ = 0 marca t′ = 1 cuando en S han pasado γ
+    cerca('dilatación: (t′ = 1, x′ = 0) es t = γ en S', boost(-b, [1, 0])[0], g, 1e-13)
+    // dos boosts seguidos = uno con la velocidad compuesta, y las rapideces se suman
+    const b2 = -0.41
+    const dos = boost(b2, boost(b, sucesos[3]))
+    const uno = boost(componer(b, b2), sucesos[3])
+    cierto('boost(β₂)∘boost(β₁) = boost((β₁ + β₂)/(1 + β₁β₂))', Math.abs(dos[0] - uno[0]) < 1e-12 && Math.abs(dos[1] - uno[1]) < 1e-12)
+    cerca('las rapideces se suman', rapidez(componer(b, b2)), rapidez(b) + rapidez(b2), 1e-13)
+    cerca('componer con la luz da la luz', componer(0.999999, 0.9), 1, 1e-6)
+    // simultaneidad: sucesos con igual t′ cumplen Δt = β Δx en S
+    const p1 = boost(-b, [0.8, -1.3])
+    const p2 = boost(-b, [0.8, 2.2])
+    cerca('simultáneos en S′: Δt = β Δx en S', p2[0] - p1[0], b * (p2[1] - p1[1]), 1e-13)
+    // contracción: los extremos de una varilla quieta en S′ (x′ = 0 y x′ = L₀) cortados por t = 0
+    const L0 = 1.9
+    const corte = (xp: number) => {
+      const q = boost(-b, [0, xp])
+      const r = boost(-b, [3, xp])
+      return q[1] - (q[0] * (r[1] - q[1])) / (r[0] - q[0])
+    }
+    cerca('contracción: medida a t = 0 en S, L = L₀/γ', corte(L0) - corte(0), L0 / g, 1e-12)
+    // gemelos: tiempo propio del viajero sumando los dos tramos, Doppler y salto de simultaneidad
+    const L = 3.4
+    const gm = gemelos(b, L)
+    const giro: Suceso = [gm.T / 2, L]
+    const tauTramos = Math.sqrt(intervalo([0, 0], giro)) + Math.sqrt(intervalo(giro, [gm.T, 0]))
+    cerca('gemelos: τ = suma de tiempos propios de los tramos', gm.tau, tauTramos, 1e-12)
+    const D = doppler(b)
+    cerca('gemelos: T = (τ/2)(D + 1/D) contando señales Doppler', (gm.tau / 2) * (D + 1 / D), gm.T, 1e-12)
+    // en el sistema de ida, el suceso de casa simultáneo al giro tiene el mismo t′
+    const tGiroIda = boost(b, giro)[0]
+    cerca('gemelos: casa simultánea al giro (ida) = T/2 − βL', tGiroIda / g, gm.antes, 1e-12)
+    const tGiroVuelta = boost(-b, giro)[0]
+    cerca('gemelos: casa simultánea al giro (vuelta) = T/2 + βL', tGiroVuelta / g, gm.despues, 1e-12)
   }
 }

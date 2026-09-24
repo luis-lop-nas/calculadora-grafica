@@ -134,6 +134,13 @@ propiedad de la media en Laplace y una sonda de |ψ|² en los orbitales.
 - Circuitos RLC — serie y paralelo: transitorio exacto en los tres regímenes, fasores girando, impedancia, potencia y curva de resonancia.
 - Filtros digitales — media móvil, IIR, resonador, peine, Butterworth (bilineal) o coeficientes propios: plano z, |H(e^{iω})| y h[n].
 
+**Mecánica**
+- Tu lagrangiano — escribe L(q, q̇) con `q'` para las velocidades: ecuaciones de Euler–Lagrange y de Hamilton, animación, fases, energía y sección de Poincaré. Presets: péndulo, doble péndulo, elástico, carro y péndulo, Atwood, cono, oscilador.
+- Órbitas — potencial −μ/r (+ ε/r³ para la precesión), elementos orbitales, áreas iguales y transferencia de Hohmann.
+- Oscilaciones — cadena de N masas o M y K escritas: modos normales (problema generalizado), superposición y dispersión; oscilador forzado amortiguado con amplitud, fase y transitorio exacto.
+- Sólido rígido — tensor de inercia de piezas (`caja m=1 a=… b=… c=… en (x, y, z)`, cilindro, esfera, cáscara, varilla, cono, punto) con Steiner, ejes principales y elipsoide; rotación libre de Euler (raqueta, periodo 4K(k)/λ); peonza pesada con nutación entre las raíces de la cúbica y precesión uniforme.
+- Relatividad especial — diagrama de Minkowski con sucesos y el eje t′ arrastrables, intervalos, simultaneidad, gemelos (con Doppler), contracción y composición de velocidades.
+
 ## Cómo añadir un módulo
 
 Un módulo es un fichero que exporta `definir<S>({...})`:
@@ -179,6 +186,10 @@ dependen del tiempo.
 - `src/lib/senales.ts` — saltos de una función, integrales partidas en ellos, coeficientes de Fourier y transformada continua.
 - `src/lib/control.ts` — respuesta temporal, Bode, márgenes, Nyquist, lugar de las raíces y Routh.
 - `src/lib/cas/laplace.ts` — Laplace directa, inversa y EDO lineales, con su comprobación numérica.
+- `src/lib/cas/compilar.ts` — pasa una expresión del CAS a un cierre numérico rápido.
+- `src/lib/mecanica.ts` — de un lagrangiano a sus ecuaciones (simbólicas) y su integración (Dormand–Prince).
+- `src/lib/solido.ts` — tensor de inercia, rotación libre con orientación y peonza simétrica.
+- `src/lib/relatividad.ts` — boosts de Lorentz, intervalo, composición de velocidades, gemelos.
 - `src/lib/expresion.ts` — evaluador de expresiones sin `eval`: descenso recursivo a un árbol
   público (`analizar`, `Nodo`) que se compila a cierres; `aLatex` para la vista previa y `compilarC`
   para evaluar la misma expresión sobre los complejos (con `i`).
@@ -190,7 +201,7 @@ dependen del tiempo.
 - `src/lib/objetos2d.ts` — qué es cada fila de Gráficas, deslizadores y puntos notables (raíces,
   extremos, inflexiones, asíntotas, cortes).
   Pruebas: `npm run pruebas`.
-- `src/lib/numerico.ts` — Euler, RK2, RK4 y trayectorias.
+- `src/lib/numerico.ts` — Euler, RK2, RK4, Dormand–Prince 5(4) con interpolación de Hermite y trayectorias.
 - `src/lib/matrices.ts` — rref, rango, núcleo, autovalores (Jacobi, generalizado, tridiagonal), raíces de polinomios, mínimos cuadrados por QR, Gram-Schmidt, clasificación de equilibrios.
 - `src/lib/contorno.ts` — marching squares, equilibrios y jacobiano numérico.
 - `src/lib/mallado.ts` — rejilla volumétrica, marching tetrahedra y nube por |ψ|².
