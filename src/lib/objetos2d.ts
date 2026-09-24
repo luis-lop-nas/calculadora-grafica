@@ -413,12 +413,14 @@ export function ceros(f: F1, a: number, b: number, n = 600) {
   }
   let prev = f(a)
   if (prev === 0) guarda(a)
+  // una meseta que empieza antes de a no es una raíz nueva en cada muestra
   for (let i = 1; i <= n; i++) {
     const x = a + ((b - a) * i) / n
     const v = f(x)
     // una muestra que cae justo en el cero no cambia de signo: hay que mirarla aparte
     if (v === 0) {
-      guarda(x)
+      // una meseta de ceros (floor x en [0, 1)) cuenta una vez, por donde empieza
+      if (prev !== 0) guarda(x)
       prev = v
       continue
     }
@@ -439,20 +441,53 @@ export function ceros(f: F1, a: number, b: number, n = 600) {
   return out.sort((x, y) => x - y)
 }
 
-export const extremos = (f: F1, a: number, b: number) =>
-  ceros((x) => derivada(f, x), a, b, 800).map((x) => ({ x, y: f(x), tipo: segunda(f, x) > 0 ? 'mín' : 'máx' }))
+/** f en x, o su valor límite si x es un punto evitable (sin x / x en 0). */
+export function valorOLimite(f: F1, x: number): number {
+  const v = f(x)
+  if (Number.isFinite(v)) return v
+  const h = 1e-6 * Math.max(1, Math.abs(x))
+  const [i, d] = [f(x - h), f(x + h)]
+  return Number.isFinite(i) && Number.isFinite(d) && Math.abs(i - d) < 1e-4 * Math.max(1, Math.abs(d)) ? (i + d) / 2 : NaN
+}
 
-export const inflexiones = (f: F1, a: number, b: number) =>
-  ceros((x) => segunda(f, x), a, b, 800)
-    .filter((x) => Math.abs(derivada((t) => segunda(f, t), x, 1e-3)) > 1e-6)
-    .map((x) => ({ x, y: f(x) }))
+/** Cambio de signo de verdad a los dos lados de x, por encima del ruido de las diferencias finitas. */
+function cambiaDeSigno(g: F1, x: number, paso: number, ruido: number) {
+  const [i, d] = [g(x - paso), g(x + paso)]
+  return Number.isFinite(i) && Number.isFinite(d) && i * d < 0 && Math.abs(i) > ruido && Math.abs(d) > ruido
+}
+
+export const extremos = (f: F1, a: number, b: number) => {
+  const paso = (b - a) / 1600
+  return ceros((x) => derivada(f, x), a, b, 800)
+    .filter((x) => cambiaDeSigno((t) => derivada(f, t), x, paso, 1e-9))
+    .map((x) => {
+      const i = derivada(f, x - paso)
+      return { x, y: valorOLimite(f, x), tipo: i < 0 ? 'mín' : 'máx' }
+    })
+}
+
+export const inflexiones = (f: F1, a: number, b: number) => {
+  const paso = (b - a) / 1600
+  // f″ por diferencias finitas tiene ruido ~ ε|f|/h²: por debajo de eso no hay curvatura que valga
+  return ceros((x) => segunda(f, x), a, b, 800)
+    .filter((x) => cambiaDeSigno((t) => segunda(f, t), x, paso, 1e-6 * (1 + Math.abs(f(x)))))
+    .map((x) => ({ x, y: valorOLimite(f, x) }))
+}
 
 export const cortes = (f: F1, g: F1, a: number, b: number) => ceros((x) => f(x) - g(x), a, b).map((x) => ({ x, y: f(x) }))
 
 export interface Asintotas {
   verticales: number[]
-  /** y = m·x + b hacia +∞ o −∞ (m = 0: horizontal). */
-  oblicuas: Array<{ m: number; b: number; lado: '+' | '-' }>
+  /** y = m·x + b hacia +∞, −∞ o los dos (m = 0: horizontal). */
+  oblicuas: Array<{ m: number; b: number; lado: '+' | '-' | '±' }>
+}
+
+/** |f| crece sin cota al acercarse a x por el lado `signo` (también despacio, como ln). */
+function explota(f: F1, x: number, signo: 1 | -1): boolean {
+  const esc = Math.max(1, Math.abs(x))
+  const v = [1e-4, 1e-8, 1e-12].map((d) => Math.abs(f(x + signo * d * esc)))
+  if (v.some((w) => w === Infinity)) return true
+  return v.every(Number.isFinite) && v[1] > 1.3 * v[0] && v[2] > 1.3 * v[1] && v[2] > 10
 }
 
 const redondea = (v: number) => (Math.abs(v - Math.round(v)) < 1e-7 ? Math.round(v) : +v.toFixed(8))
@@ -480,9 +515,26 @@ export function asintotas(f: F1, a: number, b: number): Asintotas {
     }
     const x = (lo + hi) / 2
     const cerca = Math.min(Math.abs(inv(x)), Math.abs(inv(lo)), Math.abs(inv(hi)))
-    if ((cerca < 1e-7 || !Number.isFinite(f(x))) && Math.abs(f(x - 1e-4)) > 1e3 && !verticales.some((v) => Math.abs(v - x) < 2 * h))
-      verticales.push(redondea(x))
+    const polo = (cerca < 1e-7 || !Number.isFinite(f(x))) && Math.abs(f(x - 1e-4)) > 1e3
+    // ln|x| en 0: |1/f| baja muy despacio, pero |f| sigue creciendo
+    const lento = explota(f, x, 1) || explota(f, x, -1)
+    if ((polo || lento) && !verticales.some((v) => Math.abs(v - x) < 2 * h)) verticales.push(redondea(x))
   }
+  // en el borde del dominio (ln x, 1/√x en 0): donde f pasa de no estar definida a estarlo
+  for (let i = 1; i <= n; i++) {
+    const [x0, x1] = [a + (i - 1) * h, a + i * h]
+    const [d0, d1] = [Number.isFinite(f(x0)), Number.isFinite(f(x1))]
+    if (d0 === d1) continue
+    let [lo, hi] = [x0, x1]
+    for (let k = 0; k < 70; k++) {
+      const m = (lo + hi) / 2
+      if (Number.isFinite(f(m)) === d0) lo = m
+      else hi = m
+    }
+    const borde = redondea(d0 ? lo : hi)
+    if (explota(f, borde, d0 ? -1 : 1) && !verticales.some((v) => Math.abs(v - borde) < 2 * h)) verticales.push(borde)
+  }
+  verticales.sort((p, q) => p - q)
 
   // oblicuas y horizontales: pendiente y ordenada estables muy lejos
   const oblicuas: Asintotas['oblicuas'] = []
@@ -500,8 +552,14 @@ export function asintotas(f: F1, a: number, b: number): Asintotas {
     if (Math.abs(b1 - b2) > 1e-2 * Math.max(1, Math.abs(b2))) continue
     // Richardson: si b(x) = b∞ + c/x, dos muestras bastan para quitar el término c/x
     const b = (xs[2] * b2 - xs[1] * b1) / (xs[2] - xs[1])
-    const asin = { m, b: redondea(b), lado: s > 0 ? ('+' as const) : ('-' as const) }
-    if (!oblicuas.some((o) => Math.abs(o.m - asin.m) < 1e-6 && Math.abs(o.b - asin.b) < 1e-4)) oblicuas.push(asin)
+    // si f es esa misma recta (|x|, x + 2 con un hueco), no es una asíntota: es la función
+    // (se mira más cerca: muy lejos eˣ ya es 0 en coma flotante y parecería la recta misma)
+    const cerca = [10, 20, 50].map((x) => s * x)
+    if (cerca.every((x) => Math.abs(f(x) - (m * x + b)) <= 1e-12 * Math.max(Math.abs(f(x)), Math.abs(m * x + b)))) continue
+    const asin = { m, b: redondea(b), lado: s > 0 ? ('+' as '+' | '-' | '±') : ('-' as '+' | '-' | '±') }
+    const igual = oblicuas.find((o) => Math.abs(o.m - asin.m) < 1e-6 && Math.abs(o.b - asin.b) < 1e-4)
+    if (igual) igual.lado = '±'
+    else oblicuas.push(asin)
   }
   return { verticales, oblicuas }
 }

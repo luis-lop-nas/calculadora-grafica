@@ -4,7 +4,7 @@ import { Atajos, Boton, Expresion, Grupo, Interruptor, Muestra, Rango, Segmentad
 import type { Pintor2D } from '../../render/pintor2d'
 import { contorno, encadenar } from '../../lib/contorno'
 import {
-  analizarFilas, asintotas, ceros, cortes, derivada, extremos, inflexiones, integral, nombrePunto, segunda,
+  analizarFilas, asintotas, ceros, cortes, derivada, extremos, inflexiones, integral, nombrePunto, segunda, valorOLimite,
   type Analisis, type Condicion, type Fila, type Objeto, type Param,
 } from '../../lib/objetos2d'
 
@@ -657,7 +657,8 @@ function lecturas(s: S): Array<[string, string]> {
     const r = ceros(f, ...LECTURA)
     filas.push([`Raíces en [−12, 12]`, `${r.length}`])
     r.slice(0, 4).forEach((x, k) => filas.push([`x${sub(k + 1)}`, x.toFixed(6)]))
-    filas.push(['Corte con el eje y', fmt(f(0), 6)])
+    const y0 = valorOLimite(f, 0)
+    filas.push(['Corte con el eje y', Number.isFinite(f(0)) ? fmt(y0, 6) : Number.isFinite(y0) ? `ninguno (f(0) no existe; el límite es ${fmt(y0, 6)})` : '—'])
   }
   if (s.verExtremos) {
     const e = extremos(f, ...LECTURA)
@@ -675,7 +676,9 @@ function lecturas(s: S): Array<[string, string]> {
     as.oblicuas.forEach((a) =>
       filas.push([
         `Asíntota en ${a.lado}∞`,
-        a.m === 0 ? `y = ${fmt(a.b, 4)}` : `y = ${fmt(a.m, 4)}x ${a.b < 0 ? '−' : '+'} ${fmt(Math.abs(a.b), 4)}`,
+        a.m === 0
+          ? `y = ${fmt(a.b, 4)}`
+          : `y = ${a.m === 1 ? '' : a.m === -1 ? '−' : fmt(a.m, 4)}x${a.b === 0 ? '' : ` ${a.b < 0 ? '−' : '+'} ${fmt(Math.abs(a.b), 4)}`}`,
       ]),
     )
     if (!as.verticales.length && !as.oblicuas.length) filas.push(['Asíntotas', 'ninguna'])

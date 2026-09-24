@@ -1269,6 +1269,18 @@ seccion('Gráficas: qué es cada fila y sus puntos notables')
   cierto('sin x: sin asíntotas', as4.verticales.length === 0 && as4.oblicuas.length === 0, JSON.stringify(as4))
   const as5 = asintotas(Math.exp, -6, 6)
   cierto('eˣ: horizontal y = 0 solo hacia −∞', as5.oblicuas.length === 1 && as5.oblicuas[0].lado === '-' && as5.oblicuas[0].b === 0, JSON.stringify(as5.oblicuas))
+  // lo que la revisión encontró mal
+  cierto('ln x: asíntota vertical en el borde del dominio', asintotas(Math.log, -12, 12).verticales.join() === '0', asintotas(Math.log, -12, 12).verticales.join())
+  cierto('ln|x|: asíntota vertical aunque |1/f| baje despacio', asintotas((x) => Math.log(Math.abs(x)), -12, 12).verticales.join() === '0')
+  cierto('|x| no tiene asíntota: la recta y = x es la propia función', asintotas(Math.abs, -12, 12).oblicuas.length === 0)
+  cierto('(x² − 4)/(x − 2) = x + 2 con un hueco: sin asíntotas', asintotas((x) => (x * x - 4) / (x - 2), -12, 12).oblicuas.length === 0)
+  const as6 = asintotas((x) => Math.exp(-x * x), -12, 12)
+  cierto('e^(−x²): y = 0 hacia los dos lados en una sola asíntota', as6.oblicuas.length === 1 && as6.oblicuas[0].lado === '±', JSON.stringify(as6.oblicuas))
+  cierto('(x² − 4)/(x − 2): sin inflexiones de ruido', inflexiones((x) => (x * x - 4) / (x - 2), -12, 12).length === 0)
+  cierto('floor x: ni una raíz por muestra ni extremos', ceros(Math.floor, -12, 12).length === 1 && extremos(Math.floor, -12, 12).length === 0)
+  const sx = extremos((x) => Math.sin(x) / x, -1, 1)
+  cierto('sin x / x: el máximo en 0 lleva su valor límite 1', sx.length === 1 && Math.abs(sx[0].y - 1) < 1e-9, JSON.stringify(sx))
+  cierto('x³: punto crítico sin cambio de signo no es extremo', extremos((x) => x ** 3, -2, 2).length === 0)
 }
 
 
