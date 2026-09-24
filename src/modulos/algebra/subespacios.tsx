@@ -1,6 +1,6 @@
 import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
 import { Boton, Grupo, Interruptor, Matriz, Muestra, Nota } from '../../nucleo/controles'
-import { cruz, gramSchmidt, norma, nucleo, producto, proyectar, rango } from '../../lib/matrices'
+import { cruz, det, gramSchmidt, norma, nucleo, producto, proyectar, rango } from '../../lib/matrices'
 
 interface S {
   V: number[][] // dos generadores y el vector a proyectar
@@ -11,6 +11,39 @@ interface S {
   verResiduo: boolean
   /** Puntos sueltos que se proyectan sobre W: se ponen con doble clic. */
   P: number[][]
+  /** Ejes x′, y′, z′ (filas, en coordenadas del mundo): el panel da las coordenadas en esta base. */
+  B?: number[][]
+}
+
+const I3 = () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+const baseDe = (s: S) => s.B ?? I3()
+const esCanonica = (s: S) => !s.B || s.B.every((f, i) => f.every((v, j) => Math.abs(v - (i === j ? 1 : 0)) < 1e-9))
+/** Largo de los ejes dibujados: su punta es el asa que los mueve. */
+const LARGO = 1.6
+const r3 = (x: number) => Math.round(x * 1000) / 1000
+
+/** Coordenadas de v en la base B: v = c₁b₁ + c₂b₂ + c₃b₃, o sea Bᵀc = v (Cramer). */
+function enBase(B: number[][], v: number[]): number[] {
+  const M = [0, 1, 2].map((i) => [B[0][i], B[1][i], B[2][i]])
+  const d = det(M)
+  if (Math.abs(d) < 1e-9) return v.slice()
+  // a dos decimales: es lo que cabe en la celda
+  return [0, 1, 2].map((k) => Math.round((det(M.map((f, i) => f.map((x, j) => (j === k ? v[i] : x)))) / d) * 100) / 100)
+}
+const delaBase = (B: number[][], c: number[]) => [0, 1, 2].map((i) => c[0] * B[0][i] + c[1] * B[1][i] + c[2] * B[2][i])
+
+/**
+ * Las filas se enseñan en la base de los ejes; al editar, solo se recalculan las que cambian,
+ * para que el redondeo de las demás no las mueva.
+ */
+function enEjes(s: S, A: number[][], poner: (A: number[][]) => void) {
+  const B = baseDe(s)
+  const vistas = A.map((v) => enBase(B, v))
+  return {
+    A: vistas,
+    onChange: (N: number[][]) =>
+      poner(N.map((c, i) => (i < vistas.length && c.every((x, j) => x === vistas[i][j]) ? A[i] : delaBase(B, c).map(r3)))),
+  }
 }
 
 function piezasDe(V: number[][]) {
@@ -46,12 +79,12 @@ export function sumaEInterseccion(G1: number[][], G2: number[][]) {
 
 function Panel({ s, set }: PropsPanel<S>) {
   const { dim } = piezas(s)
+  const canonica = esCanonica(s)
   return (
     <>
       <Grupo titulo="Vectores">
         <Matriz
-          A={s.V}
-          onChange={(V: number[][]) => set({ V })}
+          {...enEjes(s, s.V, (V) => set({ V }))}
           paso={0.1}
           filas={[
             { nombre: 'v₁', color: 'var(--accent)' },
@@ -62,6 +95,28 @@ function Panel({ s, set }: PropsPanel<S>) {
         <Nota>
           v₁ y v₂ generan el subespacio W; w es el que se proyecta. Ahora W es{' '}
           <b>{dim === 2 ? 'un plano' : dim === 1 ? 'una recta' : 'solo el origen'}</b> (dim {dim}).
+          {!canonica && ' Las coordenadas están en la base de los ejes x′, y′, z′.'}
+        </Nota>
+      </Grupo>
+
+      <Grupo titulo="Ejes (cambio de base)">
+        <Matriz
+          A={baseDe(s)}
+          onChange={(B: number[][]) => {
+            if (Math.abs(det(B)) > 0.05) set({ B })
+          }}
+          paso={0.1}
+          filas={[{ nombre: 'x′' }, { nombre: 'y′' }, { nombre: 'z′' }]}
+        />
+        {!canonica && (
+          <div className="interruptores">
+            <Boton onClick={() => set({ B: undefined })}>Volver a x, y, z</Boton>
+          </div>
+        )}
+        <Nota>
+          Arrastra la punta de un eje para girarlo o estirarlo. Los vectores no se mueven: cambian sus
+          coordenadas, que pasan a ser las de la base nueva (Bᵀ·c = v). Si los ejes quedan casi en un plano,
+          no se deja: dejarían de ser base.
         </Nota>
       </Grupo>
 
@@ -69,8 +124,7 @@ function Panel({ s, set }: PropsPanel<S>) {
         {s.P.length ? (
           <>
             <Matriz
-              A={s.P}
-              onChange={(P: number[][]) => set({ P })}
+              {...enEjes(s, s.P, (P) => set({ P }))}
               paso={0.1}
               filas={s.P.map((_, i) => ({ nombre: `q${sub(i + 1)}`, color: 'var(--pos)' }))}
               quitar={(i) => set({ P: s.P.filter((_, k) => k !== i) })}
@@ -80,7 +134,12 @@ function Panel({ s, set }: PropsPanel<S>) {
             </div>
           </>
         ) : (
-          <Nota>Doble clic en el suelo del lienzo pone un punto; con ⌥ lo subes o bajas.</Nota>
+          <>
+            <div className="interruptores">
+              <Boton onClick={() => set({ P: [[1, 1, 0.5]] })}>Añadir un punto</Boton>
+            </div>
+            <Nota>O doble clic en el suelo del lienzo; con ⌥ lo subes o bajas.</Nota>
+          </>
         )}
       </Grupo>
 
@@ -90,8 +149,7 @@ function Panel({ s, set }: PropsPanel<S>) {
         </Interruptor>
         {s.verSegundo && (
           <Matriz
-            A={s.V2}
-            onChange={(V2: number[][]) => set({ V2 })}
+            {...enEjes(s, s.V2, (V2) => set({ V2 }))}
             paso={0.1}
             filas={[{ nombre: 'v₁', color: 'var(--aux)' }, { nombre: 'v₂', color: 'var(--aux)' }]}
           />
@@ -128,6 +186,7 @@ function asas(s: S): Asa[] {
   ]
   if (s.verSegundo) s.V2.forEach((v, i) => out.push({ id: `W${i}`, p: v, color: '--aux' }))
   s.P.forEach((q, i) => out.push({ id: `P${i}`, p: q, color: '--pos' }))
+  baseDe(s).forEach((b, i) => out.push({ id: `E${i}`, p: b.map((c) => c * LARGO), color: '--ink-soft' }))
   return out
 }
 
@@ -137,6 +196,11 @@ function mover(id: string, p: number[], s: S): Partial<S> {
   const cambia = (A: number[][]) => A.map((f, i) => (i === k ? q : f))
   if (id[0] === 'V') return { V: cambia(s.V) }
   if (id[0] === 'W') return { V2: cambia(s.V2) }
+  if (id[0] === 'E') {
+    // la punta del eje está a LARGO del origen: el vector de la base es p / LARGO
+    const B = baseDe(s).map((f, i) => (i === k ? p.map((c) => Math.round((c / LARGO) * 100) / 100) : f))
+    return Math.abs(det(B)) > 0.05 ? { B } : {}
+  }
   return { P: cambia(s.P) }
 }
 
@@ -194,6 +258,17 @@ export default definir<S>({
     if (nw > 1e-9 && np > 1e-9)
       filas.push(['Ángulo w–W', `${((Math.acos(Math.min(1, np / nw)) * 180) / Math.PI).toFixed(2)}°`])
     base.forEach((u, i) => filas.push([`u${i + 1}`, `(${u.map((c) => c.toFixed(3)).join(', ')})`]))
+    if (!esCanonica(s)) {
+      const B = baseDe(s)
+      const d = det(B)
+      const orto = B.every((f, i) => B.every((g, j) => Math.abs(producto(f, g) - (i === j ? 1 : 0)) < 1e-6))
+      filas.push(
+        ['Ejes: det B', d.toFixed(4)],
+        ['Ejes', orto ? (d > 0 ? 'ortonormales, orientación positiva' : 'ortonormales, orientación invertida') : 'base no ortonormal'],
+        ['w en x′y′z′', `(${enBase(B, w).join(', ')})`],
+        ['w en xyz', `(${w.map((c) => c.toFixed(3)).join(', ')})`],
+      )
+    }
     if (s.verSegundo) {
       const si = sumaEInterseccion(s.V.slice(0, 2), s.V2)
       filas.push(
@@ -224,11 +299,21 @@ export default definir<S>({
       mover: (id, t, s) => mover(id, t.p, s),
       anadir: (t, s) => ({ P: [...s.P, redondo(t.p)] }),
       quitar: (id, s) => (id[0] === 'P' ? { P: s.P.filter((_, i) => i !== +id.slice(1)) } : undefined),
-      pista: 'Arrastra las puntas · ⌥: en vertical · doble clic: punto nuevo · doble clic o Supr: quitarlo',
+      pista: 'Arrastra las puntas o los ejes · ⌥: en vertical · doble clic: punto nuevo · doble clic o Supr: quitarlo',
     },
     construir(e, s) {
       e.zArriba(true)
-      e.ejes(1.6, ['x', 'y', 'z'], { rejilla: true, infinita: true, planos: ['xy'], paso: 0.5 })
+      const canonica = esCanonica(s)
+      // con otra base, los ejes de siempre quedan de referencia sin nombre y los nuevos se dibujan finos
+      e.ejes(LARGO, canonica ? ['x', 'y', 'z'] : null, { rejilla: true, infinita: true, planos: ['xy'], paso: 0.5 })
+      if (!canonica) {
+        const tinta = e.color('--ink-soft')
+        baseDe(s).forEach((b, i) => {
+          e.linea([[-b[0] * LARGO, -b[1] * LARGO, -b[2] * LARGO], [b[0] * LARGO, b[1] * LARGO, b[2] * LARGO]], tinta, 0.55)
+          e.flecha(b as [number, number, number], tinta, [0, 0, 0], 0.006)
+          e.rotulo(`${'xyz'[i]}′`, [b[0] * LARGO * 1.1, b[1] * LARGO * 1.1, b[2] * LARGO * 1.1 + 0.06], 0.22)
+        })
+      }
       const { v1, v2, w, base, dim, p, r } = piezas(s)
       const acento = e.color('--accent')
       const suave = e.color('--ink-soft')

@@ -80,7 +80,7 @@ Atajos en los lienzos 3D (el botón **?** de la barra los recuerda):
 | arrastrar un asa + **Mayús** | solo por el eje en que más se mueve, a pasos de 0,5 |
 | clic en la figura (Aplicaciones) | seleccionarla (marco discontinuo); **Esc** la suelta |
 | **⌘** (Ctrl) + arrastrar | mover la figura; con **Mayús**, por un eje y a pasos de 0,5 |
-| **R** | girarla con el ratón; **X/Y/Z** eligen el eje, **Mayús** a pasos de 15°, clic o Intro confirma, Esc deshace |
+| **R** o **⌘R** | girarla con el ratón; **X/Y/Z** eligen el eje, **Mayús** a pasos de 15°, clic o Intro confirma, Esc deshace |
 
 El giro y el desplazamiento se hacen en el dominio, antes de aplicar A: se ve cómo la matriz deforma
 la figura ya colocada. «Recolocar la figura» la devuelve al origen.

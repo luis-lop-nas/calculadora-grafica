@@ -39,7 +39,7 @@ const ATAJOS_3D = [
   'Arrastrar un punto: moverlo · ⌥: en vertical · Mayús: por un eje y a pasos de 0,5',
   'Clic en una figura movible: seleccionarla · Esc: soltarla',
   '⌘ (Ctrl) + arrastrar: mover la figura · Mayús: por un eje y a pasos de 0,5',
-  'R: girarla con el ratón · X / Y / Z: eje de giro · Mayús: a pasos de 15° · clic o Intro: vale · Esc: deshacer',
+  'R (o ⌘R): girarla con el ratón · X / Y / Z: eje de giro · Mayús: a pasos de 15° · clic o Intro: vale · Esc: deshacer',
 ].join('\n')
 
 function descargarCanvas(canvas: HTMLCanvasElement, nombre: string) {
@@ -169,7 +169,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
             ? `Girando en ${girando.eje.toUpperCase()} · ${Math.round((girando.ang * 180) / Math.PI)}° · X/Y/Z: eje · Mayús: 15° · clic: vale · Esc: deshacer`
             : movObj
               ? movObj.eje !== null ? `Moviendo por el eje ${'XYZ'[movObj.eje]} · pasos de 0,5` : 'Moviendo · Mayús: por un eje y a pasos de 0,5 · ⌥: en vertical'
-              : `${o.nombre[0].toUpperCase()}${o.nombre.slice(1)} seleccionada · ⌘+arrastrar: mover · R: girar · Esc: soltar`,
+              : `${o.nombre[0].toUpperCase()}${o.nombre.slice(1)} seleccionada · ⌘+arrastrar: mover · R o ⌘R: girar · Esc: soltar`,
       )
       if (!o || !caja) {
         e.ponerGuias([])
@@ -370,10 +370,13 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
       if (toque) aplicar(inter.anadir({ ...toque, mayus: ev.altKey }, estado.current.s))
     }
     const tecla = (ev: KeyboardEvent) => {
-      if (escribiendo(ev) || ev.metaKey || ev.ctrlKey) return
+      if (escribiendo(ev)) return
       const inter = estado.current.vista.interaccion
       const k = ev.key.toLowerCase()
       const o = objeto()
+      // ⌘R (Ctrl+R) con la figura seleccionada gira igual que R, en vez de recargar la página
+      const girarConMando = k === 'r' && !!o && seleccionado && !girando
+      if ((ev.metaKey || ev.ctrlKey) && !girarConMando) return
       // girando: X, Y, Z eligen el eje; Mayús, a pasos de 15°; Esc deshace; Intro confirma
       if (girando && o) {
         if (k === 'x' || k === 'y' || k === 'z') {

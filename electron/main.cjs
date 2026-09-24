@@ -191,7 +191,8 @@ function construirMenu() {
         { type: 'separator' },
         { role: 'togglefullscreen', label: 'Pantalla completa' },
         { type: 'separator' },
-        { role: 'reload', label: 'Recargar' },
+        // ⌘R es girar la figura seleccionada en los lienzos 3D: recargar pasa a ⌥⌘R
+        { role: 'reload', label: 'Recargar', accelerator: 'Alt+CmdOrCtrl+R' },
         { role: 'toggleDevTools', label: 'Herramientas de desarrollo' },
       ],
     },
