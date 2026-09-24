@@ -41,7 +41,7 @@ los scripts ya la quitan.
 
 ## Moverse por la aplicación
 
-Arriba hay dos filas: las **áreas** (Cuántica · EDP · EDO · Álgebra) y, debajo, los **módulos del
+Arriba hay dos filas: las **áreas** (Álgebra · Geometría · Funciones · EDO · EDP · Campos · Señales · Mecánica · Física · Cuántica) y, debajo, los **módulos del
 área** abierta. Un clic en un área abre su primer módulo; un clic en un módulo lo abre. Nada se
 esconde detrás de un desplegable.
 
@@ -87,36 +87,6 @@ propiedad de la media en Laplace y una sonda de |ψ|² en los orbitales.
 
 ## Módulos
 
-**Funciones y variable compleja**
-- Gráficas — vista algebraica al estilo GeoGebra: cada fila es texto libre y se reconoce sola. `x^3-3x` o `f(x) = …` (función), `x^2+y^2=9` (implícita), `y < sin(x)` o `x^2+y^2<=4 & y>x` (región sombreada, borde discontinuo si es estricta), `(cos(3t), sin(2t))` (paramétrica), `r = 1+cos(θ)` (polar), `x = y^2` (función de y), `A = (2, 1)` (punto que se arrastra) y `a = 3` (deslizador). Una restricción al final acota el dominio: `f(x) = x^2, 0 < x < 2`. **Deslizadores automáticos**: cualquier letra libre (`a sin(bx+c)`) crea el suyo, con rango editable y ▶ para animarlo. Una función puede usar otra y sus derivadas: `g(x) = f'(x) + 1`. Sobre la función activa: x₀ con tangente, f′, área bajo la curva o entre dos, raíces y corte con y, extremos, inflexiones, asíntotas (verticales, horizontales y oblicuas) y cortes entre curvas; tabla de valores. Doble clic junto a una curva marca un punto sobre ella; en un hueco crea un punto libre.
-- Variable compleja — coloreado del dominio (color = fase, brillo = módulo, con bandas por duplicación), imagen de una rejilla para ver la conformidad, y campo de Pólya. Comprueba Cauchy-Riemann comparando la derivada en dos direcciones.
-- Cálculo simbólico (CAS) — una orden por fila y el resultado exacto a la derecha, compuesto en LaTeX. `derivar(f, x, n)`, `integrar(f, x)` y `integrar(f, x, a, b)` (regla de Barrow, o Simpson adaptativo si no hay primitiva), `simplificar` (cancela fracciones de polinomios, sin² + cos² = 1), `desarrollar`, `factorizar` (sobre ℚ, con multiplicidades), `resolver(ecuación, x)` (raíces exactas con radicales, complejas aparte, familias con k ∈ ℤ, numérica si no hay forma cerrada) y sistemas lineales `resolver({x+y=3, x-y=1}, {x, y})`, `limite(f, x, a)` con `a = inf` (L'Hôpital simbólico, 1^∞ y 0·∞, laterales), `taylor(f, x, a, n)`, `numerico` y `sustituir`. `f(x) := …` y `a := …` definen para las filas de debajo, y `f'(x)` funciona. Aritmética exacta con racionales grandes: √72 = 6√2, 1/√2 = √2/2, sin(π/3) = √3/2. Integra con la tabla y, si no basta, por **fracciones simples** (factores lineales con multiplicidad y cuadráticos irreducibles), **cambio de variable** (busca u con u′ en el integrando, también eˣ en e^{2x}) y **partes** (tabular para polinomio × exp/trig, u = ln/arctan/arcsen, y la cíclica e^{ax}·sin bx). Cada primitiva se comprueba derivándola; si no hay primitiva elemental (e^{x²}, sin x / x) lo dice en vez de inventar.
-
-**Geometría**
-- Regla y compás — construcciones que se mantienen al mover los puntos: cada objeto guarda su definición, no sus coordenadas. Herramientas por grupos: puntos (libre, sobre un objeto, medio, intersección, centro), rectas (segmento, recta, semirrecta, vector, perpendicular, paralela, mediatriz, bisectriz, tangentes), polígonos (y regulares), circunferencias (centro y punto, centro y radio, por tres puntos, compás, arco, semicircunferencia), cónicas (elipse e hipérbola por focos, parábola por foco y directriz, por cinco puntos), medidas (ángulo, distancia, área, pendiente), transformaciones (simetría axial y central, rotación, traslación, homotecia) y lugar geométrico. Con Mover se arrastran los puntos libres (azules) y los que van sobre un objeto (verdes). La lista de objetos da coordenadas, ecuaciones y medidas, y cada uno se oculta o se borra con todo lo que depende de él.
-- Espacio — una fila por objeto: superficies implícitas (`x^2+y^2+z^2=4`, planos), `z = f(x, y)` escrita como `x^2 - y^2`, puntos arrastrables `A = (1, 2, 3)`, curvas `(cos(t), sin(t), t/4), -12 < t < 12`, superficies paramétricas en u, v, y órdenes `recta`, `segmento`, `vector`, `plano(A, B, C)`, `esfera(C, r)`, `cubo`, `prisma`, `piramide`, `cono`, `cilindro` y los poliedros regulares (con volumen y área), `revolucion(f(x), a, b)` y `corte(1, 2)`, la curva donde se cortan dos superficies. Las letras libres son deslizadores.
-
-**Cuántica**
-- Orbitales y estados ligados 3D — hidrógeno, caja cúbica y oscilador isótropo, con nube |ψ|² e isosuperficie.
-- Paquete de ondas y dispersión — ψ compleja como hélice coloreada por la fase, y su ensanchamiento.
-- Pozos, barrera y efecto túnel — pozo infinito, finito (ecuación trascendente resuelta numéricamente), armónico y T(E) de la barrera.
-
-**Ecuaciones en derivadas parciales** — las dos primeras cambian de dimensión sin cambiar de módulo
-- Ecuación de onda 1D / 2D / 3D — la cuerda admite los tres contornos (**fijo-fijo, fijo-libre, libre-libre**, cada uno con su base propia) y **las dos condiciones iniciales**: perfil u(x,0) y velocidad u_t(x,0), las dos escribibles a mano. Membrana rectangular y circular (ceros de Bessel) y modos de una caja, en isosuperficies o en tres cortes ortogonales.
-- Ecuación del calor 1D / 2D / 3D — barra con Dirichlet, mixta, Neumann y **Robin** (convección, con sus autovalores resueltos de λcosλ + h senλ = 0); temperatura inicial a elegir o escrita a mano. Placa y cubo con dato separable, en superficie y en cortes.
-- Laplace — problema de Dirichlet en el cuadrado y en el disco, con dato de contorno propio y la propiedad de la media.
-
-**Ecuaciones diferenciales ordinarias**
-- Resolver una EDO — **se escribe la ecuación entera, con el igual**: `y'' + 3*y' + 2*y = 0`. La clasifica (orden, lineal o no, coeficientes constantes o variables, homogénea o no), da la **solución general en forma cerrada** y la que cumple tus condiciones iniciales, y dibuja las dos curvas —la de la fórmula y la numérica— superpuestas para que se vea que coinciden. **Límites:** la fórmula cerrada sale cuando es lineal de coeficientes constantes y el término independiente es constante; si no, se queda la solución numérica y se enseña la fórmula de variación de parámetros. No hace integración simbólica ni resuelve por separación de variables o factor integrante.
-- Campo de direcciones — y′ = f(x, y) escrita por ti; pulsa en el lienzo para lanzar soluciones. Compara Euler, punto medio y RK4.
-- Segundo orden — y″ = f(t, y, y′), con **problema de valor inicial** (y(0), y′(0)) o **de contorno** (y(0)=α, y(T)=β resuelto por tiro, enseñando los intentos que fallan). En el caso lineal da las raíces características, el régimen de amortiguamiento, la amplitud estacionaria y la frecuencia de resonancia.
-- Retrato de fase — sistemas lineales (con autovectores y clasificación) y no lineales, con nulclinas y equilibrios detectados y clasificados. Una rejilla de órbitas llena el retrato de golpe, y `x(t), y(t)` parte el lienzo para poner las series temporales al lado.
-
-**Campos y superficies**
-- Superficies z = f(x, y) — la escribes tú; plano tangente, las dos curvas de corte con sus tangentes T₁ y T₂, gradiente en la base, curvas de nivel proyectadas y clasificación de puntos críticos por el hessiano.
-- Superficies paramétricas r(u, v) — esfera, toro, astroide, Möbius, helicoide, catenoide, Klein, silla del mono, o la tuya; curvas coordenadas y área ∬‖rᵤ×rᵥ‖.
-- Campos vectoriales — F = (P, Q, R) escrita a mano o de la lista (radial, dipolo, hilo con corriente, torbellino…); flechas coloreadas por ‖F‖, líneas de campo integradas, y divergencia y rotacional en un punto de sonda.
-
 **Álgebra y análisis funcional**
 - Aplicaciones lineales en R³ — la matriz como deformación del espacio: rango, núcleo, determinante como factor de volumen.
 - Subespacios y proyección ortogonal — Gram-Schmidt, proyección, residuo y complemento ortogonal.
@@ -124,6 +94,31 @@ propiedad de la media en Laplace y una sonda de |ψ|² en los orbitales.
 - Grupos, anillos y cuerpos — tablas de Cayley de Zₙ, Sₙ y Dₙ, con unidades, divisores de cero, ideales y subgrupos.
 - Espacios y métricas — distancias euclídea, ponderada, Manhattan, Minkowski y Poincaré, con bolas unidad y comparación.
 - Unidades — conversiones dimensionales de longitud, masa, tiempo, velocidad, fuerza, energía, presión y temperatura.
+
+**Geometría**
+- Regla y compás — construcciones que se mantienen al mover los puntos: cada objeto guarda su definición, no sus coordenadas. Herramientas por grupos: puntos (libre, sobre un objeto, medio, intersección, centro), rectas (segmento, recta, semirrecta, vector, perpendicular, paralela, mediatriz, bisectriz, tangentes), polígonos (y regulares), circunferencias (centro y punto, centro y radio, por tres puntos, compás, arco, semicircunferencia), cónicas (elipse e hipérbola por focos, parábola por foco y directriz, por cinco puntos), medidas (ángulo, distancia, área, pendiente), transformaciones (simetría axial y central, rotación, traslación, homotecia) y lugar geométrico. Con Mover se arrastran los puntos libres (azules) y los que van sobre un objeto (verdes). La lista de objetos da coordenadas, ecuaciones y medidas, y cada uno se oculta o se borra con todo lo que depende de él.
+- Espacio — una fila por objeto: superficies implícitas (`x^2+y^2+z^2=4`, planos), `z = f(x, y)` escrita como `x^2 - y^2`, puntos arrastrables `A = (1, 2, 3)`, curvas `(cos(t), sin(t), t/4), -12 < t < 12`, superficies paramétricas en u, v, y órdenes `recta`, `segmento`, `vector`, `plano(A, B, C)`, `esfera(C, r)`, `cubo`, `prisma`, `piramide`, `cono`, `cilindro` y los poliedros regulares (con volumen y área), `revolucion(f(x), a, b)` y `corte(1, 2)`, la curva donde se cortan dos superficies. Las letras libres son deslizadores.
+
+**Funciones y variable compleja**
+- Gráficas — vista algebraica al estilo GeoGebra: cada fila es texto libre y se reconoce sola. `x^3-3x` o `f(x) = …` (función), `x^2+y^2=9` (implícita), `y < sin(x)` o `x^2+y^2<=4 & y>x` (región sombreada, borde discontinuo si es estricta), `(cos(3t), sin(2t))` (paramétrica), `r = 1+cos(θ)` (polar), `x = y^2` (función de y), `A = (2, 1)` (punto que se arrastra) y `a = 3` (deslizador). Una restricción al final acota el dominio: `f(x) = x^2, 0 < x < 2`. **Deslizadores automáticos**: cualquier letra libre (`a sin(bx+c)`) crea el suyo, con rango editable y ▶ para animarlo. Una función puede usar otra y sus derivadas: `g(x) = f'(x) + 1`. Sobre la función activa: x₀ con tangente, f′, área bajo la curva o entre dos, raíces y corte con y, extremos, inflexiones, asíntotas (verticales, horizontales y oblicuas) y cortes entre curvas; tabla de valores. Doble clic junto a una curva marca un punto sobre ella; en un hueco crea un punto libre.
+- Variable compleja — coloreado del dominio (color = fase, brillo = módulo, con bandas por duplicación), imagen de una rejilla para ver la conformidad, y campo de Pólya. Comprueba Cauchy-Riemann comparando la derivada en dos direcciones.
+- Cálculo simbólico (CAS) — una orden por fila y el resultado exacto a la derecha, compuesto en LaTeX. `derivar(f, x, n)`, `integrar(f, x)` y `integrar(f, x, a, b)` (regla de Barrow, o Simpson adaptativo si no hay primitiva), `simplificar` (cancela fracciones de polinomios, sin² + cos² = 1), `desarrollar`, `factorizar` (sobre ℚ, con multiplicidades), `resolver(ecuación, x)` (raíces exactas con radicales, complejas aparte, familias con k ∈ ℤ, numérica si no hay forma cerrada) y sistemas lineales `resolver({x+y=3, x-y=1}, {x, y})`, `limite(f, x, a)` con `a = inf` (L'Hôpital simbólico, 1^∞ y 0·∞, laterales), `taylor(f, x, a, n)`, `numerico` y `sustituir`. `f(x) := …` y `a := …` definen para las filas de debajo, y `f'(x)` funciona. Aritmética exacta con racionales grandes: √72 = 6√2, 1/√2 = √2/2, sin(π/3) = √3/2. Integra con la tabla y, si no basta, por **fracciones simples** (factores lineales con multiplicidad y cuadráticos irreducibles), **cambio de variable** (busca u con u′ en el integrando, también eˣ en e^{2x}) y **partes** (tabular para polinomio × exp/trig, u = ln/arctan/arcsen, y la cíclica e^{ax}·sin bx). Cada primitiva se comprueba derivándola; si no hay primitiva elemental (e^{x²}, sin x / x) lo dice en vez de inventar.
+
+**Ecuaciones diferenciales ordinarias**
+- Resolver una EDO — **se escribe la ecuación entera, con el igual**: `y'' + 3*y' + 2*y = 0`. La clasifica (orden, lineal o no, coeficientes constantes o variables, homogénea o no), da la **solución general en forma cerrada** y la que cumple tus condiciones iniciales, y dibuja las dos curvas —la de la fórmula y la numérica— superpuestas para que se vea que coinciden. **Límites:** la fórmula cerrada sale cuando es lineal de coeficientes constantes y el término independiente es constante; si no, se queda la solución numérica y se enseña la fórmula de variación de parámetros. No hace integración simbólica ni resuelve por separación de variables o factor integrante.
+- Campo de direcciones — y′ = f(x, y) escrita por ti; pulsa en el lienzo para lanzar soluciones. Compara Euler, punto medio y RK4.
+- Segundo orden — y″ = f(t, y, y′), con **problema de valor inicial** (y(0), y′(0)) o **de contorno** (y(0)=α, y(T)=β resuelto por tiro, enseñando los intentos que fallan). En el caso lineal da las raíces características, el régimen de amortiguamiento, la amplitud estacionaria y la frecuencia de resonancia.
+- Retrato de fase — sistemas lineales (con autovectores y clasificación) y no lineales, con nulclinas y equilibrios detectados y clasificados. Una rejilla de órbitas llena el retrato de golpe, y `x(t), y(t)` parte el lienzo para poner las series temporales al lado.
+
+**Ecuaciones en derivadas parciales** — las dos primeras cambian de dimensión sin cambiar de módulo
+- Ecuación de onda 1D / 2D / 3D — la cuerda admite los tres contornos (**fijo-fijo, fijo-libre, libre-libre**, cada uno con su base propia) y **las dos condiciones iniciales**: perfil u(x,0) y velocidad u_t(x,0), las dos escribibles a mano. Membrana rectangular y circular (ceros de Bessel) y modos de una caja, en isosuperficies o en tres cortes ortogonales.
+- Ecuación del calor 1D / 2D / 3D — barra con Dirichlet, mixta, Neumann y **Robin** (convección, con sus autovalores resueltos de λcosλ + h senλ = 0); temperatura inicial a elegir o escrita a mano. Placa y cubo con dato separable, en superficie y en cortes.
+- Laplace — problema de Dirichlet en el cuadrado y en el disco, con dato de contorno propio y la propiedad de la media.
+
+**Campos y superficies**
+- Superficies z = f(x, y) — la escribes tú; plano tangente, las dos curvas de corte con sus tangentes T₁ y T₂, gradiente en la base, curvas de nivel proyectadas y clasificación de puntos críticos por el hessiano.
+- Superficies paramétricas r(u, v) — esfera, toro, astroide, Möbius, helicoide, catenoide, Klein, silla del mono, o la tuya; curvas coordenadas y área ∬‖rᵤ×rᵥ‖.
+- Campos vectoriales — F = (P, Q, R) escrita a mano o de la lista (radial, dipolo, hilo con corriente, torbellino…); flechas coloreadas por ‖F‖, líneas de campo integradas, y divergencia y rotacional en un punto de sonda.
 
 **Señales y sistemas**
 - Series de Fourier — f escrita en un periodo; suma parcial, espectro, Gibbs (tiende a 8,949 %), Fejér y Parseval. Los coeficientes se reconocen en forma exacta cuando la tienen (4/(3π)…).
@@ -148,6 +143,11 @@ propiedad de la media en Laplace y una sonda de |ψ|² en los orbitales.
 - Óptica ondulatoria — rendijas y redes, Fraunhofer por FFT 2D de una abertura, películas delgadas y Michelson.
 - Óptica geométrica — sistemas de lentes con matrices ABCD (objeto y lentes arrastrables), aberración esférica de un espejo cóncavo con su cáustica y dispersión en un prisma.
 - Termodinámica — ciclos de Carnot, Otto, Diesel, Brayton y Stirling (con o sin regenerador) en P–V y T–S con los estados arrastrables: calor y trabajo tramo a tramo, y el rendimiento del balance contrastado con la fórmula del libro y con Carnot entre las mismas temperaturas. Gas de van der Waals en variables reducidas: isotermas, construcción de Maxwell con las dos áreas, campana de coexistencia y espinodal, presión de vapor, calor latente y fase del estado (metaestable, inestable…), con los puntos críticos de CO₂, H₂O, N₂, Ar y He.
+
+**Cuántica**
+- Orbitales y estados ligados 3D — hidrógeno, caja cúbica y oscilador isótropo, con nube |ψ|² e isosuperficie.
+- Paquete de ondas y dispersión — ψ compleja como hélice coloreada por la fase, y su ensanchamiento.
+- Pozos, barrera y efecto túnel — pozo infinito, finito (ecuación trascendente resuelta numéricamente), armónico y T(E) de la barrera.
 
 ## Cómo añadir un módulo
 

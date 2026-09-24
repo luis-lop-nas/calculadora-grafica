@@ -50,16 +50,19 @@ import difraccion from '../modulos/fisica/difraccion'
 import geometrica from '../modulos/fisica/geometrica'
 import termodinamica from '../modulos/fisica/termodinamica'
 
-/** El orden de esta lista es el orden del menú. */
+/**
+ * El orden de esta lista es el orden del menú, y las áreas salen en el orden de su primer módulo:
+ * de la más potente a la más concreta.
+ */
 export const MODULOS: ModuloAny[] = [
-  grafica, complejos, cas,
-  geometria, espacio,
-  orbitales, paquete, pozo,
-  edpPropia, onda, calor, laplace,
-  resolver, campo, segundoorden, fases,
-  superficies, parametricas, vectorial, teoremas,
   aplicaciones, subespacios, hilbert, estructuras, espacios, unidades,
+  geometria, espacio,
+  grafica, complejos, cas,
+  resolver, campo, segundoorden, fases,
+  edpPropia, onda, calor, laplace,
+  superficies, parametricas, vectorial, teoremas,
   fourier, transformadaF, convolucionM, laplaceT, control, circuito, filtros,
   lagrangiano, orbitas, oscilaciones, solido, relatividad,
   electrostatica, magnetostatica, ondas, difraccion, geometrica, termodinamica,
+  orbitales, paquete, pozo,
 ]

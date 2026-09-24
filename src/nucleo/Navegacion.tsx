@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AREAS, AREAS_CORTAS, type Area, type ModuloAny } from './tipos'
 
-const ORDEN: Area[] = ['funciones', 'geometria', 'cuantica', 'edp', 'edo', 'campos', 'algebra', 'senales', 'mecanica', 'fisica', 'estadistica', 'numerico']
+/** De la más potente a la más concreta; el menú de la app sigue el orden de `MODULOS`, que va igual. */
+const ORDEN: Area[] = ['algebra', 'geometria', 'funciones', 'edo', 'edp', 'campos', 'senales', 'mecanica', 'fisica', 'cuantica', 'estadistica', 'numerico']
 
 export function Navegacion({
   modulos,
