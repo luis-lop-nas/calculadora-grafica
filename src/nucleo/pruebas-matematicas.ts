@@ -54,6 +54,7 @@ import { cerca, cierto, cuenta, lectura, parecido, seccion } from './pruebas/com
 import { pruebasBase } from './pruebas/base'
 import { pruebasSenales } from './pruebas/senales'
 import { pruebasMecanica } from './pruebas/mecanica'
+import { pruebasFisica } from './pruebas/fisica'
 
 /* ═══════════ funciones especiales ═══════════ */
 seccion('Funciones especiales')
@@ -1469,6 +1470,7 @@ seccion('Espacio: sólidos, filas y curvas de corte')
 pruebasBase()
 pruebasSenales()
 pruebasMecanica()
+pruebasFisica()
 
 /* ═══════════ Asas: soltar un asa donde está no cambia nada ═══════════ */
 seccion('Asas: ida y vuelta en todos los módulos')
