@@ -48,7 +48,7 @@ import { MODULOS } from './registro'
 import { uEn } from '../modulos/edp/laplace'
 import { analizarFilas3, cortarMalla, medidasSolido, recortarACaja } from '../lib/objetos3d'
 import { construirRejilla, marching } from '../lib/mallado'
-import { analizarFilas, asintotas, ceros, extremos, inflexiones, integral as integral2d } from '../lib/objetos2d'
+import { analizarFilas, asintotas, ceros, estudio, extremos, inflexiones, integral as integral2d, sumaRiemann, taylorNumerico } from '../lib/objetos2d'
 
 declare const process: { exitCode?: number }
 
@@ -1282,6 +1282,27 @@ seccion('Gráficas: qué es cada fila y sus puntos notables')
   const sx = extremos((x) => Math.sin(x) / x, -1, 1)
   cierto('sin x / x: el máximo en 0 lleva su valor límite 1', sx.length === 1 && Math.abs(sx[0].y - 1) < 1e-9, JSON.stringify(sx))
   cierto('x³: punto crítico sin cambio de signo no es extremo', extremos((x) => x ** 3, -2, 2).length === 0)
+  // Taylor numérico (Chebyshev) contra los coeficientes de libro
+  const ts = taylorNumerico(Math.sin, 0, 7)!
+  ;[0, 1, 0, -1 / 6, 0, 1 / 120, 0, -1 / 5040].forEach((c, k) => cerca(`Taylor de sin en 0: coeficiente ${k}`, ts[k], c, 1e-8))
+  const tl = taylorNumerico(Math.log, 0.1, 3)!
+  ;[Math.log(0.1), 10, -50, 1000 / 3].forEach((c, k) => parecido(`Taylor de ln en 0,1: coeficiente ${k} (h se encoge cerca del polo)`, tl[k] || 1e-300, c, 1e-7))
+  cierto('Taylor de |x| en 0: no es suave, no se inventa', taylorNumerico(Math.abs, 0, 3) === null)
+  // Riemann: punto medio y trapecios con error O(h²), izquierda O(h)
+  cerca('Riemann izquierda de x² en [0, 1] con n = 4 = 7/32', sumaRiemann((x) => x * x, 0, 1, 4, 'izquierda'), 7 / 32, 1e-15)
+  cerca('trapecios de x² en [0, 1] con n = 4 = 11/32', sumaRiemann((x) => x * x, 0, 1, 4, 'trapecio'), 11 / 32, 1e-15)
+  const eM = (n: number) => Math.abs(sumaRiemann(Math.sin, 0, Math.PI, n, 'medio') - 2)
+  cerca('punto medio: el error baja como 1/n²', eM(20) / eM(40), 4, 0.01)
+  // estudio de la función
+  const e1 = estudio((x) => x ** 3 - 3 * x, -12, 12)
+  cierto('x³ − 3x: crece en (−12, −1) ∪ (1, 12) y decrece en (−1, 1)', e1.crece.length === 2 && Math.abs(e1.crece[0][1] + 1) < 1e-6 && e1.decrece.length === 1 && Math.abs(e1.decrece[0][0] + 1) < 1e-6, JSON.stringify(e1))
+  cierto('x³ − 3x: impar, cóncava en x < 0 y convexa en x > 0', e1.paridad === 'impar' && Math.abs(e1.concava[0][1]) < 1e-6 && Math.abs(e1.convexa[0][0]) < 1e-6)
+  const e2 = estudio((x) => 1 / x, -12, 12)
+  cierto('1/x: decrece en dos tramos, sin juntarlos a través del polo', e2.decrece.length === 2 && e2.crece.length === 0, JSON.stringify(e2.decrece))
+  const e3 = estudio((x) => (x * x - 4) / (x - 2), -12, 12)
+  cierto('(x² − 4)/(x − 2): hueco en (2, 4)', e3.huecos.length === 1 && e3.huecos[0].x === 2 && Math.abs(e3.huecos[0].y - 4) < 1e-6, JSON.stringify(e3.huecos))
+  const e4 = estudio((x) => Math.sqrt(4 - x * x), -12, 12)
+  cierto('√(4 − x²): dominio [−2, 2] y par', e4.dominio.length === 1 && Math.abs(e4.dominio[0][0] + 2) < 1e-9 && Math.abs(e4.dominio[0][1] - 2) < 1e-9 && e4.paridad === 'par', JSON.stringify(e4.dominio))
 }
 
 

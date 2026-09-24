@@ -563,3 +563,159 @@ export function asintotas(f: F1, a: number, b: number): Asintotas {
   }
   return { verticales, oblicuas }
 }
+
+/* ---------- Taylor, Riemann y estudio de la función ---------- */
+
+/**
+ * Coeficientes de Taylor a₀…aₙ de f en x₀, numéricos: se interpola f en nodos de
+ * Chebyshev de [x₀ − h, x₀ + h] y se pasa el interpolante a potencias de (x − x₀).
+ * Para una función analítica el interpolante converge como una serie geométrica;
+ * si algo no cuadra (una singularidad cerca) se encoge h.
+ */
+export function taylorNumerico(f: F1, x0: number, n: number): number[] | null {
+  const N = Math.max(2 * n + 12, 24)
+  for (let h = 0.5; h > 1e-3; h /= 2) {
+    const t = Array.from({ length: N }, (_, j) => Math.cos((Math.PI * (j + 0.5)) / N))
+    const v = t.map((tj) => f(x0 + h * tj))
+    if (!v.every(Number.isFinite)) continue
+    // coeficientes de Chebyshev
+    const c = Array.from({ length: N }, (_, k) => (2 / N) * v.reduce((s, vj, j) => s + vj * Math.cos((k * Math.PI * (j + 0.5)) / N), 0))
+    c[0] /= 2
+    // ¿el interpolante reproduce f entre nodos?
+    const cheb = (x: number) => {
+      let [b1, b2] = [0, 0]
+      for (let k = N - 1; k >= 1; k--) [b1, b2] = [2 * x * b1 - b2 + c[k], b1]
+      return x * b1 - b2 + c[0]
+    }
+    const escala = Math.max(1, ...v.map(Math.abs))
+    const prueba = [-0.93, -0.41, 0.17, 0.66, 0.97]
+    if (prueba.some((x) => Math.abs(cheb(x) - f(x0 + h * x)) > 1e-10 * escala)) continue
+    // Tₖ en potencias de t, y de t = (x − x₀)/h a (x − x₀)
+    const potencias: number[] = Array(N).fill(0)
+    let Tm1 = [1]
+    let T = [0, 1]
+    potencias[0] += c[0]
+    for (let k = 1; k < N; k++) {
+      T.forEach((a, i) => (potencias[i] += c[k] * a))
+      const sig = Array(T.length + 1).fill(0)
+      T.forEach((a, i) => (sig[i + 1] += 2 * a))
+      Tm1.forEach((a, i) => (sig[i] -= a))
+      ;[Tm1, T] = [T, sig]
+    }
+    return potencias.slice(0, n + 1).map((a, k) => a / h ** k)
+  }
+  return null
+}
+
+export type MetodoRiemann = 'izquierda' | 'derecha' | 'medio' | 'trapecio'
+
+export function sumaRiemann(f: F1, a: number, b: number, n: number, metodo: MetodoRiemann): number {
+  const h = (b - a) / n
+  let s = 0
+  for (let i = 0; i < n; i++) {
+    const x = a + i * h
+    s += metodo === 'izquierda' ? f(x) : metodo === 'derecha' ? f(x + h) : metodo === 'medio' ? f(x + h / 2) : (f(x) + f(x + h)) / 2
+  }
+  return s * h
+}
+
+export interface Estudio {
+  paridad: 'par' | 'impar' | null
+  huecos: Array<{ x: number; y: number }>
+  crece: Array<[number, number]>
+  decrece: Array<[number, number]>
+  convexa: Array<[number, number]>
+  concava: Array<[number, number]>
+  /** Tramos de [a, b] donde f está definida. */
+  dominio: Array<[number, number]>
+}
+
+/** Tramos donde f está definida, con los bordes afinados por bisección. */
+function tramosDefinidos(f: F1, a: number, b: number, n = 2400): Array<[number, number]> {
+  const out: Array<[number, number]> = []
+  const def = (x: number) => Number.isFinite(f(x))
+  let ini: number | null = def(a) ? a : null
+  let prev = a
+  const afina = (lo: number, hi: number, dentroLo: boolean) => {
+    for (let k = 0; k < 60; k++) {
+      const m = (lo + hi) / 2
+      if (def(m) === dentroLo) lo = m
+      else hi = m
+    }
+    return (lo + hi) / 2
+  }
+  for (let i = 1; i <= n; i++) {
+    const x = a + ((b - a) * i) / n
+    const d = def(x)
+    if (ini === null && d) ini = afina(prev, x, false)
+    else if (ini !== null && !d) {
+      // un punto suelto sin definir (un hueco) no corta el tramo
+      const siguiente = a + ((b - a) * (i + 1)) / n
+      if (i < n && def(siguiente)) {
+        prev = x
+        continue
+      }
+      out.push([ini, afina(prev, x, true)])
+      ini = null
+    }
+    prev = x
+  }
+  if (ini !== null) out.push([ini, b])
+  return out
+}
+
+/** Intervalos donde g > 0 y donde g < 0, partiendo por los ceros dados y los bordes del dominio. */
+function signos(g: F1, cortes: number[], dominio: Array<[number, number]>): { pos: Array<[number, number]>; neg: Array<[number, number]> } {
+  const pos: Array<[number, number]> = []
+  const neg: Array<[number, number]> = []
+  for (const [p, q] of dominio) {
+    // dentro de un tramo se juntan los trozos del mismo signo; entre tramos (un polo en medio), nunca
+    const inicioPos = pos.length
+    const inicioNeg = neg.length
+    const bordes = [p, ...cortes.filter((c) => c > p + 1e-9 && c < q - 1e-9), q]
+    for (let i = 0; i + 1 < bordes.length; i++) {
+      const [u, v] = [bordes[i], bordes[i + 1]]
+      // el signo en tres puntos del tramo (por si el centro cae en un hueco)
+      const vals = [0.5, 0.3, 0.7].map((t) => g(u + t * (v - u))).filter(Number.isFinite)
+      if (!vals.length) continue
+      const sgn = Math.sign(vals.sort((x, y) => Math.abs(y) - Math.abs(x))[0])
+      const lista = sgn > 0 ? pos : sgn < 0 ? neg : null
+      if (!lista) continue
+      const ultimo = lista.length > (sgn > 0 ? inicioPos : inicioNeg) ? lista[lista.length - 1] : null
+      if (ultimo && Math.abs(ultimo[1] - u) < 1e-9) ultimo[1] = v
+      else lista.push([u, v])
+    }
+  }
+  return { pos, neg }
+}
+
+export function estudio(f: F1, a: number, b: number): Estudio {
+  const dominio = tramosDefinidos(f, a, b)
+  const as = asintotas(f, a, b)
+  // los polos parten el dominio aunque f esté definida muy cerca
+  const trozos: Array<[number, number]> = []
+  for (const [p, q] of dominio) {
+    const vs = as.verticales.filter((v) => v > p && v < q)
+    const bordes = [p, ...vs, q]
+    for (let i = 0; i + 1 < bordes.length; i++) trozos.push([bordes[i], bordes[i + 1]])
+  }
+  const ext = extremos(f, a, b).map((e) => e.x)
+  const inf = inflexiones(f, a, b).map((e) => e.x)
+  const mono = signos((x) => derivada(f, x), ext, trozos)
+  const curv = signos((x) => segunda(f, x), inf, trozos)
+  // huecos: puntos «redondos» donde f no está pero su límite sí
+  const huecos: Array<{ x: number; y: number }> = []
+  for (let k = Math.ceil(a * 24); k <= Math.floor(b * 24); k++) {
+    const x = k / 24
+    if (Number.isFinite(f(x))) continue
+    const y = valorOLimite(f, x)
+    if (Number.isFinite(y)) huecos.push({ x, y })
+  }
+  // paridad con muestras donde las dos están definidas
+  const xs = [0.37, 0.91, 1.43, 2.2, 3.1, 4.7, 6.3, 0.05]
+  const pares = xs.map((x) => [f(x), f(-x)]).filter(([u, v]) => Number.isFinite(u) && Number.isFinite(v))
+  const tol = (u: number) => 1e-9 * Math.max(1, Math.abs(u))
+  const paridad =
+    pares.length >= 4 && pares.every(([u, v]) => Math.abs(u - v) < tol(u)) ? 'par' : pares.length >= 4 && pares.every(([u, v]) => Math.abs(u + v) < tol(u)) ? 'impar' : null
+  return { paridad, huecos, crece: mono.pos, decrece: mono.neg, convexa: curv.pos, concava: curv.neg, dominio }
+}

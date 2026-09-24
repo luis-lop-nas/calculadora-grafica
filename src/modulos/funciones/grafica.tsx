@@ -4,7 +4,8 @@ import { Atajos, Boton, Expresion, Grupo, Interruptor, Muestra, Rango, Segmentad
 import type { Pintor2D } from '../../render/pintor2d'
 import { contorno, encadenar } from '../../lib/contorno'
 import {
-  analizarFilas, asintotas, ceros, cortes, derivada, extremos, inflexiones, integral, nombrePunto, segunda, valorOLimite,
+  analizarFilas, asintotas, ceros, cortes, derivada, estudio, extremos, inflexiones, integral, nombrePunto, segunda, sumaRiemann, taylorNumerico, valorOLimite,
+  type MetodoRiemann,
   type Analisis, type Condicion, type Fila, type Objeto, type Param,
 } from '../../lib/objetos2d'
 
@@ -32,6 +33,12 @@ interface S {
   verTabla: boolean
   tablaDesde: number
   tablaPaso: number
+  /** Sumas de Riemann sobre el área bajo la curva. */
+  riemann: 'no' | MetodoRiemann
+  nRiemann: number
+  verTaylor: boolean
+  ordenTaylor: number
+  verEstudio: boolean
 }
 
 const COLORES = ['--accent', '--aux', '--rosa', '--morado', '--ocre', '--neg']
@@ -270,6 +277,23 @@ function sombra(g: Pintor2D, arriba: F1, abajo: F1, a: number, b: number, color:
   ctx.restore()
 }
 
+/** Rectángulos (o trapecios) de la suma de Riemann, con su contorno. */
+function rectangulos(g: Pintor2D, f: F1, a: number, b: number, n: number, metodo: MetodoRiemann, color: string) {
+  const h = (b - a) / n
+  for (let i = 0; i < n; i++) {
+    const x = a + i * h
+    const [y0, y1] =
+      metodo === 'trapecio' ? [f(x), f(x + h)] : (() => {
+        const y = metodo === 'izquierda' ? f(x) : metodo === 'derecha' ? f(x + h) : f(x + h / 2)
+        return [y, y]
+      })()
+    if (!Number.isFinite(y0) || !Number.isFinite(y1)) continue
+    const pts: Array<[number, number]> = [[x, 0], [x, y0], [x + h, y1], [x + h, 0]]
+    g.rellenar(pts, color, 0.22)
+    g.curva([...pts, [x, 0]], color, 1)
+  }
+}
+
 function dibujar(g: Pintor2D, s: S) {
   g.ejes({ etiquetaX: 'x', etiquetaY: 'y' })
   ventanaActual = { x: [...g.ventana.x], y: [...g.ventana.y] }
@@ -288,7 +312,13 @@ function dibujar(g: Pintor2D, s: S) {
     const a = Math.min(s.a, s.x0)
     const b = Math.max(s.a, s.x0)
     const og = s.area === 'entre' ? otra(s, an, fa.i) : null
-    sombra(g, fa.o.f, og ? og.o.f : () => 0, a, b, g.color(colorDe(fa.i)))
+    if (s.area === 'bajo' && s.riemann !== 'no') rectangulos(g, fa.o.f, a, b, s.nRiemann, s.riemann, g.color(colorDe(fa.i)))
+    else sombra(g, fa.o.f, og ? og.o.f : () => 0, a, b, g.color(colorDe(fa.i)))
+  }
+
+  if (fa && s.verTaylor) {
+    const c = taylorNumerico(fa.o.f, s.x0, s.ordenTaylor)
+    if (c) trazo(g, (x) => [x, c.reduceRight((acc, ck) => acc * (x - s.x0) + ck, 0)], xa, xb, 900, g.color('--morado'), 1.8, true)
   }
 
   if (fa && s.verAsintotas) {
@@ -548,6 +578,26 @@ function Panel({ s, set }: PropsPanel<S>) {
             onChange={(area) => set({ area })}
           />
           {s.area !== 'no' && <Rango etiqueta="desde a" valor={s.a} min={-12} max={12} paso={0.01} formato={(v) => v.toFixed(2)} onChange={(a) => set({ a })} />}
+          {s.area === 'bajo' && (
+            <>
+              <Segmentado
+                valor={s.riemann}
+                opciones={[
+                  { v: 'no', t: 'Sin sumas de Riemann' },
+                  { v: 'izquierda', t: 'Riemann por la izquierda' },
+                  { v: 'derecha', t: 'Riemann por la derecha' },
+                  { v: 'medio', t: 'Riemann en el punto medio' },
+                  { v: 'trapecio', t: 'Trapecios' },
+                ]}
+                onChange={(riemann) => set({ riemann })}
+              />
+              {s.riemann !== 'no' && <Rango etiqueta="subintervalos n" valor={s.nRiemann} min={1} max={100} paso={1} formato={(v) => String(v)} onChange={(nRiemann) => set({ nRiemann: Math.round(nRiemann) })} />}
+            </>
+          )}
+          <Interruptor activo={s.verTaylor} onChange={(verTaylor) => set({ verTaylor })}>
+            Polinomio de Taylor en x₀
+          </Interruptor>
+          {s.verTaylor && <Rango etiqueta="grado" valor={s.ordenTaylor} min={0} max={10} paso={1} formato={(v) => String(v)} onChange={(ordenTaylor) => set({ ordenTaylor: Math.round(ordenTaylor) })} />}
         </Grupo>
       )}
 
@@ -571,6 +621,9 @@ function Panel({ s, set }: PropsPanel<S>) {
                 Cortes entre curvas
               </Interruptor>
             )}
+            <Interruptor activo={s.verEstudio} onChange={(verEstudio) => set({ verEstudio })}>
+              Estudio: dominio, monotonía y curvatura
+            </Interruptor>
           </div>
         </Grupo>
       )}
@@ -652,6 +705,20 @@ function lecturas(s: S): Array<[string, string]> {
     const og = s.area === 'entre' ? otra(s, an, i) : null
     const val = og ? integral((x) => f(x) - og.o.f(x), s.a, s.x0) : integral(f, s.a, s.x0)
     filas.push([og ? `∫ (${n} − ${og.o.nombre})` : `∫ ${n}`, `${fmt(val, 6)} en [${fmt(s.a, 2)}, ${fmt(s.x0, 2)}]`])
+    if (s.area === 'bajo' && s.riemann !== 'no') {
+      const suma = sumaRiemann(f, s.a, s.x0, s.nRiemann, s.riemann)
+      const nombreM = { izquierda: 'izquierda', derecha: 'derecha', medio: 'punto medio', trapecio: 'trapecios' }[s.riemann]
+      filas.push([`Suma de Riemann (${nombreM}, n = ${s.nRiemann})`, fmt(suma, 6)], ['Error de la suma', fmt(suma - val, 6)])
+    }
+  }
+  if (s.verTaylor) {
+    const c = taylorNumerico(f, s.x0, s.ordenTaylor)
+    if (!c) filas.push([`Taylor en x₀`, 'no se puede: f no es suave cerca de x₀'])
+    else {
+      const x1 = s.x0 + 0.5
+      const p = c.reduceRight((acc, ck) => acc * (x1 - s.x0) + ck, 0)
+      filas.push([`T${sub(s.ordenTaylor)}(x₀ + 0,5) frente a ${n}`, `${fmt(p, 6)} · ${fmt(f(x1), 6)} (error ${fmt(Math.abs(p - f(x1)), 8)})`])
+    }
   }
   if (s.verRaices) {
     const r = ceros(f, ...LECTURA)
@@ -682,6 +749,20 @@ function lecturas(s: S): Array<[string, string]> {
       ]),
     )
     if (!as.verticales.length && !as.oblicuas.length) filas.push(['Asíntotas', 'ninguna'])
+  }
+  if (s.verEstudio) {
+    const e = estudio(f, ...LECTURA)
+    const iv = (l: Array<[number, number]>) => (l.length ? l.map(([p, q]) => `(${fmt(p, 3)}, ${fmt(q, 3)})`).join(' ∪ ') : 'en ningún tramo')
+    const fuera = [...asintotas(f, ...LECTURA).verticales, ...e.huecos.map((h) => h.x)].sort((p, q) => p - q)
+    filas.push(
+      ['Dominio en [−12, 12]', `${e.dominio.map(([p, q]) => `[${fmt(p, 3)}, ${fmt(q, 3)}]`).join(' ∪ ')}${fuera.length ? ` salvo x = ${fuera.map((x) => fmt(x, 4)).join(', ')}` : ''}`],
+      ['Simetría', e.paridad === 'par' ? 'par: f(−x) = f(x)' : e.paridad === 'impar' ? 'impar: f(−x) = −f(x)' : 'ni par ni impar'],
+      ...e.huecos.slice(0, 3).map((h): [string, string] => ['Hueco (discontinuidad evitable)', `(${fmt(h.x, 4)}, ${fmt(h.y, 4)})`]),
+      ['Crece en', iv(e.crece)],
+      ['Decrece en', iv(e.decrece)],
+      ['Convexa (∪) en', iv(e.convexa)],
+      ['Cóncava (∩) en', iv(e.concava)],
+    )
   }
   if (s.verCortes) {
     for (const g of funciones(s, an)) {
@@ -725,6 +806,11 @@ export default definir<S>({
     verTabla: false,
     tablaDesde: -2,
     tablaPaso: 0.5,
+    riemann: 'no',
+    nRiemann: 8,
+    verTaylor: false,
+    ordenTaylor: 3,
+    verEstudio: false,
   },
   Panel,
   rotulo: (s) => ({ nombre: `x₀ = ${s.x0.toFixed(3)}`, apunte: 'arrastra el punto por la curva' }),
@@ -739,6 +825,26 @@ export default definir<S>({
       const og = s.area === 'entre' ? otra(s, an, fa.i) : null
       const cuerpo = og ? `\\left(${fa.o.nombre}(x)-${og.o.nombre}(x)\\right)` : `${fa.o.nombre}(x)`
       out.push(String.raw`\int_{a}^{x_0} ${cuerpo}\,dx \quad (\text{Simpson, 2000 tramos})`)
+      if (s.area === 'bajo' && s.riemann !== 'no')
+        out.push(s.riemann === 'trapecio' ? String.raw`T_n = h\sum_{i=0}^{n-1}\frac{f(x_i)+f(x_{i+1})}{2},\quad h=\frac{x_0-a}{n}` : String.raw`S_n = h\sum_{i=0}^{n-1} f(\xi_i),\quad h=\frac{x_0-a}{n}`)
+    }
+    if (s.verTaylor) {
+      const c = taylorNumerico(fa.o.f, s.x0, s.ordenTaylor)
+      if (c) {
+        const h = s.x0 === 0 ? 'x' : `(x ${s.x0 > 0 ? '-' : '+'} ${fmt(Math.abs(s.x0), 3)})`
+        const escala = Math.max(1, ...c.map(Math.abs))
+        const terminos = c
+          .map((ck, k) => [ck, k] as const)
+          .filter(([ck]) => Math.abs(ck) > 1e-8 * escala)
+          .map(([ck, k], j) => {
+            const v = +ck.toPrecision(5)
+            const signo = v < 0 ? '-' : j ? '+' : ''
+            const a = Math.abs(v)
+            const pot = k === 0 ? '' : k === 1 ? h : `${h}^{${k}}`
+            return `${signo} ${k > 0 && a === 1 ? '' : String(a).replace('.', '{,}')}${pot}`
+          })
+        out.push(`T_{${s.ordenTaylor}}(x) = ${terminos.join(' ') || '0'}`)
+      }
     }
     return out
   },
@@ -757,6 +863,7 @@ export default definir<S>({
           )
         })}
         {s.verDerivada && activa(s, an) && <Muestra color="var(--pos)">{activa(s, an)!.o.nombre}′</Muestra>}
+        {s.verTaylor && activa(s, an) && <Muestra color="var(--morado)">Taylor de grado {s.ordenTaylor}</Muestra>}
       </>
     )
   },
