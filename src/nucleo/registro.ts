@@ -25,6 +25,7 @@ import teoremas from '../modulos/campos/teoremas'
 import fases from '../modulos/edo/fases'
 import segundoorden from '../modulos/edo/segundoorden'
 
+import matrices from '../modulos/algebra/matrices'
 import aplicaciones from '../modulos/algebra/aplicaciones'
 import subespacios from '../modulos/algebra/subespacios'
 import hilbert from '../modulos/algebra/hilbert'
@@ -55,7 +56,7 @@ import termodinamica from '../modulos/fisica/termodinamica'
  * de la más potente a la más concreta.
  */
 export const MODULOS: ModuloAny[] = [
-  aplicaciones, subespacios, hilbert, estructuras, espacios, unidades,
+  matrices, aplicaciones, subespacios, hilbert, estructuras, espacios, unidades,
   geometria, espacio,
   grafica, complejos, cas,
   resolver, campo, segundoorden, fases,

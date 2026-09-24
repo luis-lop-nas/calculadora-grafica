@@ -57,6 +57,7 @@ import { pruebasBase } from './pruebas/base'
 import { pruebasSenales } from './pruebas/senales'
 import { pruebasMecanica } from './pruebas/mecanica'
 import { pruebasFisica } from './pruebas/fisica'
+import { pruebasAlgebra } from './pruebas/algebra'
 
 /* ═══════════ funciones especiales ═══════════ */
 seccion('Funciones especiales')
@@ -1530,6 +1531,7 @@ pruebasBase()
 pruebasSenales()
 pruebasMecanica()
 pruebasFisica()
+pruebasAlgebra()
 
 /* ═══════════ Asas: soltar un asa donde está no cambia nada ═══════════ */
 seccion('Asas: ida y vuelta en todos los módulos')
