@@ -1,6 +1,7 @@
 import { campo, flujoEsfera, imagenes, lineaDeCampo, potencial, type Carga } from '../../lib/electro'
 import { campoCuadratura, campoPoligonal, campoTramo, circulacion, poligonal, type P3 } from '../../lib/magneto'
 import { campoEspacio, campoPlano, circulacionBorde, circulacionPlana, curvaPlana, estrellada, flujoCerrado, flujoPlano, flujoRotacional, integralDivergencia, integralRegion, parametrizacion } from '../../lib/teoremas'
+import { brewster, campoPolarizado, critico, elipse, fase, fresnel, picoEnvolvente } from '../../lib/ondas'
 import { cerca, cierto, parecido, seccion } from './comun'
 
 export function pruebasFisica() {
@@ -118,5 +119,64 @@ export function pruebasFisica() {
     const vol = integralDivergencia(H, cil)
     cierto('Gauss: el caso probado no es trivial', Math.abs(vol) > 0.1, String(vol))
     cerca('Gauss: ∭ div H = ∯ H·dS (cilindro)', flujoCerrado(H, cil), vol, 1e-10)
+  }
+
+  seccion('Física · ondas y polarización')
+  {
+    // elipse: semiejes y orientación frente a los extremos de |E| a lo largo de un periodo
+    const [a, b, d] = [1.3, 0.7, 1.1]
+    const el = elipse(a, b, d)
+    const r2 = (f: number) => {
+      const [x, y] = campoPolarizado(a, b, d, f)
+      return x * x + y * y
+    }
+    const extremo = (signo: 1 | -1) => {
+      let mejor = 0
+      for (let i = 0; i < 2000; i++) if (signo * r2((i / 2000) * 2 * Math.PI) > signo * r2(mejor)) mejor = (i / 2000) * 2 * Math.PI
+      let lo = mejor - 0.01
+      let hi = mejor + 0.01
+      for (let i = 0; i < 100; i++) {
+        const m1 = lo + (hi - lo) / 3
+        const m2 = hi - (hi - lo) / 3
+        if (signo * r2(m1) > signo * r2(m2)) hi = m2
+        else lo = m1
+      }
+      return (lo + hi) / 2
+    }
+    const fM = extremo(1)
+    cerca('polarización: semieje mayor = máx |E|', el.semiMayor, Math.sqrt(r2(fM)), 1e-12)
+    cerca('polarización: semieje menor = mín |E|', el.semiMenor, Math.sqrt(r2(extremo(-1))), 1e-12)
+    const [xM, yM] = campoPolarizado(a, b, d, fM)
+    // la posición de un máximo buscado por su valor solo se fija a √ε ≈ 1e-8 (la función es plana allí)
+    cerca('polarización: orientación ψ = dirección del máximo', Math.sin(2 * (Math.atan2(yM, xM) - el.psi)), 0, 1e-7)
+    cerca('Stokes: S₀² = S₁² + S₂² + S₃² (luz polarizada)', el.S[0] ** 2, el.S[1] ** 2 + el.S[2] ** 2 + el.S[3] ** 2, 1e-13)
+    const circ = elipse(1, 1, Math.PI / 2)
+    cierto('circular: S₁ = S₂ = 0 y χ = π/4', Math.abs(circ.S[1]) < 1e-15 && Math.abs(circ.S[2]) < 1e-15 && Math.abs(circ.chi - Math.PI / 4) < 1e-15)
+    cerca('lineal a 45°: ψ = π/4, χ = 0', elipse(1, 1, 0).psi, Math.PI / 4, 1e-15)
+    // Fresnel
+    const [n1, n2] = [1, 1.52]
+    for (const ti of [0.2, 0.7, 1.3]) {
+      const f = fresnel(n1, n2, ti)
+      cerca(`Fresnel θ = ${ti}: R_s + T_s = 1`, f.Rs + f.Ts, 1, 1e-14)
+      cerca(`Fresnel θ = ${ti}: R_p + T_p = 1`, f.Rp + f.Tp, 1, 1e-14)
+      // relaciones de Stokes con el camino inverso (de n₂ a n₁ con el ángulo refractado)
+      const g = fresnel(n2, n1, f.thetaT)
+      cerca(`Stokes θ = ${ti}: r′_s = −r_s`, g.rs[0], -f.rs[0], 1e-14)
+      cerca(`Stokes θ = ${ti}: t_s t′_s = 1 − r_s²`, f.ts[0] * g.ts[0], 1 - f.rs[0] ** 2, 1e-14)
+      cerca(`Stokes θ = ${ti}: t_p t′_p = 1 − r_p²`, f.tp[0] * g.tp[0], 1 - f.rp[0] ** 2, 1e-14)
+    }
+    cerca('incidencia normal: R = ((n₁ − n₂)/(n₁ + n₂))²', fresnel(n1, n2, 0).Rs, ((n1 - n2) / (n1 + n2)) ** 2, 1e-15)
+    cerca('Brewster: r_p = 0 en tan θ_B = n₂/n₁', fresnel(n1, n2, brewster(n1, n2)).Rp, 0, 1e-30)
+    const tc = critico(n2, n1)
+    cerca('ángulo crítico: sin θ_c = n₂/n₁', Math.sin(tc), n1 / n2, 1e-15)
+    const tir = fresnel(n2, n1, tc + 0.2)
+    cierto('reflexión total: R_s = R_p = 1 y T = 0', tir.total && Math.abs(tir.Rs - 1) < 1e-14 && Math.abs(tir.Rp - 1) < 1e-14 && tir.Ts === 0)
+    const nn = n1 / n2
+    const th = tc + 0.2
+    cerca('reflexión total: desfase de s, tan(δ/2) = √(sin²θ − n²)/cos θ', Math.abs(fase(tir.rs)), 2 * Math.atan(Math.sqrt(Math.sin(th) ** 2 - nn * nn) / Math.cos(th)), 1e-13)
+    // paquete gaussiano con ω = k²/2: el pico va exactamente a v_g = k₀
+    const k0 = 3
+    cerca('paquete ω = k²/2: el pico está en x = v_g t = k₀ t', picoEnvolvente((k) => (k * k) / 2, k0, 0.5, 4, 11, 3), 12, 1e-6)
+    cerca('paquete ω = ck: el pico viaja sin deformarse a c', picoEnvolvente((k) => 1.7 * k, k0, 0.5, 5, 8, 3), 8.5, 1e-6)
   }
 }

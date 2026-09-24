@@ -45,6 +45,7 @@ import solido from '../modulos/mecanica/solido'
 import relatividad from '../modulos/mecanica/relatividad'
 import electrostatica from '../modulos/fisica/electrostatica'
 import magnetostatica from '../modulos/fisica/magnetostatica'
+import ondas from '../modulos/fisica/ondas'
 
 /** El orden de esta lista es el orden del menú. */
 export const MODULOS: ModuloAny[] = [
@@ -57,5 +58,5 @@ export const MODULOS: ModuloAny[] = [
   aplicaciones, subespacios, hilbert, estructuras, espacios, unidades,
   fourier, transformadaF, convolucionM, laplaceT, control, circuito, filtros,
   lagrangiano, orbitas, oscilaciones, solido, relatividad,
-  electrostatica, magnetostatica,
+  electrostatica, magnetostatica, ondas,
 ]
