@@ -141,9 +141,13 @@ select,input[type=number],input[type=text]{font:inherit;font-size:13px;color:var
 .calculando{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--panel) 90%,transparent);color:var(--ink-soft);font:12px var(--mono);box-shadow:0 8px 24px rgba(0,0,0,.16);pointer-events:none}
 .pista{position:absolute;right:16px;top:14px;font-size:12px;color:var(--ink-soft);pointer-events:none;text-align:right}
 .pista-asas{display:block;margin-top:4px;color:var(--accent)}
-.leyenda{position:absolute;left:16px;bottom:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;
-  background:color-mix(in srgb,var(--panel) 85%,transparent);border:1px solid var(--line);border-radius:10px;
-  padding:8px 12px;font-size:12px;pointer-events:none;max-width:calc(100% - 32px)}
+/* Leyenda común: una caja en la esquina inferior izquierda, una entrada por línea */
+.leyenda{position:absolute;left:16px;bottom:16px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;
+  background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:10px;
+  box-shadow:0 4px 14px rgba(0,0,0,.12);backdrop-filter:blur(6px);
+  padding:10px 12px;font-size:12px;line-height:1.35;pointer-events:none;max-width:min(300px,calc(100% - 32px))}
+.leyenda>*{display:flex;align-items:center;gap:0}
+.leyenda .sw,.leyenda .rueda{flex:none}
 .sw{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-2px;margin-right:6px}
 .rueda{width:18px;height:18px;border-radius:50%;vertical-align:-4px;margin-right:6px;display:inline-block;
   background:conic-gradient(from 90deg,hsl(0 80% 55%),hsl(60 80% 55%),hsl(120 80% 55%),hsl(180 80% 55%),hsl(240 80% 55%),hsl(300 80% 55%),hsl(360 80% 55%))}
