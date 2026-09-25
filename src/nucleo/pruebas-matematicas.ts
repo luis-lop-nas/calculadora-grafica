@@ -47,7 +47,8 @@ import { resolver as resolverE, resolverSistema } from '../lib/cas/resolver'
 import { limite as limiteE, taylor as taylorE } from '../lib/cas/limites'
 import { integrar as integrarE } from '../lib/cas/integrar'
 import { clasificarConica, evaluar as evaluarGeo, evalConica, dist as distGeo, type Obj as ObjGeo } from '../lib/geometria'
-import { ejemploActivo } from './tipos'
+import { ejemploActivo, type EntradaMenu } from './tipos'
+import { analizar as analizarFourier, sobreoscilacion } from '../modulos/senales/fourier'
 import { MODULOS } from './registro'
 import { uEn } from '../modulos/edp/laplace'
 import { analizarFilas3, cortarMalla, medidasSolido, recortarACaja } from '../lib/objetos3d'
@@ -1726,6 +1727,28 @@ seccion('Ejemplos del armazón: todos dan fórmulas y lecturas finitas')
     }
   }
   cierto('hay ejemplos del armazón', n >= 40, String(n))
+  // también los ejemplos del menú de cada módulo (con sus submenús)
+  let nm = 0
+  const hojas = (es: EntradaMenu<any>[]): EntradaMenu<any>[] => es.flatMap((e) => (e.hijos ? hojas(e.hijos) : [e]))
+  for (const m of MODULOS)
+    for (const ej of hojas(m.menu?.(m.inicial).ejemplos ?? [])) {
+      const st = { ...m.inicial, ...(ej.hacer?.(m.inicial) ?? {}) }
+      let textos: string[] = []
+      try {
+        textos = [...(m.formula?.(st) ?? []), ...(m.lecturas?.(st) ?? []).map(([a, b]) => `${a} ${b}`)]
+      } catch (e) {
+        textos = [`Error: ${(e as Error).message}`]
+      }
+      const malo = textos.find((t) => /NaN|Infinity|undefined|desconocid|Error:/.test(t))
+      cierto(`${m.id}: ejemplo de menú «${ej.t}»`, !malo, malo)
+      nm++
+    }
+  cierto('hay ejemplos de menú', nm >= 100, String(nm))
+  // Gibbs: la sobreoscilación tiende a 8,949 % también cuando f no es plana junto al salto
+  for (const expr of ['sign(t)', 't/pi', 'exp(t)']) {
+    const { c, f } = analizarFourier({ expr, periodoPi: 2 })
+    cerca(`Fourier: Gibbs en ${expr} con N = 200`, sobreoscilacion(f!, c!, 200)!, 8.949, 0.03)
+  }
   // lecturas concretas de ejemplos, contra la forma cerrada
   const lectura = (id: string, t: string, clave: string) => {
     const m = MODULOS.find((x) => x.id === id)!
@@ -1736,6 +1759,9 @@ seccion('Ejemplos del armazón: todos dan fórmulas y lecturas finitas')
   cierto('órbitas: circunferencia sin precesión que medir', lectura('orbitas', 'Órbita circular', 'Precesión') === '')
   cierto('órbitas: v₀ = √(2μ/r₀) es una parábola', lectura('orbitas', 'Velocidad de escape', 'Tipo').includes('parábola'))
   cierto('pozo: oscilador, E₀ = ħω/2', lectura('pozo', 'Oscilador', 'E0').startsWith('0.5000'))
+  const ctl = MODULOS.find((x) => x.id === 'control')!
+  const ej1 = hojas(ctl.menu!(ctl.inicial).ejemplos ?? []).find((e) => e.t.startsWith('1.er orden'))!
+  cierto('control: 1.er orden sin pico', (ctl.lecturas!({ ...ctl.inicial, ...ej1.hacer!(ctl.inicial) }).find(([a]) => a === 'Tiempo de pico')?.[1] ?? '').startsWith('—'))
   cierto('oscilaciones: cadena libre, ω₁ = 0 y T = ∞', lectura('oscilaciones', 'Cadena libre', 'ω1').includes('∞'))
 }
 

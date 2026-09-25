@@ -296,7 +296,7 @@ export default definir<EstadoControl>({
       if (estable) {
         const y = respuesta(T, s.tMax, 4000)
         const m = metricas(y, evalFT(T, 0, 0)[0])
-        filas.push(['Valor final T(0)', fmt(m.final, 5)], ['Sobreoscilación', `${fmt(m.sobreoscilacion, 2)} %`], ['Tiempo de pico', fmt(m.tPico)], ['Subida 10–90 %', fmt(m.tSubida)], ['Establecimiento 2 %', fmt(m.tEstablecimiento)])
+        filas.push(['Valor final T(0)', fmt(m.final, 5)], ['Sobreoscilación', `${fmt(m.sobreoscilacion, 2)} %`], ['Tiempo de pico', m.sobreoscilacion > 1e-3 ? fmt(m.tPico) : '— (sin sobreoscilación: no hay pico)'], ['Subida 10–90 %', fmt(m.tSubida)], ['Establecimiento 2 %', fmt(m.tEstablecimiento)])
         if (s.cerrado) filas.push(['Error en régimen permanente', fmt(1 - m.final, 5)])
       } else filas.push(['Respuesta', 'no se asienta: hay polos con Re ≥ 0'])
     }

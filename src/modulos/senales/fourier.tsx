@@ -62,22 +62,26 @@ export function saltos(f: (t: number) => number, c: Coeficientes): Array<{ t: nu
 }
 
 /**
- * Sobreoscilación de S_N en el primer salto, en % del salto: se busca el extremo de S_N a la derecha
- * del salto (en el primer lóbulo, antes de 3T/N) y se compara con el valor límite f(τ⁺).
+ * Sobreoscilación de S_N en el primer salto, en % del salto: el mayor exceso de S_N sobre f a la derecha
+ * del salto (en el primer lóbulo, antes de 3T/N). Se compara con f(t) y no con el valor f(τ⁺): si f no es
+ * plana junto al salto (diente de sierra), restar la constante f(τ⁺) se come parte del exceso.
  */
 export function sobreoscilacion(f: (t: number) => number, c: Coeficientes, N: number): number | null {
   const ss = saltos(f, c)
   if (!ss.length) return null
   const { t: tau, der, izq } = ss[0]
   const J = der - izq
-  let ext = der
+  const fp = periodica(f, c.T)
+  // hasta el primer lóbulo, pero sin llegar al salto siguiente (el pulso tiene dos muy juntos)
+  const siguiente = Math.min(...ss.map((q) => (((q.t - tau) % c.T) + c.T) % c.T).filter((d) => d > 1e-9), c.T)
+  const ancho = Math.min((3 * c.T) / (N + 1), siguiente / 2)
+  let ext = 0
   const M = 600
   for (let i = 1; i <= M; i++) {
-    const t = tau + ((3 * c.T) / (N + 1)) * (i / M)
-    const v = sumaParcial(c, N, t)
-    ext = J > 0 ? Math.max(ext, v) : Math.min(ext, v)
+    const t = tau + ancho * (i / M)
+    ext = Math.max(ext, Math.sign(J) * (sumaParcial(c, N, t) - fp(t)))
   }
-  return (100 * (ext - der)) / J
+  return (100 * ext) / Math.abs(J)
 }
 
 /** Energía de S_N: a₀²/4 + ½Σ(aₙ² + bₙ²), que por Parseval tiende a (1/T)∫f². */
