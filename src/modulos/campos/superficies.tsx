@@ -1,5 +1,5 @@
 import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
-import { accion, capaFija, capaVer, coords } from '../../nucleo/menu'
+import { accion, capaFija, capaVer, casilla, coords } from '../../nucleo/menu'
 import { Atajos, Boton, Expresion, Grupo, Interruptor, Muestra, Nota, Rango, Segmentado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { contorno } from '../../lib/contorno'
@@ -209,6 +209,12 @@ export default definir<S>({
   menu: (s) => ({
     anadir: [accion<S>('Otra superficie z = g(x, y)', (t) => ({ otras: [...t.otras, 'x*y/2'] }))],
     ejemplos: EJEMPLOS.map((e) => ({ t: e.t, tipo: 'radio' as const, activo: s.expr === e.e, hacer: () => ({ expr: e.e }) })),
+    herramientas: {
+      'multivariable.plano': casilla<S>('', s.verTangente, (verTangente) => ({ verTangente })),
+      'multivariable.gradiente': casilla<S>('', s.verGradiente, (verGradiente) => ({ verGradiente })),
+      'multivariable.nivel': casilla<S>('', s.verNivel, (verNivel) => ({ verNivel })),
+      'multivariable.cortes': casilla<S>('', s.verCortes, (verCortes) => ({ verCortes })),
+    },
     acciones: [
       accion<S>('Punto de tangencia al origen', () => ({ a: 0, b: 0 })),
       accion<S>('Quitar los puntos', () => ({ puntos: [] }), !s.puntos.length),

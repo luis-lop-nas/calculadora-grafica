@@ -175,6 +175,8 @@ export interface MenuModulo<S> {
   ejemplos?: EntradaMenu<S>[]
   /** Módulo ▸ (sección del módulo abierto) */
   acciones?: EntradaMenu<S>[]
+  /** Herramientas ▸ …, por id del esqueleto de `barra.ts` (`'derivacion.tangente'`). */
+  herramientas?: Partial<Record<string, EntradaMenu<S>>>
 }
 
 export interface Modulo<S> {
@@ -200,7 +202,7 @@ export interface Modulo<S> {
   leyenda?: (s: S) => ReactNode
   /** Lo que se dibuja, con nombre y color: el menú Capas de la app de Mac (mostrar, ocultar, solo esta, eliminar). */
   capas?: (s: S) => Capa<S>[]
-  /** Entradas propias para la barra de menús: Objeto ▸ Añadir, Módulo ▸ Ejemplos y acciones del módulo. */
+  /** Entradas propias para la barra de menús: Objeto ▸ Añadir, Herramientas, Módulo ▸ Ejemplos y acciones. */
   menu?: (s: S) => MenuModulo<S>
   pista?: string
   /**

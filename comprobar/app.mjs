@@ -163,17 +163,17 @@ if (!bajados.some((f) => f.endsWith('.csv'))) errores.push('[exportar] no se esc
 
 // 5. Vista y Edición: una casilla de superposición y deshacer/rehacer
 const prefs = () => win.evaluate(() => JSON.parse(localStorage.getItem('calculadora:vista') ?? '{}'))
-await pulsar(['Vista', 'Superposiciones', 'Ejes'])
+await pulsar(['Escena', 'Ejes', 'Mostrar ejes'])
 await win.waitForTimeout(400)
-if ((await prefs()).ejes !== false) errores.push('[vista] «Superposiciones ▸ Ejes» no quita los ejes')
-await pulsar(['Vista', 'Superposiciones', 'Ejes'])
+if ((await prefs()).ejes !== false) errores.push('[vista] «Escena ▸ Ejes ▸ Mostrar ejes» no quita los ejes')
+await pulsar(['Escena', 'Ejes', 'Mostrar ejes'])
 await win.waitForTimeout(400)
-if ((await prefs()).ejes !== true) errores.push('[vista] «Superposiciones ▸ Ejes» no los vuelve a poner')
+if ((await prefs()).ejes !== true) errores.push('[vista] «Escena ▸ Ejes ▸ Mostrar ejes» no los vuelve a poner')
 await pulsar(menu.rutas[paleta.indexOf('aplicaciones')])
 await win.waitForTimeout(1200)
 const estadoDe = (id) => win.evaluate((id) => JSON.parse(localStorage.getItem('calculadora:estado') ?? '{}').estados?.[id], id)
 const antesT = (await estadoDe('aplicaciones'))?.t
-await pulsar(['Edición', 'Restablecer el módulo'])
+await pulsar(['Módulo', 'Restablecer el módulo'])
 await win.evaluate(() => {
   const r = document.querySelector('input[type="range"]')
   if (r) {
@@ -203,15 +203,15 @@ const fallo6 = await pulsar(['Objeto', 'Añadir', 'Punto'])
 await win.waitForTimeout(800)
 const tras = await filas()
 if (fallo6 || tras.length < n0 || !/=\s*\(1, 1\)/.test(tras.at(-1)?.src ?? '')) errores.push(`[objeto] «Añadir ▸ Punto» no añadió la fila (${fallo6 ?? ''} ${JSON.stringify(tras.at(-1))})`)
-const capas = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.find((i) => i.label === 'Capas').submenu.items.filter((i) => i.type === 'submenu').map((i) => i.label))
+const capas = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.find((i) => i.label === 'Ventana').submenu.items.find((i) => i.label === 'Capas').submenu.items.filter((i) => i.type === 'submenu').map((i) => i.label))
 const ultima = capas.find((c) => /= \(1, 1\)/.test(c))
 if (!ultima) errores.push(`[capas] el punto nuevo no sale en Capas: ${capas.join(' | ')}`)
 else {
-  await pulsar(['Capas', ultima, 'Mostrar'])
+  await pulsar(['Ventana', 'Capas', ultima, 'Mostrar'])
   await win.waitForTimeout(600)
   if ((await filas()).at(-1)?.visible !== false) errores.push('[capas] «Mostrar» no esconde la capa')
-  const oculta = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.find((i) => i.label === 'Capas').submenu.items.filter((i) => i.type === 'submenu').map((i) => i.label).find((l) => l.includes('(oculta)')))
-  await pulsar(['Capas', oculta ?? ultima, 'Eliminar'])
+  const oculta = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.find((i) => i.label === 'Ventana').submenu.items.find((i) => i.label === 'Capas').submenu.items.filter((i) => i.type === 'submenu').map((i) => i.label).find((l) => l.includes('(oculta)')))
+  await pulsar(['Ventana', 'Capas', oculta ?? ultima, 'Eliminar'])
   await win.waitForTimeout(600)
   if ((await filas()).some((f) => /= \(1, 1\)/.test(f.src))) errores.push('[capas] «Eliminar» no quita la capa')
   else console.log(`capas: ${capas.length} en Gráficas; añadir, esconder y eliminar funcionan`)
@@ -225,13 +225,70 @@ for (const id of paleta) {
   await win.waitForTimeout(700)
   const propio = await app.evaluate(({ Menu }) => {
     const items = Menu.getApplicationMenu().items
-    const capas = items.find((i) => i.label === 'Capas').submenu.items.length > 1
+    const capas = items.find((i) => i.label === 'Ventana').submenu.items.find((i) => i.label === 'Capas').submenu.items.some((i) => i.enabled !== false)
     const modulo = items.find((i) => i.label === 'Módulo').submenu.items.some((i) => i.label === 'Ejemplos' || (i.type !== 'separator' && !i.enabled && i.label !== 'Cargando…'))
     return capas || modulo
   })
   if (!propio) sinMenu.push(id)
 }
 if (sinMenu.length) errores.push(`[menú] sin capas ni entradas propias: ${sinMenu.join(', ')}`)
+
+// 7. la barra nueva: orden fijo y esqueleto de Herramientas igual en todos los módulos
+const BARRA = ['Archivo', 'Edición', 'Objeto', 'Herramientas', 'Escena', 'Vista', 'Animación', 'Módulo', 'Ventana', 'Ayuda']
+const barra = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.map((i) => i.label).slice(1))
+if (barra.join('|') !== BARRA.join('|')) errores.push(`[barra] orden inesperado: ${barra.join(' · ')}`)
+const esqueleto = () =>
+  app.evaluate(({ Menu }) => {
+    const h = Menu.getApplicationMenu().items.find((i) => i.label === 'Herramientas').submenu.items
+    return {
+      forma: h.map((i) => `${i.label}(${i.submenu.items.map((j) => j.label).join(',')})`).join('|'),
+      activas: h.flatMap((i) => i.submenu.items.filter((j) => j.enabled).map((j) => j.label)),
+    }
+  })
+let formaEsqueleto = null
+for (const id of ['grafica', 'superficies', 'orbitales']) {
+  const i = paleta.indexOf(id)
+  if (i < 0) continue
+  await pulsar(menu.rutas[i])
+  await win.waitForTimeout(800)
+  const e = await esqueleto()
+  if (formaEsqueleto && formaEsqueleto !== e.forma) errores.push(`[herramientas] el esqueleto cambia en ${id}: ${e.forma}`)
+  formaEsqueleto = e.forma
+  const esperadas = { grafica: 'Recta tangente en x₀', superficies: 'Plano tangente', orbitales: null }[id]
+  if (esperadas && !e.activas.includes(esperadas)) errores.push(`[herramientas] «${esperadas}» no está activa en ${id}`)
+  if (!esperadas && e.activas.length) errores.push(`[herramientas] ${id} no declara herramientas pero hay activas: ${e.activas.join(', ')}`)
+}
+await pulsar(menu.rutas[paleta.indexOf('grafica')])
+await win.waitForTimeout(900)
+const tangenteAntes = (await estadoDe('grafica'))?.verTangente
+await pulsar(['Herramientas', 'Derivación', 'Recta tangente en x₀'])
+await win.waitForTimeout(500)
+const tangenteDespues = (await estadoDe('grafica'))?.verTangente
+if (tangenteAntes === tangenteDespues) errores.push('[herramientas] «Derivación ▸ Recta tangente» no cambia la tangente')
+else console.log(`herramientas: tangente ${tangenteAntes} → ${tangenteDespues} desde el menú`)
+await pulsar(['Herramientas', 'Derivación', 'Recta tangente en x₀'])
+await win.waitForTimeout(300)
+
+// 8. Buscar orden (⇧⌘P): escribir «tangente» y pulsar Intro hace lo mismo que el menú
+await win.evaluate(() => document.activeElement?.blur?.())
+await win.keyboard.press('Meta+Shift+p')
+await win.waitForTimeout(300)
+const hayPaleta = await win.evaluate(() => !!document.querySelector('[aria-label="Buscar orden"]'))
+if (!hayPaleta) errores.push('[paleta] ⇧⌘P no abre «Buscar orden»')
+else {
+  await win.keyboard.type('recta tangente')
+  await win.waitForTimeout(200)
+  const primera = await win.evaluate(() => document.querySelector('#lista-ordenes li b')?.textContent)
+  await win.keyboard.press('Enter')
+  await win.waitForTimeout(500)
+  const t2 = (await estadoDe('grafica'))?.verTangente
+  if (t2 === tangenteAntes) errores.push(`[paleta] «recta tangente» + Intro no la cambia (primera: ${primera})`)
+  else console.log(`paleta: «recta tangente» → ${primera}`)
+  await win.keyboard.press('Meta+Shift+p')
+  await win.keyboard.type('recta tangente')
+  await win.keyboard.press('Enter')
+  await win.waitForTimeout(300)
+}
 
 // app.close() se quedaría esperando el «¿guardar cambios?» del documento abierto: se sale sin preguntar
 await app.evaluate(({ app }) => setTimeout(() => app.exit(0), 50)).catch(() => {})

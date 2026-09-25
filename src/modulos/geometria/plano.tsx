@@ -513,9 +513,7 @@ export default definir<S>({
     acciones: [
       { t: 'Herramienta Mover', tipo: 'radio', activo: s.herramienta === 'mover', hacer: () => ({ herramienta: 'mover', grupo: 'Mover', pendientes: [] }) },
       accion<S>('Cancelar la construcción en curso', () => ({ pendientes: [] }), !s.pendientes.length),
-      casilla<S>('Ajustar a la rejilla', s.ajustar, (ajustar) => ({ ajustar })),
       casilla<S>('Nombres', s.etiquetas, (etiquetas) => ({ etiquetas })),
-      casilla<S>('Ejes', s.ejes, (ejes) => ({ ejes })),
       accion<S>('Quitar el último objeto', (t) => (t.objs.length ? borrar(t, t.objs[t.objs.length - 1].id) : undefined), !s.objs.length),
       accion<S>('Borrar todo', () => ({ objs: [], pendientes: [] }), !s.objs.length),
     ],

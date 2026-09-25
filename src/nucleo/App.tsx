@@ -7,6 +7,8 @@ import { AREAS_CORTAS, type Capa, type EntradaMenu, type ModuloAny, type Vista }
 import { escritorio, type CapaMenu, type EntradaSerie, type Orden } from './escritorio'
 import { animacion, ContextoVista, espacio, guardarPrefs, leerPrefs, ordenVista, type OrdenVista, type PrefsVista } from './vista'
 import { HojaAtajos } from './Atajos'
+import { fusionar, HERRAMIENTAS } from './barra'
+import { aplanar, PaletaOrdenes, type OrdenPaleta } from './Ordenes'
 
 /** ¿El foco está en un campo de texto? Ahí ⌘Z y compañía son los del propio campo. */
 const enCampo = () => !!(document.activeElement as HTMLElement | null)?.matches?.('input, textarea, select, [contenteditable="true"]')
@@ -223,6 +225,7 @@ export default function App() {
   const [giro, setGiro] = useState(false)
   const [, tic] = useState(0)
   const [atajos, setAtajos] = useState(false)
+  const [ordenes, setOrdenes] = useState(false)
   // menú Animación: el reloj común de los lienzos lee `animacion`; aquí se guarda para el menú
   const [anim, setAnim] = useState({ pausado: false, velocidad: 1 })
   useEffect(() => {
@@ -345,6 +348,18 @@ export default function App() {
     const h = setInterval(() => tic((v) => v + 1), 100)
     return () => clearInterval(h)
   }, [id])
+
+  // ⇧⌘P lo escucha la página en la web y en la app (el menú solo lo muestra, como ⌘K)
+  useEffect(() => {
+    const atajo = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault()
+        setOrdenes((v) => !v)
+      }
+    }
+    document.addEventListener('keydown', atajo)
+    return () => document.removeEventListener('keydown', atajo)
+  }, [])
 
   // En la web (en la app de Mac los lleva el menú): ⌘Z, ⇧⌘Z y ⌘/
   const teclasRef = useRef({ deshacer, rehacer })
@@ -480,6 +495,7 @@ export default function App() {
         setCmp((c) => ({ ...c, ...(dato as Partial<Comparar>) }))
       }
     } else if (orden === 'atajos') setAtajos((v) => !v)
+    else if (orden === 'ordenes') setOrdenes((v) => !v)
     else if (orden === 'animacion') {
       if (dato === 'paso') {
         animacion.pasos++
@@ -505,8 +521,9 @@ export default function App() {
         })
     }
     else if (orden === 'menuModulo' && dato && typeof dato === 'object') {
-      const { grupo, ruta } = dato as { grupo: 'anadir' | 'ejemplos' | 'acciones'; ruta: number[] }
-      let lista = moduloP.menu?.(s)?.[grupo]
+      const { grupo, ruta } = dato as { grupo: 'anadir' | 'ejemplos' | 'acciones' | 'herramientas'; ruta: number[] }
+      const propio = moduloP.menu?.(s)
+      let lista = grupo === 'herramientas' ? fusionar(HERRAMIENTAS, propio?.herramientas) : propio?.[grupo]
       let e: EntradaMenu<any> | undefined
       for (const i of ruta) {
         e = lista?.[i]
@@ -555,6 +572,7 @@ export default function App() {
     anadir: serieEntradas(menuPropio?.anadir),
     ejemplos: serieEntradas(menuPropio?.ejemplos),
     acciones: serieEntradas(menuPropio?.acciones),
+    herramientas: serieEntradas(fusionar(HERRAMIENTAS, menuPropio?.herramientas)),
   })
   useEffect(() => {
     escritorio?.estado({
@@ -583,6 +601,35 @@ export default function App() {
       menu: JSON.parse(menuMenu),
     })
   }, [id, cmp.activo, cmp.disposicion, cmp.enlazar, cmp.idB, giro, es3D, hayLienzo, hayLecturas, modificado, vistaA.tipo, hayFormula, puedeDeshacer, puedeRehacer, prefs, moduloP, capasMenu, menuMenu, animado, anim, grabando, transformable])
+  const listaOrdenes = (): OrdenPaleta[] => {
+    const ejecutar = (e: EntradaMenu<any>) => {
+      const p = e.hacer?.(s)
+      if (p) set(p)
+    }
+    const pref = (camino: string[], clave: 'ejes' | 'nombres' | 'rejilla' | 'ajustar' | 'leyenda' | 'formula' | 'lecturas' | 'presentacion'): OrdenPaleta => ({
+      camino,
+      activo: prefs[clave],
+      hacer: () => cambiarPrefs({ [clave]: !prefs[clave] }),
+    })
+    return [
+      ...aplanar(menuPropio?.anadir, ['Objeto', 'Añadir'], ejecutar),
+      ...aplanar(fusionar(HERRAMIENTAS, menuPropio?.herramientas), ['Herramientas'], ejecutar),
+      pref(['Escena', 'Ejes', 'Mostrar ejes'], 'ejes'),
+      pref(['Escena', 'Ejes', 'Nombres de los ejes'], 'nombres'),
+      pref(['Escena', 'Rejilla', 'Mostrar rejilla'], 'rejilla'),
+      pref(['Escena', 'Rejilla', 'Ajustar a la rejilla'], 'ajustar'),
+      { camino: ['Vista', 'Encuadrar todo'], hacer: () => ordenVista({ orden: 'encuadrar' }) },
+      pref(['Vista', 'Mostrar', 'Leyenda'], 'leyenda'),
+      pref(['Vista', 'Mostrar', 'Fórmula'], 'formula'),
+      pref(['Vista', 'Mostrar', 'Lecturas'], 'lecturas'),
+      pref(['Vista', 'Modo presentación'], 'presentacion'),
+      { camino: ['Edición', 'Deshacer'], hacer: deshacer },
+      { camino: ['Edición', 'Rehacer'], hacer: rehacer },
+      ...aplanar(menuPropio?.ejemplos, ['Módulo', 'Ejemplos'], ejecutar),
+      ...aplanar(menuPropio?.acciones, ['Módulo', moduloP.corto ?? moduloP.resumen], ejecutar),
+      { camino: ['Módulo', 'Restablecer el módulo'], hacer: restablecer },
+    ]
+  }
   // superponer solo tiene sentido con dos lienzos del mismo tipo
   const superpuesto = cmp.activo && cmp.disposicion === 'encima' && vistaA.tipo === vistaB.tipo && vistaA.tipo !== 'html'
 
@@ -757,6 +804,7 @@ export default function App() {
         </div>
       </div>
       {atajos && <HojaAtajos onCerrar={() => setAtajos(false)} />}
+      {ordenes && <PaletaOrdenes ordenes={listaOrdenes()} onCerrar={() => setOrdenes(false)} />}
     </div>
     </ContextoVista.Provider>
   )

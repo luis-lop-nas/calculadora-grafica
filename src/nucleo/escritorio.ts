@@ -28,8 +28,10 @@ export type Orden =
   /** dato: { disposicion } | { enlazar } | 'copiarAenB' */
   | 'cmp'
   | 'atajos'
-  /** dato: { grupo: 'anadir' | 'ejemplos' | 'acciones', ruta: number[] } */
+  /** dato: { grupo: 'anadir' | 'ejemplos' | 'acciones' | 'herramientas', ruta: number[] } */
   | 'menuModulo'
+  /** Ayuda ▸ Buscar orden… */
+  | 'ordenes'
   /** dato: { id?: string, op: 'alternar' | 'quitar' | 'solo' | 'todas' | 'ninguna' } */
   | 'capa'
   /** dato: { pausado } | { velocidad } | 'paso' | 'reiniciar' */
@@ -65,7 +67,7 @@ export interface EstadoMenu {
   grabando: boolean
   /** El módulo tiene una figura que se mueve y gira entera (Objeto ▸ Transformar). */
   transformable: boolean
-  menu: { anadir: EntradaSerie[]; ejemplos: EntradaSerie[]; acciones: EntradaSerie[] }
+  menu: { anadir: EntradaSerie[]; ejemplos: EntradaSerie[]; acciones: EntradaSerie[]; herramientas: EntradaSerie[] }
 }
 
 /** Capa lista para el proceso principal: sin funciones, con el color ya resuelto (#rrggbb). */

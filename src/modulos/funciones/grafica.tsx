@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { definir, type Asa, type Capa, type PropsPanel } from '../../nucleo/tipos'
-import { accion, capaVer, casilla, radios, submenu } from '../../nucleo/menu'
+import { accion, capaVer, casilla, radios } from '../../nucleo/menu'
 import { Atajos, Boton, Expresion, Grupo, Interruptor, Muestra, Rango, Segmentado } from '../../nucleo/controles'
 import type { Pintor2D } from '../../render/pintor2d'
 import { contorno, encadenar } from '../../lib/contorno'
@@ -864,27 +864,27 @@ export default definir<S>({
         fila('Recta', 'y = 2x + 1'),
       ],
       ejemplos: EJEMPLOS.map((e) => fila(e.t, e.e)),
-      acciones: [
-        { t: 'Función activa', desactivado: !fs.length, hijos: fs.length ? fs.map((f) => ({ t: f.o.nombre, tipo: 'radio' as const, activo: activa(s, an)?.i === f.i, hacer: () => ({ activa: f.i }) })) : [{ t: 'No hay funciones', desactivado: true }] },
-        submenu<S>('Análisis', [
-          casilla<S>('Tangente en x₀', s.verTangente, (verTangente) => ({ verTangente })),
-          casilla<S>('Derivada', s.verDerivada, (verDerivada) => ({ verDerivada })),
-          casilla<S>('Raíces', s.verRaices, (verRaices) => ({ verRaices })),
-          casilla<S>('Extremos', s.verExtremos, (verExtremos) => ({ verExtremos })),
-          casilla<S>('Inflexiones', s.verInflexion, (verInflexion) => ({ verInflexion })),
-          casilla<S>('Asíntotas', s.verAsintotas, (verAsintotas) => ({ verAsintotas })),
-          casilla<S>('Cortes entre curvas', s.verCortes, (verCortes) => ({ verCortes })),
-          casilla<S>('Estudio de la función', s.verEstudio, (verEstudio) => ({ verEstudio })),
-          casilla<S>('Tabla de valores', s.verTabla, (verTabla) => ({ verTabla })),
-        ]),
-        radios<S, S['area']>('Área', [{ v: 'no', t: 'Sin área' }, { v: 'bajo', t: 'Bajo la curva' }, { v: 'entre', t: 'Entre dos curvas' }], s.area, (area) => ({ area })),
-        radios<S, S['riemann']>(
-          'Sumas de Riemann',
+      herramientas: {
+        'estudio.raices': casilla<S>('', s.verRaices, (verRaices) => ({ verRaices })),
+        'estudio.asintotas': casilla<S>('', s.verAsintotas, (verAsintotas) => ({ verAsintotas })),
+        'estudio.extremos': casilla<S>('', s.verExtremos, (verExtremos) => ({ verExtremos })),
+        'estudio.inflexiones': casilla<S>('', s.verInflexion, (verInflexion) => ({ verInflexion })),
+        'estudio.completo': casilla<S>('', s.verEstudio, (verEstudio) => ({ verEstudio })),
+        'estudio.tabla': casilla<S>('', s.verTabla, (verTabla) => ({ verTabla })),
+        'derivacion.derivada': casilla<S>('', s.verDerivada, (verDerivada) => ({ verDerivada })),
+        'derivacion.tangente': casilla<S>('', s.verTangente, (verTangente) => ({ verTangente })),
+        'integracion.area': radios<S, S['area']>('', [{ v: 'no', t: 'Sin área' }, { v: 'bajo', t: 'Bajo la curva' }, { v: 'entre', t: 'Entre dos curvas' }], s.area, (area) => ({ area })),
+        'integracion.riemann': radios<S, S['riemann']>(
+          '',
           [{ v: 'no', t: 'No' }, { v: 'izquierda', t: 'Izquierda' }, { v: 'derecha', t: 'Derecha' }, { v: 'medio', t: 'Punto medio' }, { v: 'trapecio', t: 'Trapecios' }],
           s.riemann,
           (riemann) => ({ riemann, ...(riemann !== 'no' && s.area === 'no' ? { area: 'bajo' as const } : {}) }),
         ),
-        { t: 'Polinomio de Taylor', hijos: [casilla<S>('Mostrar', s.verTaylor, (verTaylor) => ({ verTaylor })), ...[1, 2, 3, 4, 5, 6, 8, 10].map((n) => ({ t: `Grado ${n}`, tipo: 'radio' as const, activo: s.ordenTaylor === n, hacer: () => ({ ordenTaylor: n, verTaylor: true }) }))] },
+        'series.taylor': { t: '', hijos: [casilla<S>('Mostrar', s.verTaylor, (verTaylor) => ({ verTaylor })), ...[1, 2, 3, 4, 5, 6, 8, 10].map((n) => ({ t: `Grado ${n}`, tipo: 'radio' as const, activo: s.ordenTaylor === n, hacer: () => ({ ordenTaylor: n, verTaylor: true }) }))] },
+        'intersecciones.cortes': casilla<S>('', s.verCortes, (verCortes) => ({ verCortes })),
+      },
+      acciones: [
+        { t: 'Función activa', desactivado: !fs.length, hijos: fs.length ? fs.map((f) => ({ t: f.o.nombre, tipo: 'radio' as const, activo: activa(s, an)?.i === f.i, hacer: () => ({ activa: f.i }) })) : [{ t: 'No hay funciones', desactivado: true }] },
         accion<S>('Quitar las marcas', () => ({ marcas: [] }), !s.marcas.length),
         accion<S>('Borrar todas las filas', () => ({ filas: [{ src: '', visible: true }], marcas: [], activa: 0 })),
       ],

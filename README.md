@@ -31,38 +31,44 @@ npm run app             # compila dist/ y abre la app sin empaquetar (en la barr
 Para actualizar la instalada: `git pull && npm run app:instalar`. Se firma «ad hoc» (sin cuenta de
 desarrollador): en Apple Silicon una app sin ninguna firma no arranca.
 
-Menús, al estilo de Illustrator o Blender:
+Menús, al estilo de Photoshop o Blender, en este orden: Archivo · Edición · Objeto · Herramientas ·
+Escena · Vista · Animación · Módulo · Ventana · Ayuda. El esqueleto es **fijo**: lo que el módulo
+abierto no sabe hacer sale en gris, no desaparece.
 
 - **Archivo**: nueva ventana ⌘N, abrir ⌘O, recientes, guardar ⌘S / como ⇧⌘S, volver a lo
-  guardado, **Exportar ▸** PNG ⌘E, PDF ⇧⌘E, lecturas CSV, estado JSON; imprimir ⌘P.
+  guardado, **Exportar ▸** PNG ⌘E, PDF ⇧⌘E, lecturas CSV, estado JSON, vídeo WebM; imprimir ⌘P.
 - **Edición**: **deshacer ⌘Z / rehacer ⇧⌘Z** en todos los módulos (cada gesto es un paso; en un
   campo de texto, el del campo), cortar/copiar/pegar, **Copiar como ▸** imagen del lienzo ⇧⌘C,
-  fórmula en LaTeX, lecturas; **Restablecer el módulo**.
-- **Módulo**: un submenú por área (Álgebra ▸ Matrices…), ⌘1…⌘9 por área, ⌘[ ⌘] anterior/siguiente,
-  ⌘K buscar; debajo, lo propio del módulo abierto: **Ejemplos ▸** y sus opciones (operación de
-  Matrices, base de Hilbert, método del campo de direcciones, dimensión de onda y calor…).
+  fórmula en LaTeX, lecturas.
 - **Objeto**: **Añadir ▸** lo que el módulo sabe crear (en Gráficas función, punto, deslizador,
   región, paramétrica, polar…; en Espacio 3D puntos, superficies, curvas y sólidos; en Regla y
-  compás las herramientas por grupos; puntos, soluciones, órbitas, focos…), **Eliminar ▸**, ocultar
-  y mostrar todo.
-- **Capas**: cada cosa dibujada con su **muestra de color** y su nombre (y coordenadas o tipo al
-  lado); en su submenú, Mostrar, **Solo esta** y Eliminar. Mostrar todas ⌥⌘3.
+  compás las herramientas por grupos; puntos, soluciones, órbitas, focos…), **Transformar ▸**
+  (mover a pasos de la rejilla y girar ±15° / ±90° en X, Y o Z las figuras que se agarran enteras),
+  **Eliminar ▸**, ocultar todo y mostrar todo ⌥⌘3.
+- **Herramientas**: análisis sobre lo dibujado, por categorías fijas — Estudio de la función
+  (raíces, asíntotas, extremos, inflexiones, estudio completo, tabla), Derivación (f′, tangente),
+  Integración (área, sumas de Riemann), Límites y series (Taylor), Intersecciones, Multivariable
+  (plano tangente, gradiente, curvas de nivel, cortes). Hoy las aportan Gráficas y Superficies.
+- **Escena**: **Ejes ▸** mostrar y nombres; **Rejilla ▸** mostrar, en los tres planos, **ajustar a
+  la rejilla** ⇧⌘' y su **paso** (0,1 · 0,25 · 0,5 · 1, que también usa Mayús al arrastrar).
 - **Vista**: **Punto de vista ▸** partida, desde X/Y/Z, isométrica y **proyección ortográfica**
-  ⇧⌘O; **encuadrar todo ⌘0**, acercar ⌘+ / alejar ⌘− (el lienzo); **Superposiciones ▸** ejes,
-  nombres de los ejes, rejilla, rejilla en los tres planos, leyenda, fórmula, lecturas; **ajustar a
-  la rejilla** ⇧⌘' y su **paso** (0,1 · 0,25 · 0,5 · 1, que también usa Mayús al arrastrar);
-  **Comparar ▸** activar ⌥⌘D, lado a lado / superpuestos, cámaras enlazadas, copiar A en B;
-  autogiro; **modo presentación** ⌘\ (solo el lienzo); **Tema ▸** sistema, claro, oscuro; tamaño
-  de la interfaz ⌥⌘0 / ⌥⌘+ / ⌥⌘−.
+  ⇧⌘O; **encuadrar todo ⌘0**, acercar ⌘+ / alejar ⌘− (el lienzo); **Mostrar ▸** leyenda, fórmula,
+  lecturas; **Comparar ▸** activar ⌥⌘D, lado a lado / superpuestos, cámaras enlazadas, copiar A en
+  B; autogiro; **modo presentación** ⌘\ (solo el lienzo); **Tema ▸**; tamaño de la interfaz
+  ⌥⌘0 / ⌥⌘+ / ⌥⌘−.
 - **Animación** (todos los módulos que se mueven): **reproducir/pausa ⌥⌘P**, avanzar un fotograma
   ⌥⌘→, volver al instante 0 ⌥⌘←, **velocidad** 0,25×–4× y **grabar vídeo del lienzo** en WebM
   ⌥⇧⌘R (se para con la misma orden o al minuto).
-- **Objeto ▸ Transformar**: mover a pasos de la rejilla y girar ±15° / ±90° en X, Y o Z las figuras
-  que se agarran enteras (Aplicaciones lineales).
-- **Clic derecho** en un lienzo: Añadir, Capas, Transformar, punto de vista, encuadrar,
-  superposiciones, reproducir, copiar y exportar la imagen, deshacer.
-- **Ayuda**: **atajos de teclado ⌘/** (también en la web) y esta guía. El buscador de Ayuda de
-  macOS encuentra cualquier entrada de los menús.
+- **Módulo**: un submenú por área (Álgebra ▸ Matrices…), ⌘1…⌘9 por área, ⌘[ ⌘] anterior/siguiente,
+  ⌘K buscar; debajo, lo propio del módulo abierto: **Ejemplos ▸** y sus opciones (operación de
+  Matrices, base de Hilbert, dimensión de onda y calor…); **Restablecer el módulo**.
+- **Ventana ▸ Capas**: cada cosa dibujada con su **muestra de color** y su nombre (y coordenadas o
+  tipo al lado); en su submenú, Mostrar, **Solo esta** y Eliminar.
+- **Clic derecho** en un lienzo: Añadir, Capas, Transformar, punto de vista, encuadrar, ejes,
+  rejilla, mostrar, reproducir, copiar y exportar la imagen, deshacer.
+- **Ayuda**: **Buscar orden ⇧⌘P** (paleta: cualquier entrada escribiendo su nombre, también en la
+  web), **atajos de teclado ⌘/** y esta guía; Desarrollo ▸. El buscador de Ayuda de macOS también
+  encuentra cualquier entrada.
 
 Las preferencias de Vista son de quien usa la app (se guardan aparte), no del documento. Las
 sesiones se guardan como documentos `.calc` (el mismo JSON del autoguardado; también abre los
@@ -70,8 +76,9 @@ sesiones se guardan como documentos `.calc` (el mismo JSON del autoguardado; tam
 **aparte del del navegador**.
 
 Un módulo entra en esos menús declarando `capas(s)` (nombre, color, visible, `alternar`,
-`quitar`) y `menu(s)` (`anadir`, `ejemplos`, `acciones`), con las ayudas de `src/nucleo/menu.ts`
-(`capaVer`, `casilla`, `radios`…). Los declaran los 45 módulos.
+`quitar`) y `menu(s)` (`anadir`, `ejemplos`, `acciones` y `herramientas`, esta última por id del
+esqueleto de `src/nucleo/barra.ts`, p. ej. `'derivacion.tangente'`), con las ayudas de
+`src/nucleo/menu.ts` (`capaVer`, `casilla`, `radios`…). Los declaran los 45 módulos.
 
 Piezas: `electron/main.cjs` (ventanas, menú, diálogos), `electron/preload.cjs` (el puente que la
 página ve como `window.escritorio`) y `src/nucleo/escritorio.ts` (sus tipos; en la web no existe).

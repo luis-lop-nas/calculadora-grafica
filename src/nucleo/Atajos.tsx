@@ -6,6 +6,7 @@ const GRUPOS: Array<[string, Array<[string, string]>]> = [
     'General',
     [
       ['⌘K', 'Buscar módulo'],
+      ['⇧⌘P', 'Buscar orden (cualquier entrada de los menús)'],
       ['⌘Z · ⇧⌘Z', 'Deshacer · Rehacer'],
       ['⌘S · ⇧⌘S', 'Guardar · Guardar como'],
       ['⌘E', 'Exportar PNG'],

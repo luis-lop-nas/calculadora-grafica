@@ -178,7 +178,6 @@ function entradasModulo(lista, grupo, ruta = []) {
 function menuCapas(e) {
   const capas = e.capas ?? []
   if (!capas.length) return [{ label: 'Este módulo no tiene capas', enabled: false }]
-  const alguna = capas.some((c) => c.alternable)
   const items = capas.map((c) => {
     const icon = muestra(c.color)
     const nombre = `${c.nombre}${c.detalle ? `   ${c.detalle}` : ''}`
@@ -194,12 +193,7 @@ function menuCapas(e) {
     }
     return { label: c.visible === false ? `${nombre}   (oculta)` : nombre, icon, submenu: sub }
   })
-  return [
-    { label: 'Mostrar todas', accelerator: 'Alt+CmdOrCtrl+3', enabled: alguna, click: alFoco('capa', { op: 'todas' }) },
-    { label: 'Ocultar todas', enabled: alguna, click: alFoco('capa', { op: 'ninguna' }) },
-    { type: 'separator' },
-    ...items,
-  ]
+  return items
 }
 
 function menuModulos(e) {
@@ -230,6 +224,8 @@ function menuModulos(e) {
     ...(e.menu?.ejemplos?.length || e.menu?.acciones?.length ? [{ type: 'separator' }, { label: e.nombreModulo ?? 'Este módulo', enabled: false }] : []),
     ...(e.menu?.ejemplos?.length ? [{ label: 'Ejemplos', submenu: entradasModulo(e.menu.ejemplos, 'ejemplos') }] : []),
     ...entradasModulo(e.menu?.acciones, 'acciones'),
+    { type: 'separator' },
+    { label: 'Restablecer el módulo', enabled: !!e.id, click: alFoco('restablecer') },
   ]
 }
 
@@ -266,19 +262,33 @@ function piezasMenu(win) {
       casilla('Proyección ortográfica', 'ortografica', { accelerator: 'Shift+CmdOrCtrl+O', enabled: es3D }),
     ],
   }
-  const superposiciones = {
-    label: 'Superposiciones',
-    submenu: [
-      casilla('Ejes', 'ejes'),
-      casilla('Nombres de los ejes', 'nombres'),
-      casilla('Rejilla', 'rejilla'),
-      casilla('Rejilla en los tres planos (XY, XZ, YZ)', 'planos', { enabled: es3D }),
-      { type: 'separator' },
-      casilla('Leyenda', 'leyenda'),
-      casilla('Fórmula', 'formula'),
-      casilla('Lecturas', 'lecturas'),
-    ],
+  const escena = [
+    { label: 'Ejes', submenu: [casilla('Mostrar ejes', 'ejes'), casilla('Nombres de los ejes', 'nombres')] },
+    {
+      label: 'Rejilla',
+      submenu: [
+        casilla('Mostrar rejilla', 'rejilla'),
+        casilla('En los tres planos (XY, XZ, YZ)', 'planos', { enabled: es3D }),
+        { type: 'separator' },
+        casilla('Ajustar a la rejilla', 'ajustar', { accelerator: "Shift+CmdOrCtrl+'" }),
+        {
+          label: 'Paso',
+          submenu: [0.1, 0.25, 0.5, 1].map((v) => ({
+            label: String(v).replace('.', ','),
+            type: 'radio',
+            checked: p.paso === v,
+            enabled: hay,
+            click: prefs({ paso: v }),
+          })),
+        },
+      ],
+    },
+  ]
+  const mostrar = {
+    label: 'Mostrar',
+    submenu: [casilla('Leyenda', 'leyenda'), casilla('Fórmula', 'formula'), casilla('Lecturas', 'lecturas')],
   }
+  const herramientas = hay && e.menu?.herramientas?.length ? entradasModulo(e.menu.herramientas, 'herramientas') : [{ label: 'Sin ventana', enabled: false }]
   const reproducir = {
     label: 'Reproducir (espacio)',
     type: 'checkbox',
@@ -329,12 +339,12 @@ function piezasMenu(win) {
     enabled: hay && !!e.menu?.anadir?.length,
     submenu: e.menu?.anadir?.length ? entradasModulo(e.menu.anadir, 'anadir') : [{ label: 'Nada que añadir aquí', enabled: false }],
   }
-  return { e, hay, p, lienzo, es3D, prefs, vista, casilla, puntoDeVista, superposiciones, reproducir, animacion, transformar, anadir }
+  return { e, hay, p, lienzo, es3D, prefs, vista, casilla, puntoDeVista, escena, mostrar, herramientas, reproducir, animacion, transformar, anadir }
 }
 
 function construirMenu() {
   const win = BrowserWindow.getFocusedWindow()
-  const { e, hay, p, lienzo, es3D, prefs, vista, casilla, puntoDeVista, superposiciones, animacion, transformar, anadir } = piezasMenu(win)
+  const { e, hay, p, lienzo, prefs, vista, casilla, puntoDeVista, escena, mostrar, herramientas, animacion, transformar, anadir } = piezasMenu(win)
   const plantilla = [
     {
       label: 'Calculadora gráfica',
@@ -370,6 +380,8 @@ function construirMenu() {
             { type: 'separator' },
             { label: 'Lecturas (CSV)…', enabled: hay && e.hayLecturas, click: alFoco('csv') },
             { label: 'Estado del módulo (JSON)…', enabled: hay, click: alFoco('json') },
+            { type: 'separator' },
+            { label: 'Grabar vídeo del lienzo (WebM)', type: 'checkbox', checked: !!e.grabando, enabled: lienzo, click: alFoco('grabar') },
           ],
         },
         { type: 'separator' },
@@ -396,13 +408,10 @@ function construirMenu() {
           ],
         },
         { type: 'separator' },
-        { label: 'Restablecer el módulo', enabled: hay, click: alFoco('restablecer') },
-        { type: 'separator' },
         { role: 'startSpeaking', label: 'Empezar a leer' },
         { role: 'stopSpeaking', label: 'Dejar de leer' },
       ],
     },
-    { label: 'Módulo', submenu: menuModulos(e) },
     {
       label: 'Objeto',
       submenu: [
@@ -418,10 +427,11 @@ function construirMenu() {
         },
         { type: 'separator' },
         { label: 'Ocultar todo', enabled: hay && (e.capas ?? []).some((c) => c.alternable), click: alFoco('capa', { op: 'ninguna' }) },
-        { label: 'Mostrar todo', enabled: hay && (e.capas ?? []).some((c) => c.alternable), click: alFoco('capa', { op: 'todas' }) },
+        { label: 'Mostrar todo', accelerator: 'Alt+CmdOrCtrl+3', enabled: hay && (e.capas ?? []).some((c) => c.alternable), click: alFoco('capa', { op: 'todas' }) },
       ],
     },
-    { label: 'Capas', submenu: hay ? menuCapas(e) : [{ label: 'Sin ventana', enabled: false }] },
+    { label: 'Herramientas', submenu: herramientas },
+    { label: 'Escena', submenu: escena },
     {
       label: 'Vista',
       submenu: [
@@ -430,18 +440,7 @@ function construirMenu() {
         { label: 'Acercar', accelerator: 'CmdOrCtrl+Plus', enabled: lienzo, click: vista({ orden: 'acercar', factor: 0.8 }) },
         { label: 'Alejar', accelerator: 'CmdOrCtrl+-', enabled: lienzo, click: vista({ orden: 'acercar', factor: 1.25 }) },
         { type: 'separator' },
-        superposiciones,
-        casilla('Ajustar a la rejilla', 'ajustar', { accelerator: "Shift+CmdOrCtrl+'" }),
-        {
-          label: 'Paso de la rejilla',
-          submenu: [0.1, 0.25, 0.5, 1].map((v) => ({
-            label: String(v).replace('.', ','),
-            type: 'radio',
-            checked: p.paso === v,
-            enabled: hay,
-            click: prefs({ paso: v }),
-          })),
-        },
+        mostrar,
         { type: 'separator' },
         {
           label: 'Comparar A y B',
@@ -477,6 +476,31 @@ function construirMenu() {
             { role: 'zoomOut', label: 'Más pequeña', accelerator: 'Alt+CmdOrCtrl+-' },
           ],
         },
+      ],
+    },
+    { label: 'Animación', submenu: animacion },
+    { label: 'Módulo', submenu: menuModulos(e) },
+    {
+      role: 'windowMenu',
+      label: 'Ventana',
+      submenu: [
+        { role: 'minimize', label: 'Minimizar' },
+        { role: 'zoom', label: 'Zoom' },
+        { type: 'separator' },
+        { label: 'Capas', submenu: hay ? menuCapas(e) : [{ label: 'Sin ventana', enabled: false }] },
+        { type: 'separator' },
+        { role: 'front', label: 'Traer todo al frente' },
+      ],
+    },
+    {
+      role: 'help',
+      label: 'Ayuda',
+      submenu: [
+        // la página escucha ⇧⌘P por su cuenta (también en la web): el menú solo lo muestra
+        { label: 'Buscar orden…', accelerator: 'Shift+CmdOrCtrl+P', registerAccelerator: false, enabled: hay, click: alFoco('ordenes') },
+        { label: 'Atajos de teclado', accelerator: 'CmdOrCtrl+/', enabled: hay, click: alFoco('atajos') },
+        { label: 'Guía de la calculadora (README)', click: () => shell.openPath(path.join(__dirname, '..', 'README.md').replace('app.asar', 'app.asar.unpacked')) },
+        { type: 'separator' },
         {
           label: 'Desarrollo',
           submenu: [
@@ -485,19 +509,6 @@ function construirMenu() {
             { role: 'toggleDevTools', label: 'Herramientas de desarrollo' },
           ],
         },
-      ],
-    },
-    { label: 'Animación', submenu: animacion },
-    {
-      role: 'windowMenu',
-      label: 'Ventana',
-    },
-    {
-      role: 'help',
-      label: 'Ayuda',
-      submenu: [
-        { label: 'Atajos de teclado', accelerator: 'CmdOrCtrl+/', enabled: hay, click: alFoco('atajos') },
-        { label: 'Guía de la calculadora (README)', click: () => shell.openPath(path.join(__dirname, '..', 'README.md').replace('app.asar', 'app.asar.unpacked')) },
       ],
     },
   ]
@@ -549,7 +560,7 @@ ipcMain.handle('listo', (ev, lista) => {
 ipcMain.on('contextual', (ev) => {
   const win = BrowserWindow.fromWebContents(ev.sender)
   if (!win) return
-  const { e, lienzo, es3D, puntoDeVista, superposiciones, reproducir, transformar, anadir } = piezasMenu(win)
+  const { e, lienzo, es3D, puntoDeVista, escena, mostrar, reproducir, transformar, anadir } = piezasMenu(win)
   const plantilla = [
     ...(e.menu?.anadir?.length ? [anadir] : []),
     ...((e.capas ?? []).length ? [{ label: 'Capas', submenu: menuCapas(e) }] : []),
@@ -557,7 +568,8 @@ ipcMain.on('contextual', (ev) => {
     { type: 'separator' },
     ...(es3D ? [puntoDeVista] : []),
     { label: 'Encuadrar todo', enabled: lienzo, click: alFoco('vista', { orden: 'encuadrar' }) },
-    superposiciones,
+    ...escena,
+    mostrar,
     ...(e.animado ? [{ type: 'separator' }, reproducir] : []),
     { type: 'separator' },
     { label: 'Copiar imagen del lienzo', enabled: lienzo, click: alFoco('copiar', 'imagen') },
