@@ -56,6 +56,8 @@ export interface Movil {
   w0: number
   alfa: number
   fase: number
+  /** Restitución propia (goma, madera…); si falta, la del mundo. */
+  e?: number
 }
 
 export type Aire = 'no' | 'lineal' | 'cuadratico'
@@ -374,6 +376,19 @@ const CADA = 6 // una muestra cada 0,01 s
 const V_PEGA = 1 // por debajo de esta velocidad normal (botes de menos de 5 cm), tras chocar se queda apoyado
 const V_QUIETO = 1e-3
 
+/** Tramo sobre el que empieza apoyado un móvil libre (tocándolo y sin velocidad hacia fuera), o −1. */
+export function tramoInicial(tramos: Tramo[], mv: Movil): number {
+  const rad = (mv.ang * Math.PI) / 180
+  const vx = mv.v0 * Math.cos(rad)
+  const vy = mv.v0 * Math.sin(rad)
+  for (let i = 0; i < tramos.length; i++) {
+    const s = tramos[i]
+    const h = hueco(s, mv.x0, mv.y0, mv.r)
+    if (Math.abs(h.d) < 0.02 && h.u >= 0 && h.u <= s.L && s.n[1] > 0.2 && vx * s.n[0] + vy * s.n[1] <= 1e-9) return i
+  }
+  return -1
+}
+
 /**
  * Integra un móvil libre: en el aire con RK4 y detección de choques por bisección; apoyado
  * sobre un tramo, en una dimensión a lo largo de él con gravedad, rozamiento y aire.
@@ -393,18 +408,15 @@ function simularLibre(esc: Escena, mv: Movil, tramos: Tramo[]): Recorrido {
   let quieto: number | null = null
   let paraEn: number | null = null
   const f = (z: Estado4) => derivAire(esc, m, z)
+  const e = mv.e ?? esc.e
   const vertices = verticesDe(tramos)
 
   // ¿empieza apoyado? (sobre algo y sin velocidad hacia fuera)
-  for (let i = 0; i < tramos.length; i++) {
-    const s = tramos[i]
-    const h = hueco(s, y[0], y[1], r)
-    if (Math.abs(h.d) < 0.02 && h.u >= 0 && h.u <= s.L && s.n[1] > 0.2 && y[2] * s.n[0] + y[3] * s.n[1] <= 1e-9) {
-      apoyo = i
-      u = h.u
-      w = y[2] * s.t[0] + y[3] * s.t[1]
-      break
-    }
+  apoyo = tramoInicial(tramos, mv)
+  if (apoyo >= 0) {
+    const s = tramos[apoyo]
+    u = hueco(s, y[0], y[1], r).u
+    w = y[2] * s.t[0] + y[3] * s.t[1]
   }
 
   const posApoyo = (): [number, number] => {
@@ -525,7 +537,7 @@ function simularLibre(esc: Escena, mv: Movil, tramos: Tramo[]): Recorrido {
               // pared: rebota y sigue en el mismo tramo
               u = alFinal ? s.L - (u - s.L) : -u
               const antes = Math.abs(w)
-              w = -esc.e * w
+              w = -e * w
               sucesos.push({ t, x: P[0], y: P[1], tipo: 'impacto', texto: `choca con una pared a ${coma(antes, 2)} m/s`, v: antes })
               hecho = true
             } else if (q.n[1] > 0.05 && (mejor.hacia > 1e-9 || mejor.giro < (25 * Math.PI) / 180)) {
@@ -598,9 +610,9 @@ function simularLibre(esc: Escena, mv: Movil, tramos: Tramo[]): Recorrido {
         const vn = y1[2] * n[0] + y1[3] * n[1]
         const vt = y1[2] * tg[0] + y1[3] * tg[1]
         const rapidez = Math.hypot(y1[2], y1[3])
-        const vn2 = -esc.e * vn
+        const vn2 = -e * vn
         // rozamiento durante el choque: impulso tangencial limitado por μ·(1+e)|vn|
-        const frena = Math.min(Math.abs(vt), mu * (1 + esc.e) * Math.abs(vn))
+        const frena = Math.min(Math.abs(vt), mu * (1 + e) * Math.abs(vn))
         const vt2 = vt - Math.sign(vt) * frena
         // los roces de rodar por una esquina no son choques que valga la pena contar
         if (i >= 0 || Math.abs(vn) > 0.3)

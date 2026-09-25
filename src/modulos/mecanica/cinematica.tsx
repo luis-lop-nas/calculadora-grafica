@@ -3,7 +3,7 @@ import { definir, type Asa, type Capa, type EntradaMenu, type PropsPanel } from 
 import { accion, casilla, radios, submenu } from '../../nucleo/menu'
 import { Atajos, Boton, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { animacion } from '../../nucleo/vista'
-import { BarraEditor, EDITOR_INICIAL, caja, circ, type CampoEditor, type Categoria, type EstadoEditor, type Seleccion } from '../../nucleo/editor'
+import { BarraEditor, EDITOR_INICIAL, caja, circ, pasoRejilla, type CampoEditor, type Categoria, type EstadoEditor, type Seleccion } from '../../nucleo/editor'
 import type { Pintor2D } from '../../render/pintor2d'
 import { graficasTiempo, type PanelTiempo } from '../../render/graficas'
 import { DIM, ecuacion, mags, type Dimensional } from '../../lib/dimensiones'
@@ -14,6 +14,7 @@ import {
   estadoEnT,
   simular,
   solidoEn,
+  tramoInicial,
   superficieBajo,
   tramosDe,
   type Aire,
@@ -431,28 +432,35 @@ const redondea = (v: number, k = 0.1) => Math.round(v / k) * k
 
 /** Coloca el objeto del pincel donde se ha hecho clic (x, y del mundo). */
 export function colocar(s: S, pincel: string, x: number, y: number): Partial<S> {
+  const o = objetoNuevo(s, pincel, x, y)
+  return 'ancho' in o ? { piezas: [...s.piezas, o], sig: s.sig + 1, sel: o.id, ...reiniciar() } : { moviles: [...s.moviles, o], sig: s.sig + 1, sel: o.id, ...reiniciar() }
+}
+
+/** El objeto que crearía un clic en (x, y), sin tocar el estado ni el reloj. */
+export function objetoNuevo(s: S, pincel: string, x: number, y: number): Pieza | Movil {
   const [clase, tipo, variante] = pincel.split(':')
+  const k = pasoRejilla(s.ed)
   if (clase === 'p') {
     const p = piezaNueva(tipo as TipoPieza, s, tipo === 'suelo' ? variante : undefined)
-    p.x = +redondea(x - p.ancho / 2, 0.5).toFixed(2)
+    p.x = +redondea(x - p.ancho / 2, k).toFixed(2)
     if (tipo === 'rampa' && variante === 'i') p.derecha = false
     // la plataforma, a la altura del clic
-    if (tipo === 'plataforma') p.alto = Math.max(1, +redondea(y, 0.5).toFixed(2))
-    return { piezas: [...s.piezas, p], sig: s.sig + 1, sel: p.id, ...reiniciar() }
+    if (tipo === 'plataforma') p.alto = Math.max(1, +redondea(y, k).toFixed(2))
+    return p
   }
   const m = movilNuevo(tipo as TipoMovil, s, variante as Movimiento | undefined)
   if (m.movimiento === 'mcu') {
-    m.x0 = +redondea(x).toFixed(2)
-    m.y0 = +Math.max(m.R, redondea(y)).toFixed(2)
+    m.x0 = +redondea(x, k).toFixed(2)
+    m.y0 = +Math.max(m.R, redondea(y, k)).toFixed(2)
   } else {
-    const xx = redondea(x)
+    const xx = redondea(x, k)
     const apoyo = apoyarEn(activa(s), xx, y, m.r)
     m.x0 = +xx.toFixed(2)
     // cerca de una superficie (o dentro de algo sólido), apoyado en ella; si no, donde se ha hecho clic
-    m.y0 = +(y - apoyo < 0.8 ? apoyo : redondea(y)).toFixed(2)
+    m.y0 = +(y - apoyo < 0.8 ? apoyo : redondea(y, k)).toFixed(2)
     if (m.tipo !== 'coche') m.v0 = 0
   }
-  return { moviles: [...s.moviles, m], sig: s.sig + 1, sel: m.id, ...reiniciar() }
+  return m
 }
 
 function duplicar(s: S, id: string): Partial<S> {
@@ -510,7 +518,7 @@ export function camposDe(s: S, set: (p: Partial<S>) => void): Seleccion | null {
       nombre: `${NOMBRE_PIEZA[p.tipo]}${p.material ? ' de ' + p.material : ''}`,
       color: colorPieza(p),
       campos,
-      paso: 0.5,
+      paso: pasoRejilla(s.ed),
       mover: (dx, dy) => cambia(p.tipo === 'plataforma' ? { x: +(p.x + dx).toFixed(2), alto: Math.max(0.5, +(p.alto + dy).toFixed(2)) } : { x: +(p.x + dx).toFixed(2) }),
       voltear: p.tipo === 'rampa' ? () => cambia({ derecha: p.derecha === false }) : undefined,
       duplicar: dup,
@@ -526,6 +534,8 @@ export function camposDe(s: S, set: (p: Partial<S>) => void): Seleccion | null {
     { etiqueta: 'Masa m', valor: m.m, paso: m.tipo === 'coche' ? 50 : 0.1, min: 0.01, unidad: 'kg', onChange: (v) => cambia({ m: v }) },
     { etiqueta: 'Radio', valor: m.r, paso: 0.05, min: 0.05, max: 5, unidad: 'm', onChange: (r) => cambia({ r }) },
   ]
+  if (m.movimiento === 'libre')
+    campos.push({ etiqueta: m.e === undefined ? 'Rebote e (el del mundo)' : 'Rebote e (propio)', valor: m.e ?? s.e, paso: 0.05, min: 0, max: 1, onChange: (e) => cambia({ e }) })
   if (m.movimiento === 'mcu')
     campos.push(
       { etiqueta: 'Centro x', valor: m.x0, paso: 0.5, unidad: 'm', onChange: (x0) => cambia({ x0 }) },
@@ -553,7 +563,7 @@ export function camposDe(s: S, set: (p: Partial<S>) => void): Seleccion | null {
     nombre: m.nombre,
     color: COLOR_MOVIL[m.tipo],
     campos,
-    paso: 0.5,
+    paso: pasoRejilla(s.ed),
     mover: (dx, dy) => cambia({ x0: +(m.x0 + dx).toFixed(2), y0: +Math.max(m.movimiento === 'mcu' ? 0 : m.r, m.y0 + dy).toFixed(2) }),
     voltear: m.movimiento === 'mcu' ? () => cambia({ w0: -m.w0, alfa: -m.alfa }) : () => cambia({ ang: m.ang >= 0 ? 180 - m.ang : -180 - m.ang }),
     duplicar: dup,
@@ -581,6 +591,32 @@ function Barra({ s, set }: { s: S; set: (p: Partial<S>) => void }) {
       }
     />
   )
+}
+
+/** Dónde está el ratón (para la vista previa del objeto que se va a colocar). */
+let fantasma: { x: number; y: number } | null = null
+
+function cursor(p: { x: number; y: number } | null, s: S): boolean {
+  const antes = fantasma
+  fantasma = p
+  return s.ed.modo === 'construir' && !!s.ed.pincel && (!!antes || !!p)
+}
+
+/** El objeto del pincel, translúcido, donde caería con un clic. */
+function dibujarFantasma(g: Pintor2D, s: S) {
+  if (!fantasma || s.ed.modo !== 'construir' || !s.ed.pincel) return
+  const o = objetoNuevo(s, s.ed.pincel, fantasma.x, fantasma.y)
+  g.ctx.save()
+  g.ctx.globalAlpha = 0.45
+  const p = 'ancho' in o ? o : null
+  const m = 'ancho' in o ? null : o
+  if (p) dibujarPieza(g, p, { ...s, verCotas: false }, false)
+  if (m) {
+    if (m.movimiento === 'mcu') g.curva(circulo(m.x0, m.y0, m.R, 72), g.color('--ink-soft'), 1, true)
+    const [x, y] = m.movimiento === 'mcu' ? [m.x0 + m.R * Math.cos((m.fase * Math.PI) / 180), m.y0 + m.R * Math.sin((m.fase * Math.PI) / 180)] : [m.x0, m.y0]
+    dibujarMovil(g, m, x, y, 1, 0, false)
+  }
+  g.ctx.restore()
 }
 
 /** Clic en el lienzo según el modo del editor. */
@@ -1012,6 +1048,7 @@ function vistaEscena(g: Pintor2D, s: S) {
       g.punto(e.x, e.y, g.color('--rosa'), 5)
       if (e.t <= t) g.texto(`${e.texto} · t = ${num(e.t)} s`, e.x, e.y, g.color('--rosa'), { dy: -24, alinea: 'center' })
     }
+  dibujarFantasma(g, s)
   // rótulo del tiempo, fijo arriba a la izquierda
   const tx = x[0] + 0.02 * (x[1] - x[0])
   const ty = y[1] - 0.04 * (y[1] - y[0])
@@ -1185,27 +1222,56 @@ export function formulasDe(s: S): string[] {
     if (a * m.v0 < 0) out.push(String.raw`t_{\text{parada}}=-\frac{v_0}{a}=${texN(-m.v0 / a, 3)}\ \mathrm{s},\qquad d=\frac{v_0^2}{2|a|}=${texN((m.v0 * m.v0) / (2 * Math.abs(a)), 3)}\ \mathrm{m}`)
     return out
   }
-  // libre
-  if (s.aire === 'no') {
+  // libre: ¿empieza apoyado sobre algo (desliza) o en el aire (tiro)?
+  const sim = calcular(s)
+  const visibles = s.moviles.filter((q) => !s.ocultos.includes(q.id))
+  const rec = sim.recorridos[visibles.indexOf(m)]
+  const i0 = tramoInicial(sim.tramos, m)
+  const primerChoque = rec?.sucesos.find((e) => e.tipo === 'impacto')
+  if (i0 >= 0) {
+    const tr = sim.tramos[i0]
+    const th = Math.atan(Math.abs(tr.t[1] / tr.t[0]))
+    const g = s.g
+    if (th < 1e-6) {
+      out.push(String.raw`a=-\mu_d\,g=-${texN(tr.muD)}\cdot ${texN(g)}=${texN(-tr.muD * g, 3)}\ \mathrm{m/s^2}`)
+      if (m.v0 > 0 && tr.muD > 0 && s.aire === 'no')
+        out.push(String.raw`d=\frac{v_0^2}{2\mu_d g}=${texN((m.v0 * m.v0) / (2 * tr.muD * g), 3)}\ \mathrm{m},\qquad t=\frac{v_0}{\mu_d g}=${texN(m.v0 / (tr.muD * g), 3)}\ \mathrm{s}\ \text{(si no cambia de suelo)}`)
+    } else {
+      const baja = g * (Math.sin(th) - tr.muD * Math.cos(th))
+      const sube = -g * (Math.sin(th) + tr.muD * Math.cos(th))
+      out.push(String.raw`\text{sobre la rampa de } ${texN((th * 180) / Math.PI, 1)}^\circ:\ a_{\downarrow}=g(\sin\theta-\mu_d\cos\theta)=${texN(baja, 3)}\ \mathrm{m/s^2}`)
+      if (m.v0 !== 0) out.push(String.raw`a_{\uparrow}=-g(\sin\theta+\mu_d\cos\theta)=${texN(sube, 3)}\ \mathrm{m/s^2}`)
+      else if (Math.tan(th) <= tr.muE) out.push(String.raw`\tan\theta=${texN(Math.tan(th), 3)}\le\mu_e=${texN(tr.muE)}:\ \text{no arranca}`)
+      else if (s.aire === 'no') {
+        // desde el reposo hasta el pie del tramo: L = ½ a t²
+        const baj = tr.t[1] < 0 ? tr.b : tr.a
+        const L = Math.hypot(baj[0] + m.r * tr.n[0] - m.x0, baj[1] + m.r * tr.n[1] - m.y0)
+        const t = Math.sqrt((2 * L) / baja)
+        out.push(String.raw`\text{hasta el pie } (L=${texN(L, 2)}\ \mathrm{m}):\ t=\sqrt{2L/a}=${texN(t, 3)}\ \mathrm{s},\quad v=a\,t=${texN(baja * t, 3)}\ \mathrm{m/s}`)
+      }
+    }
+  } else if (s.aire === 'no') {
     out.push(String.raw`x(t)=x_0+v_{0x}t = ${texN(m.x0)} ${signo(vx)}\,t`)
     out.push(String.raw`y(t)=y_0+v_{0y}t-\tfrac12 g t^2 = ${texN(m.y0)} ${signo(vy)}\,t - ${texN(s.g / 2, 3)}\,t^2`)
     if (s.g > 0) {
       const tSub = vy > 0 ? vy / s.g : 0
-      const hMax = m.y0 + (vy > 0 ? (vy * vy) / (2 * s.g) : 0)
-      // hasta el suelo (y = r), sin contar lo que haya en medio
-      const yS = m.r
-      const D = vy * vy + 2 * s.g * (m.y0 - yS)
-      if (D >= 0) {
-        const tv = (vy + Math.sqrt(D)) / s.g
-        out.push(String.raw`t_{\text{subida}}=\frac{v_{0y}}{g}=${texN(tSub, 3)}\ \mathrm{s},\quad h_{\max}=y_0+\frac{v_{0y}^2}{2g}=${texN(hMax, 3)}\ \mathrm{m}`)
-        out.push(String.raw`\text{hasta el suelo: } t=${texN(tv, 3)}\ \mathrm{s},\quad \Delta x=${texN(vx * tv, 3)}\ \mathrm{m},\quad |v|=${texN(Math.hypot(vx, vy - s.g * tv), 3)}\ \mathrm{m/s}`)
-      }
+      if (vy > 0 && !(primerChoque && primerChoque.t < tSub))
+        out.push(String.raw`t_{\text{subida}}=\frac{v_{0y}}{g}=${texN(tSub, 3)}\ \mathrm{s},\quad h_{\max}=y_0+\frac{v_{0y}^2}{2g}=${texN(m.y0 + (vy * vy) / (2 * s.g), 3)}\ \mathrm{m}`)
+      // el primer choque sale de la simulación; si es con el suelo, se contrasta con la fórmula
+      const D = vy * vy + 2 * s.g * (m.y0 - m.r)
+      const tSuelo = D >= 0 ? (vy + Math.sqrt(D)) / s.g : NaN
+      if (primerChoque && Math.abs(primerChoque.y - m.r) < 1e-3 && Math.abs(primerChoque.t - tSuelo) < 1e-3)
+        out.push(String.raw`\text{llega al suelo: } t=\frac{v_{0y}+\sqrt{v_{0y}^2+2g(y_0-r)}}{g}=${texN(tSuelo, 3)}\ \mathrm{s},\quad \Delta x=${texN(vx * tSuelo, 3)}\ \mathrm{m},\quad |v|=${texN(Math.hypot(vx, vy - s.g * tSuelo), 3)}\ \mathrm{m/s}`)
+      else if (primerChoque)
+        out.push(String.raw`\text{primer choque (con un obstáculo): } t=${texN(primerChoque.t, 3)}\ \mathrm{s}\ \text{en } (${texN(primerChoque.x)},\ ${texN(primerChoque.y)})\ \mathrm{m},\quad |v|=${texN(primerChoque.v ?? 0, 3)}\ \mathrm{m/s}`)
     }
-  } else if (s.aire === 'lineal') {
+  }
+  if (s.aire === 'lineal') {
     out.push(String.raw`m\,\dot{\vec v}=m\vec g-b\,\vec v,\qquad v_{\text{lím}}=\frac{mg}{b}=${texN((m.m * s.g) / Math.max(1e-9, s.kAire), 3)}\ \mathrm{m/s}`)
-  } else {
+  } else if (s.aire === 'cuadratico') {
     out.push(String.raw`m\,\dot{\vec v}=m\vec g-c\,|\vec v|\,\vec v,\qquad v_{\text{lím}}=\sqrt{\frac{mg}{c}}=${texN(Math.sqrt((m.m * s.g) / Math.max(1e-9, s.kAire)), 3)}\ \mathrm{m/s}`)
   }
+  if (i0 >= 0) return out
   for (const p of s.piezas.filter((q) => q.tipo === 'rampa' && !s.ocultos.includes(q.id))) {
     const th = Math.atan2(p.alto, p.ancho)
     const baja = s.g * (Math.sin(th) - p.muD * Math.cos(th))
@@ -1511,6 +1577,8 @@ export default definir<S>({
             animada: (st) => st.jugando,
             dibujar: (g, st) => vistaEscena(g, st),
             alPulsar: pulsar,
+            barrer: (st) => st.ed.modo === 'borrar',
+            cursor,
             barra: Barra,
             interaccion: {
               asas,

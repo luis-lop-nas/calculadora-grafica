@@ -133,6 +133,10 @@ export interface Vista2D<S> {
   /** Clic sobre el lienzo, en coordenadas del mundo. */
   alPulsar?: (p: { x: number; y: number }, s: S) => Partial<S> | void
   interaccion?: Interaccion<S>
+  /** Si devuelve true, arrastrar no desplaza: repite `alPulsar` por donde pasa (borrar de un trazo). */
+  barrer?: (s: S) => boolean
+  /** El ratón pasa por el lienzo (null al salir), sin arrastrar; true pide redibujar (vista previa). */
+  cursor?: (p: { x: number; y: number } | null, s: S) => boolean
   /** Barra de editor al pie del lienzo (Construir, Editar, Borrar): ver `nucleo/editor.tsx`. */
   barra?: (p: PropsPanel<S>) => ReactNode
 }

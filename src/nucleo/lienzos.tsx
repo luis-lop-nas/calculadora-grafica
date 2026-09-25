@@ -679,6 +679,7 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
     medir()
 
     let arrastre: { x: number; y: number; movido: boolean } | null = null
+    let barrido: unknown = null
     let asas: Asa[] = []
     let encima: string | null = null
     let mano: { id: string; dx: number; dy: number } | null = null
@@ -732,6 +733,8 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
         return
       }
       if (!arrastre) {
+        const cur = estado.current.vista.cursor
+        if (cur && cur(g.aMundo(x, y), estado.current.s)) sucio.current = true
         if (inter) {
           const id = asaEn(x, y)
           if (id !== encima) {
@@ -745,6 +748,18 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
       const dx = ev.clientX - arrastre.x
       const dy = ev.clientY - arrastre.y
       if (Math.abs(dx) + Math.abs(dy) > 3) arrastre.movido = true
+      const v = estado.current.vista
+      if (v.barrer?.(estado.current.s) && v.alPulsar) {
+        // una orden por estado: hasta que React no pinte la anterior, el estado que se ve es viejo
+        if (estado.current.s !== barrido) {
+          const parche = v.alPulsar(g.aMundo(x, y), estado.current.s)
+          if (parche) {
+            barrido = estado.current.s
+            aplicar(parche)
+          }
+        }
+        return
+      }
       if (!navegable) return
       const ux = dx / g.escalaX
       const uy = dy / g.escalaY
@@ -793,6 +808,8 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
       cursor()
     }
     const fuera = () => {
+      const cur = estado.current.vista.cursor
+      if (cur && cur(null, estado.current.s)) sucio.current = true
       if (encima && !mano) {
         encima = null
         sucio.current = true

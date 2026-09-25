@@ -460,6 +460,14 @@ export function pruebasMecanica() {
       const F = formulasDe(st)
       cierto(`cinemática: ejemplo «${ej.t}»`, L.length > 4 && F.length > 0 && L.every(([, v]) => !/NaN|Infinity/.test(v)), JSON.stringify(L))
     }
+    // las fórmulas dependen del escenario: con un edificio en medio no se promete «llega al suelo»
+    const formulasEj = (t: string) => {
+      const ej = EJEMPLOS.find((e) => e.t === t)!
+      return formulasDe({ ...base, ...ej.e, sel: ej.e.moviles?.[0]?.id ?? null } as EstadoCinematica).join(' ')
+    }
+    cierto('cinemática: entre dos edificios, el primer choque es con un obstáculo', formulasEj('Tiro parabólico entre dos edificios').includes('obstáculo'))
+    cierto('cinemática: caída libre, t = √(2h/g) = 3,030 s', formulasEj('Caída libre desde un edificio').includes('3{,}03'))
+    cierto('cinemática: el bloque en la rampa desliza (sin fórmulas de tiro)', /a_\{\\downarrow\}/.test(formulasEj('Bloque en una rampa con rozamiento')) && !formulasEj('Bloque en una rampa con rozamiento').includes('y(t)'))
   }
 
   seccion('Mecánica · lagrangiano montado con piezas')

@@ -20,9 +20,14 @@ export interface EstadoEditor {
   categoria: string
   /** Barra desplegada o recogida. */
   barra: boolean
+  /** Rejilla al colocar y con las flechas (0 = libre, al centímetro). */
+  paso?: number
 }
 
-export const EDITOR_INICIAL: EstadoEditor = { modo: 'editar', pincel: null, categoria: '', barra: true }
+export const EDITOR_INICIAL: EstadoEditor = { modo: 'editar', pincel: null, categoria: '', barra: true, paso: 0.5 }
+
+/** Paso efectivo de la rejilla. */
+export const pasoRejilla = (ed: EstadoEditor) => (ed.paso === undefined ? 0.5 : ed.paso || 0.01)
 
 export interface ObjetoCatalogo {
   id: string
@@ -301,11 +306,18 @@ export function BarraEditor({
           ) : (
             <p className="ed-pista">Clic en un objeto del lienzo para editar sus valores. Arrastra sus asas para moverlo o cambiarle el tamaño.</p>
           ))}
-        {ed.modo === 'borrar' && <p className="ed-pista">Clic en un objeto del lienzo para quitarlo. ⌘Z lo devuelve.</p>}
+        {ed.modo === 'borrar' && <p className="ed-pista">Clic en un objeto del lienzo para quitarlo, o arrastra por encima de varios para quitarlos de un trazo. ⌘Z los devuelve.</p>}
       </div>
 
       <div className="ed-extra">
         {extra}
+        <select className="ed-rejilla-paso" value={ed.paso ?? 0.5} title="Rejilla: al colocar y con las flechas" onChange={(e) => set({ paso: +e.target.value })}>
+          {[0, 0.1, 0.5, 1].map((k) => (
+            <option key={k} value={k}>
+              {k === 0 ? 'Libre' : `▦ ${String(k).replace('.', ',')}`}
+            </option>
+          ))}
+        </select>
         <button type="button" className="ed-boton" onClick={() => set({ barra: false })} title="Recoger el editor">
           ▾
         </button>
