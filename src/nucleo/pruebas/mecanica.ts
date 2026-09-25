@@ -11,6 +11,11 @@ import { boost, componer, doppler, gamma, gemelos, intervalo, rapidez, type Suce
 import oscilaciones, { amplitudForzada, desfase, evolucion, forzadoExacto, modos, type EstadoOsc, type Modos } from '../../modulos/mecanica/oscilaciones'
 import { simular, estadoDado, tiempoAngulo, type Escena, type Movil, type Pieza } from '../../lib/escenario'
 import cinematica, { EJEMPLOS, lecturasDe, formulasDe, type EstadoCinematica } from '../../modulos/mecanica/cinematica'
+import { aTexto, generar, type Montaje } from '../../lib/montaje'
+import { EJEMPLOS_MONTAJE, asasMontaje, moverMontaje, textoDe, type EstadoMontaje } from '../../modulos/mecanica/montaje'
+import { calcularModulo } from '../../modulos/mecanica/lagrangiano'
+import { analizar } from '../../lib/expresion'
+import { desdeNodo, evaluar } from '../../lib/cas/expr'
 import { cerca, cierto, parecido, seccion } from './comun'
 
 export function pruebasMecanica() {
@@ -420,6 +425,79 @@ export function pruebasMecanica() {
       const L = lecturasDe(st)
       const F = formulasDe(st)
       cierto(`cinemática: ejemplo «${ej.t}»`, L.length > 4 && F.length > 0 && L.every(([, v]) => !/NaN|Infinity/.test(v)), JSON.stringify(L))
+    }
+  }
+
+  seccion('Mecánica · lagrangiano montado con piezas')
+  {
+    // el L generado vale lo mismo que el escrito a mano en estados cualesquiera
+    const valorL = (coords: string, L: string, params: Record<string, number>, estado: Record<string, number>) => {
+      const q = coords.split(/,\s*/)
+      const vars = [...q, ...q.map((x) => x + "'"), ...Object.keys(params)]
+      return evaluar(desdeNodo(analizar(L, { variables: vars }), { funciones: {}, valores: {} }), { ...params, ...estado })
+    }
+    const comparar = (nombre: string, mt: Montaje, Lmano: string, traduce: (p: Record<string, number>) => Record<string, number>) => {
+      const g = generar(mt)
+      for (const est of [
+        [0.3, -1.1, 0.7, 0.2],
+        [2.1, 0.4, -1.3, 0.9],
+      ]) {
+        const estado: Record<string, number> = {}
+        g.coords.forEach((q, i) => {
+          estado[q] = est[i]
+          estado[q + "'"] = est[g.coords.length + i]
+        })
+        const a = valorL(g.coords.join(', '), g.L, g.params, estado)
+        const b = valorL(g.coords.join(', '), Lmano, traduce(g.params), estado)
+        // V puede diferir en una constante: se compara L − L(q = 0, q̇ = 0)
+        const cero: Record<string, number> = {}
+        for (const k of Object.keys(estado)) cero[k] = 0
+        const a0 = valorL(g.coords.join(', '), g.L, g.params, cero)
+        const b0 = valorL(g.coords.join(', '), Lmano, traduce(g.params), cero)
+        cerca(`${nombre}: L generado = L de libro`, a - a0, b - b0, 1e-10)
+      }
+    }
+    const P = (i: number) => EJEMPLOS_MONTAJE[i].mt
+    comparar('péndulo', P(0), "1/2*m1*l1^2*theta'^2 + m1*g*l1*cos(theta)", (p) => p)
+    comparar('doble péndulo', P(1), "(m1+m2)/2*l1^2*theta'^2 + m2/2*l2^2*phi'^2 + m2*l1*l2*theta'*phi'*cos(theta-phi) + (m1+m2)*g*l1*cos(theta) + m2*g*l2*cos(phi)", (p) => p)
+    comparar('péndulo elástico', P(3), "m1/2*(r'^2 + r^2*theta'^2) + m1*g*r*cos(theta) - k1/2*(r-l1)^2", (p) => p)
+    comparar('carro con péndulo', P(4), "(m1+m2)/2*x'^2 + m2*l2*x'*theta'*cos(theta) + m2/2*l2^2*theta'^2 + m2*g*l2*cos(theta)", (p) => p)
+    comparar('Atwood con polea de masa M', P(5), "(m1+m2+mp1/2)/2*x'^2 + (m1-m2)*g*x", (p) => p)
+    // rueda (disco) que rueda sin deslizar por una rampa de 25°: a = g sin α/(1 + 1/2); la caja, g sin α
+    {
+      const g = generar(P(8))
+      const est = { coords: g.coords.join(', '), L: g.L, params: Object.entries(g.params).map(([k, v]) => `${k} = ${v}`).join(', '), ci: "x = 0, s = 0, x' = 0, s' = 0", puntos: '', tMax: 1 }
+      const c = calcularModulo({ ...(lagrangiano.inicial as EstadoLagrangiano), ...est, modo: 'escribir' })
+      if ('error' in c) cierto('rueda: se resuelve', false, c.error)
+      else {
+        const a = c.num.aceleraciones([0, 0, 0, 0])
+        const al = Math.sin((25 * Math.PI) / 180) * 9.8
+        cerca('rueda que rueda: a = g sin α / (1 + I/mR²)', a[0], al / 1.5, 1e-12)
+        cerca('caja sin rozamiento: a = g sin α', a[1], al, 1e-12)
+      }
+    }
+    // Atwood: se para cuando se acaba la cuerda
+    {
+      const st = { ...(lagrangiano.inicial as EstadoLagrangiano), modo: 'construir' as const, montaje: P(5), tMax: 10 }
+      const c = calcularModulo(st)
+      cierto('Atwood: la simulación se para al acabarse la cuerda', !('error' in c) && !!c.tr.parada && c.tr.t[c.tr.t.length - 1] < 3, 'error' in c ? c.error : String(c.tr.t.at(-1)))
+    }
+    // todos los ejemplos de montaje generan un L que el módulo integra
+    for (const e of EJEMPLOS_MONTAJE) {
+      const st = { ...(lagrangiano.inicial as EstadoLagrangiano), modo: 'construir' as const, montaje: e.mt, tMax: Math.min(e.tMax, 5) }
+      const c = calcularModulo(st)
+      cierto(`montaje «${e.t}» se resuelve`, !('error' in c), 'error' in c ? c.error : '')
+      // y sus asas vuelven a su sitio
+      const est: EstadoMontaje = { montaje: e.mt, selPieza: null, sigPieza: 100, tMax: e.tMax }
+      for (const asa of asasMontaje(est)) {
+        const parche = moverMontaje(asa.id, { p: asa.p, mayus: false }, est)
+        const otra = asasMontaje({ ...est, ...(parche ?? {}) }).find((a) => a.id === asa.id)
+        const d = otra ? Math.hypot(asa.p[0] - otra.p[0], asa.p[1] - otra.p[1]) : Infinity
+        cierto(`montaje «${e.t}»: el asa ${asa.id} vuelve a su sitio`, d < 1e-2, `se movió ${d}`)
+      }
+      // el texto generado se vuelve a leer igual
+      const t = textoDe(e.mt)
+      cierto(`montaje «${e.t}»: el texto de L se relee`, !('error' in t) && aTexto(generar(e.mt).Lexpr).length > 0)
     }
   }
 }
