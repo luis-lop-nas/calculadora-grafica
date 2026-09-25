@@ -308,7 +308,7 @@ export default definir<S>({
     },
     construir(e, s) {
       e.zArriba(true)
-      e.ejes(1.6, ['x', 'y', 'z'], { rejilla: true, infinita: true, planos: ['xy'], paso: 0.5 })
+      e.ejes(1.6, ['x', 'y', 'z'])
       const M = mezcla(s.A, s.t)
       const T = (v: number[]) => aplicar(M, v) as [number, number, number]
       const acento = e.color('--accent')

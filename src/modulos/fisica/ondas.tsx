@@ -104,6 +104,7 @@ const L = 1.7
 
 function construirPolar(e: Escena3D, s: EstadoOndas) {
   e.zArriba(false)
+  e.suelo()
   e.linea([[-L - 0.1, 0, 0], [L + 0.5, 0, 0]], e.color('--ink-soft'), 0.6)
   e.rotulo('z', [L + 0.7, 0, 0], 0.4)
   e.rotulo('Ey', [-L, 0.95, 0], 0.4)

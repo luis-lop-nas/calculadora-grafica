@@ -110,7 +110,7 @@ function construir(e: Escena3D, s: S) {
   const an = analisis(s)
   const L = s.L
   e.escala = L / 1.5
-  e.ejes(L, ['x', 'y', 'z'], { caja: true, rejilla: true, paso: L / 4 })
+  e.ejes(L, ['x', 'y', 'z'], { caja: true })
   const N = s.detalle
   const mallas = new Map<number, Float32Array>()
   const mallaDe = (i: number) => {

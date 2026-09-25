@@ -554,7 +554,7 @@ const vistaSuperficie: Vista<S> = {
   construir(e, s) {
     e.zArriba(true)
     const dos = s.dim === 2
-    e.ejes(1.2, ['x', dos ? 'y' : 't', dos ? (s.ver === 'v' ? 'v' : 'u') : 'u'], { rejilla: true, paso: 0.4 })
+    e.ejes(1.2, ['x', dos ? 'y' : 't', dos ? (s.ver === 'v' ? 'v' : 'u') : 'u'])
     e.datos.sup = e.superficie(NS, NS)
     const c = corrida(e, s)
     if (c) pintarSuperficie(e, s, c)

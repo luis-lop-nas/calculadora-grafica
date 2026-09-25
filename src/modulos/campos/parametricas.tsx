@@ -307,7 +307,7 @@ export default definir<S>({
     },
     construir(e, s) {
       e.zArriba(true)
-      e.ejes(1.3, ['x', 'y', 'z'], { rejilla: true, infinita: true, paso: 0.4 })
+      e.ejes(1.3, ['x', 'y', 'z'])
       const g = encuadre(s)
       if (!g) return
       const { fx, fy, fz } = piezas(s)

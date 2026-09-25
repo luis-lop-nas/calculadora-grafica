@@ -333,7 +333,7 @@ export default definir<S>({
       e.zArriba(true)
       const canonica = esCanonica(s)
       // con otra base, los ejes de siempre quedan de referencia sin nombre y los nuevos se dibujan finos
-      e.ejes(LARGO, canonica ? ['x', 'y', 'z'] : null, { rejilla: true, infinita: true, planos: ['xy'], paso: 0.5 })
+      e.ejes(LARGO, canonica ? ['x', 'y', 'z'] : null)
       if (!canonica) {
         const tinta = e.color('--ink-soft')
         baseDe(s).forEach((b, i) => {

@@ -209,7 +209,7 @@ export default definir<S>({
     },
     construir(e, s) {
       e.zArriba(true)
-      e.ejes(1.2, ['x', 'y', 'z'], { rejilla: true, infinita: true, paso: 0.4 })
+      e.ejes(1.2, ['x', 'y', 'z'])
       const { F } = campo(s)
       if (!F) return
 

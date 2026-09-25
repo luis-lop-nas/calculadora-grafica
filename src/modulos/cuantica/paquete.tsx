@@ -118,6 +118,7 @@ export default definir<S>({
     camara: { theta: 0.55, phi: 1.0, r: 3.4 },
     construir(e, s) {
       e.zArriba(false)
+      e.suelo()
       e.linea([
         [-1.1, 0, 0],
         [1.1, 0, 0],

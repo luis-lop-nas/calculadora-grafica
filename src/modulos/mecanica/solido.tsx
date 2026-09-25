@@ -201,7 +201,7 @@ function extension(piezas: Pieza[]): number {
 
 function escenaTensor(e: Escena3D, s: EstadoSolido) {
   const r = leer(s)
-  e.ejes(1.2, ['x', 'y', 'z'], { rejilla: true })
+  e.ejes(1.2, ['x', 'y', 'z'])
   if ('error' in r) return
   const { piezas, T } = r
   const k = 1 / extension(piezas)
@@ -291,7 +291,7 @@ function escenaEuler(e: Escena3D, s: EstadoSolido) {
 }
 
 function escenaPeonza(e: Escena3D, s: EstadoSolido) {
-  e.ejes(1.3, ['x', 'y', 'z'], { rejilla: true })
+  e.ejes(1.3, ['x', 'y', 'z'])
   const tr = trayectoria(s)
   if ('error' in tr) return
   const h = 1.1

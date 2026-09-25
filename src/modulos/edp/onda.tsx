@@ -485,7 +485,7 @@ const vista2d: Vista<EstadoOnda> = {
   camara: { theta: 0.85, phi: 1.24, r: 3.1 },
   construir(e, s) {
     e.zArriba(true)
-    e.ejes(1.2, ['x', 'y', 'z'], { rejilla: true, paso: 0.4 })
+    e.ejes(1.2, ['x', 'y', 'z'])
     e.datos.sup = e.superficie(NU, NU, { alambre: s.alambre })
     e.datos.f = forma2d(s)
     e.datos.w = omega(s)
@@ -529,7 +529,7 @@ const vista3d: Vista<EstadoOnda> = {
     const Lmax = Math.max(...Ls)
     const hs = Ls.map((l) => l / Lmax)
     e.datos.hs = hs
-    e.ejes(1.15, ['x', 'y', 'z'], { rejilla: true, paso: 0.4 })
+    e.ejes(1.15, ['x', 'y', 'z'])
     for (const [a, b] of ARISTAS) e.linea([a.map((c, k) => c * hs[k]) as [number, number, number], b.map((c, k) => c * hs[k]) as [number, number, number]], e.color('--ink-soft'), 0.4)
     const fFisica = forma3d(s)
     const f = (x: number, y: number, z: number) => fFisica(x * Ls[0] / 2, y * Ls[1] / 2, z * Ls[2] / 2)

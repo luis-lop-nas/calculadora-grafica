@@ -285,7 +285,7 @@ export default definir<S>({
       e.zArriba(true)
       const { f } = compilarSuave(s.expr, ['x', 'y'])
       if (!f) {
-        e.ejes(1.2, ['x', 'y', 'z'], { rejilla: true, infinita: true, paso: 0.4 })
+        e.ejes(1.2, ['x', 'y', 'z'])
         return
       }
       const R = s.R
@@ -294,7 +294,7 @@ export default definir<S>({
       if (!g) return
       const { lo, span, Z, X } = g
       const base = -0.95
-      e.ejes(1.25, ['x', 'y', 'z'], { rejilla: true, infinita: true, paso: 0.4 })
+      e.ejes(1.25, ['x', 'y', 'z'])
 
       const col = mapa(s.color)
       const sup = e.superficie(NU, NU, { alambre: s.alambre })

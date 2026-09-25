@@ -75,6 +75,7 @@ export class Escena3D {
 
   fondo() {
     this.renderer.setClearColor(this.color('--stage'), this.transparente ? 0 : 1)
+    for (const m of this.suelos) (m.material as THREE.ShaderMaterial).uniforms.uColor.value = this.color('--ink-soft')
   }
 
   dimensionar(w: number, h: number) {
@@ -142,6 +143,7 @@ export class Escena3D {
 
   pintar() {
     this.colocarCamara()
+    this.ajustarSuelos()
     this.escalarAsas()
     this.renderer.render(this.scene, this.camera)
   }
@@ -325,17 +327,12 @@ export class Escena3D {
     return this.add(s)
   }
 
-  /** Tres ejes centrados en el origen, con sus letras. */
-  ejes(
-    largo = 1.15,
-    etiquetas: [string, string, string] | null = ['x', 'y', 'z'],
-    opts: { caja?: boolean | number; rejilla?: boolean; planos?: Array<'xy' | 'xz' | 'yz'>; infinita?: boolean; paso?: number } = {},
-  ) {
-    if (opts.rejilla && this.mostrarRejilla) {
-      const planos = this.rejillaCompleta ? ['xy', 'xz', 'yz'] as const : opts.planos ?? ['xy']
-      const extension = opts.infinita ? 50 : largo
-      for (const plano of planos) this.rejilla(plano, extension, opts.paso ?? largo / 5).userData.referencia = true
-    }
+  /**
+   * Tres ejes centrados en el origen, con sus letras, sobre el suelo común (`suelo`).
+   * Todos los módulos 3D comparten el mismo escenario: la rejilla no se elige por módulo.
+   */
+  ejes(largo = 1.15, etiquetas: [string, string, string] | null = ['x', 'y', 'z'], opts: { caja?: boolean | number } = {}) {
+    this.suelo()
     if (opts.caja) {
       const l = typeof opts.caja === 'number' ? opts.caja : largo
       this.add(
@@ -363,25 +360,73 @@ export class Escena3D {
     }
   }
 
-  /** Cuadrícula de referencia en uno de los planos coordenados. */
-  rejilla(plano: 'xy' | 'xz' | 'yz', largo = 1.5, paso = 0.3) {
-    const pts: THREE.Vector3[] = []
-    for (let v = -largo; v <= largo + paso * 0.1; v += paso) {
-      if (plano === 'xy') {
-        pts.push(new THREE.Vector3(-largo, v, 0), new THREE.Vector3(largo, v, 0))
-        pts.push(new THREE.Vector3(v, -largo, 0), new THREE.Vector3(v, largo, 0))
-      } else if (plano === 'xz') {
-        pts.push(new THREE.Vector3(-largo, 0, v), new THREE.Vector3(largo, 0, v))
-        pts.push(new THREE.Vector3(v, 0, -largo), new THREE.Vector3(v, 0, largo))
-      } else {
-        pts.push(new THREE.Vector3(0, -largo, v), new THREE.Vector3(0, largo, v))
-        pts.push(new THREE.Vector3(0, v, -largo), new THREE.Vector3(0, v, largo))
-      }
+  /**
+   * Suelo infinito con rejilla al estilo GeoGebra: al acercarse aparecen líneas más finas y al
+   * alejarse se funden, sin saltos (el paso lo fija `pintar` según la distancia de la cámara).
+   * Es el plano horizontal de la pantalla; con «tres planos» del menú Vista se añaden los otros dos.
+   */
+  suelo() {
+    if (!this.mostrarRejilla) return
+    const horizontal = this.conZArriba ? 'xy' : 'xz'
+    const planos = this.rejillaCompleta ? (['xy', 'xz', 'yz'] as const) : [horizontal]
+    for (const plano of planos) {
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          uColor: { value: this.color('--ink-soft') },
+          uPaso: { value: 1 },
+          uMenor: { value: 0 },
+          uCentro: { value: new THREE.Vector2() },
+          uRadio: { value: 10 },
+          uOpacidad: { value: plano === horizontal ? 0.34 : 0.2 },
+        },
+        vertexShader: SUELO_VERTICES,
+        fragmentShader: SUELO_FRAGMENTOS,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        extensions: { derivatives: true } as any,
+      })
+      const malla = this.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat))
+      if (plano === 'xz') malla.rotation.x = Math.PI / 2
+      if (plano === 'yz') malla.rotation.y = Math.PI / 2
+      malla.renderOrder = -2
+      malla.userData.referencia = true
+      malla.userData.suelo = plano
+      this.suelos.push(malla)
     }
-    const geo = new THREE.BufferGeometry().setFromPoints(pts)
-    const lineas = this.add(new THREE.LineSegments(geo, this.matLinea(0.18)))
-    lineas.renderOrder = -2
-    return lineas
+  }
+  private suelos: THREE.Mesh[] = []
+
+  /** Paso de la rejilla y fundido de la fina según la distancia de la cámara (ver `suelo`). */
+  private ajustarSuelos() {
+    this.suelos = this.suelos.filter((m) => m.parent)
+    if (!this.suelos.length) return
+    const r = this.orb.r
+    // niveles de ×2: a la distancia de partida (r ≈ 4) el paso es 0,5; al acercarse, la rejilla
+    // fina (medio paso) se va encendiendo hasta igualar a la gruesa, y entonces pasa a ser ella
+    const nivel = Math.log2(r / 5.2)
+    const paso = 2 ** Math.floor(nivel)
+    const menor = 1 - (nivel - Math.floor(nivel))
+    const centro = this.root.worldToLocal(this.objetivo.clone())
+    const lado = r * 60
+    for (const m of this.suelos) {
+      const u = (m.material as THREE.ShaderMaterial).uniforms
+      u.uPaso.value = paso
+      u.uMenor.value = menor
+      u.uRadio.value = r * 4.5
+      const plano = m.userData.suelo as 'xy' | 'xz' | 'yz'
+      const [a, b] = plano === 'xy' ? [centro.x, centro.y] : plano === 'xz' ? [centro.x, centro.z] : [centro.y, centro.z]
+      // el plano sigue a la cámara (a pasos de la rejilla, para que las líneas no se muevan)
+      const ca = Math.round(a / paso) * paso
+      const cb = Math.round(b / paso) * paso
+      if (plano === 'xy') m.position.set(ca, cb, 0)
+      else if (plano === 'xz') m.position.set(ca, 0, cb)
+      else m.position.set(0, ca, cb)
+      m.scale.set(lado, lado, 1)
+      // en yz la malla está girada: su x local es −z y su y local es y
+      if (plano === 'yz') u.uCentro.value.set(-(b - cb), a - ca)
+      else u.uCentro.value.set(a - ca, b - cb)
+    }
   }
 
   linea(pts: Array<[number, number, number]>, color?: THREE.Color, opacidad = 1, grosor?: number) {
@@ -595,3 +640,39 @@ const texturaPunto = (() => {
   x.fillRect(0, 0, 64, 64)
   return new THREE.CanvasTexture(c)
 })()
+
+/* Rejilla del suelo: líneas antialiasadas con derivadas de pantalla. `vPlano` son las
+   coordenadas del plano (unidades del mundo) relativas al centro de la malla. */
+const SUELO_VERTICES = /* glsl */ `
+varying vec2 vPlano;
+void main() {
+  vec4 mundo = modelMatrix * vec4(position, 1.0);
+  vPlano = position.xy * vec2(length(modelMatrix[0].xyz), length(modelMatrix[1].xyz));
+  gl_Position = projectionMatrix * viewMatrix * mundo;
+}
+`
+const SUELO_FRAGMENTOS = /* glsl */ `
+uniform vec3 uColor;
+uniform float uPaso;
+uniform float uMenor;
+uniform vec2 uCentro;
+uniform float uRadio;
+uniform float uOpacidad;
+varying vec2 vPlano;
+float lineas(vec2 q, float paso) {
+  vec2 c = q / paso;
+  vec2 w = fwidth(c);
+  vec2 g = abs(fract(c - 0.5) - 0.5) / max(w, 1e-5);
+  float l = 1.0 - min(min(g.x, g.y), 1.0);
+  // donde las líneas se amontonan (lejos o muy de canto) se funden en vez de hacer muaré
+  return l * (1.0 - smoothstep(0.25, 0.6, max(w.x, w.y)));
+}
+void main() {
+  float gruesa = lineas(vPlano, uPaso);
+  float fina = lineas(vPlano, uPaso / 2.0) * uMenor;
+  float a = max(gruesa, fina);
+  a *= 1.0 - smoothstep(uRadio * 0.25, uRadio, length(vPlano - uCentro));
+  if (a < 0.003) discard;
+  gl_FragColor = vec4(uColor, a * uOpacidad);
+}
+`
