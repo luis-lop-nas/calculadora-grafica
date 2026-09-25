@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { escritorio } from './escritorio'
 import { AREAS, AREAS_CORTAS, type Area, type ModuloAny } from './tipos'
 
 /** De la más potente a la más concreta; el menú de la app sigue el orden de `MODULOS`, que va igual. */
@@ -52,12 +53,17 @@ export function Navegacion({
             <span className="ruta-modulo">{activo.corto ?? activo.resumen}</span>
           </button>
           <div className="navegacion-relleno" />
-          <button type="button" className="buscar" onClick={() => setPaleta(true)} aria-label="Buscar módulo">
-            <span className="buscar-icono" aria-hidden="true">⌕</span>
-            <span className="buscar-texto">Buscar módulo</span>
-            <kbd>⌘K</kbd>
-          </button>
-          {acciones}
+          {/* en la app de Mac esto vive en el menú nativo (Módulo, Vista) */}
+          {!escritorio && (
+            <>
+              <button type="button" className="buscar" onClick={() => setPaleta(true)} aria-label="Buscar módulo">
+                <span className="buscar-icono" aria-hidden="true">⌕</span>
+                <span className="buscar-texto">Buscar módulo</span>
+                <kbd>⌘K</kbd>
+              </button>
+              {acciones}
+            </>
+          )}
         </div>
       </header>
 
