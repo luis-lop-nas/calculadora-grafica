@@ -1,3 +1,8 @@
+import { abrirMenuRapido } from './MenuRapido'
+import { Rastros2D } from '../render/rastros'
+import { decoracionEscena } from '../render/decoracion'
+import { idDeAsa, propiedades } from './objetos'
+import { contextoSVG } from '../render/svg'
 import { useContext, useEffect, useRef, useState } from 'react'
 import { Escena3D } from '../render/escena3d'
 import { ContextoVista, alOrdenVista, espacio, relojLienzo, type PrefsVista } from './vista'
@@ -7,6 +12,7 @@ import { alCambiarTema } from '../render/tema'
 import * as THREE from 'three'
 import { varCss } from '../render/tema'
 import type { Asa, Vista2D, Vista3D } from './tipos'
+import { leerEscena, ajustarPunto, type AjustesEscena } from './escena'
 
 /** Acepta `--pos`, `var(--pos)` o un color literal. */
 function colorDeAsa(c: string | undefined) {
@@ -39,9 +45,9 @@ const COLOR_EJE = ['--rosa', '--aux', '--accent']
 
 /** Clic derecho: en la app de Mac, el menú contextual nativo (capas, añadir, vista…). */
 function contextual(ev: MouseEvent) {
-  if (!escritorio?.contextual) return
   ev.preventDefault()
-  escritorio.contextual()
+  if(ev.altKey && escritorio?.contextual)escritorio.contextual()
+  else abrirMenuRapido(ev.clientX,ev.clientY)
 }
 
 function ponerPrefs3D(e: Escena3D, p: PrefsVista) {
@@ -81,6 +87,8 @@ export interface Enlace {
 }
 
 interface Extras {
+  onActivar?: () => void
+  onSeleccion?: (id: string | null, multiple: boolean) => void
   enlace?: Enlace | null
   /** Sin fondo propio: va encima de otro lienzo. */
   transparente?: boolean
@@ -91,10 +99,10 @@ interface Extras {
 }
 
 /** Lienzo WebGL con cámara en órbita. */
-export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario, lado }: { vista: Vista3D<any>; s: any; set: (p: any) => void; giro: boolean } & Extras) {
+export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario, lado, onSeleccion, onActivar }: { vista: Vista3D<any>; s: any; set: (p: any) => void; giro: boolean } & Extras) {
   const ref = useRef<HTMLCanvasElement>(null)
-  const estado = useRef({ vista, s, set, giro, enlace })
-  estado.current = { vista, s, set, giro, enlace }
+  const estado = useRef({ vista, s, set, giro, enlace, onSeleccion, onActivar })
+  estado.current = { vista, s, set, giro, enlace, onSeleccion, onActivar }
   const escena = useRef<Escena3D | null>(null)
   const sucio = useRef(true)
   const construyendo = useRef(false)
@@ -258,6 +266,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     void cursor
 
     const abajo = (ev: PointerEvent) => {
+      if (ev.button !== 0) return
       // un clic mientras se gira confirma el giro
       if (girando) {
         girando = null
@@ -283,6 +292,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
           const bajo = asa.sobre === 'superficie' ? null : e.puntoEnPlano(x, y, asa.p, ev.altKey)
           mano = { id: asa.id, desfase: bajo ? asa.p.map((c, i) => c - bajo[i]) : [0, 0, 0], p0: asa.p.slice() }
           elegida = asa.id
+          estado.current.onSeleccion?.(idDeAsa(estado.current.s, asa.id), ev.shiftKey)
           repintarAsas()
           cursor()
           return
@@ -501,7 +511,8 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     canvas.addEventListener('pointercancel', arriba)
     canvas.addEventListener('wheel', rueda, { passive: false })
     canvas.addEventListener('dblclick', doble)
-    canvas.addEventListener('contextmenu', contextual)
+    const contextualLocal=(ev:MouseEvent)=>{const p=local(ev),id=e.asaEn(p.x,p.y);estado.current.onActivar?.();if(id)estado.current.onSeleccion?.(idDeAsa(estado.current.s,id),false);contextual(ev)}
+    canvas.addEventListener('contextmenu', contextualLocal)
     canvas.addEventListener('pointerleave', fuera)
     window.addEventListener('keydown', tecla)
 
@@ -527,8 +538,9 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
         const construir = () => {
           if (!vivo) return
           e.limpiar()
+          e.ajustes = leerEscena(st)
           v.construir(e, st)
-          asas = v.interaccion?.asas(st) ?? []
+          asas = (v.interaccion?.asas(st) ?? []).filter(a => !propiedades(st,idDeAsa(st,a.id)).bloqueado).map(a => ({ ...a, color: propiedades(st,idDeAsa(st,a.id)).color || a.color }))
           if (encima && !asas.some((a) => a.id === encima)) encima = null
           if (elegida && !asas.some((a) => a.id === elegida)) elegida = null
           repintarAsas()
@@ -578,7 +590,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
       canvas.removeEventListener('wheel', rueda)
       canvas.removeEventListener('dblclick', doble)
       canvas.removeEventListener('pointerleave', fuera)
-      canvas.removeEventListener('contextmenu', contextual)
+      canvas.removeEventListener('contextmenu', contextualLocal)
       window.removeEventListener('keydown', tecla)
       e.destruir()
       escena.current = null
@@ -674,23 +686,36 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
 }
 
 /** Lienzo 2D con paneo, zoom y coordenadas del mundo. */
-export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: Vista2D<any>; s: any; set: (p: any) => void } & Extras) {
+export function Lienzo2D({ vista, s, set, enlace, secundario, lado, onSeleccion, onActivar }: { vista: Vista2D<any>; s: any; set: (p: any) => void } & Extras) {
   const ref = useRef<HTMLCanvasElement>(null)
-  const estado = useRef({ vista, s, set, enlace })
-  estado.current = { vista, s, set, enlace }
+  const estado = useRef({ vista, s, set, enlace, onSeleccion, onActivar })
+  estado.current = { vista, s, set, enlace, onSeleccion, onActivar }
   const sucio = useRef(true)
   const { prefs } = useContext(ContextoVista)
   const prefsRef = useRef<PrefsVista>(prefs)
   prefsRef.current = prefs
+  // el efecto principal deja aquí cómo reaccionar a un cambio de la escena (encuadre, proporción)
+  const alCambiarEscena = useRef<(antes: AjustesEscena, ahora: AjustesEscena) => void>(() => {})
 
   useEffect(() => {
     const canvas = ref.current!
     const ctx = canvas.getContext('2d')!
     const g = new Pintor2D(ctx)
+    const rastros = new Rastros2D()
+    const decoracion = decoracionEscena(() => { sucio.current = true })
     const v0 = estado.current.vista
-    g.ventana = v0.ventana ? { x: [...v0.ventana.x], y: [...v0.ventana.y] } : { x: [-5, 5], y: [-5, 5] }
+    const escenaCompatible = (e: AjustesEscena) => v0.logaritmica ? e : {...e,logX:false,logY:false}
+    g.escena = escenaCompatible(leerEscena(estado.current.s))
+    // la ventana de partida: la que fijó el usuario en Escena ▸ Encuadre, o la del módulo
+    const partida = (): { x: [number, number]; y: [number, number] } => {
+      const w = g.escena.encuadre ?? v0.ventana
+      return w ? { x: [...w.x], y: [...w.y] } : { x: [-5, 5], y: [-5, 5] }
+    }
+    g.ventana = partida()
     const navegable = v0.navegable !== false
+    let ultimoInstante = 0
     let primeraVez = true
+    const libre = () => g.escena.proporcion === 'libre' || g.escena.logX || g.escena.logY
 
     const medir = () => {
       // React quita el canvas del DOM antes de limpiar el efecto: en ese hueco puede llegar un aviso
@@ -702,7 +727,8 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
       g.alto = p.clientHeight
       // al cambiar de tamaño se conservan los px por unidad (se ve más o menos mundo): si no, la
       // ventana se estira y la rejilla deja de ser cuadrada
-      if (navegable && !primeraVez && antesAncho > 0 && antesAlto > 0 && (antesAncho !== g.ancho || antesAlto !== g.alto)) {
+      // (con proporción libre la ventana se queda y es el dibujo el que se estira)
+      if (navegable && !libre() && !primeraVez && antesAncho > 0 && antesAlto > 0 && (antesAncho !== g.ancho || antesAlto !== g.alto)) {
         const { x, y } = g.ventana
         const cx = (x[0] + x[1]) / 2
         const cy = (y[0] + y[1]) / 2
@@ -714,7 +740,7 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
       canvas.height = Math.round(g.alto * dpr)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       if (primeraVez && g.ancho > 0) {
-        g.igualarEscala()
+        if (!libre()) g.igualarEscala()
         primeraVez = false
       }
       sucio.current = true
@@ -753,6 +779,7 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
     }
 
     const abajo = (ev: PointerEvent) => {
+      if (ev.button !== 0) return
       canvas.setPointerCapture(ev.pointerId)
       if (espacio.pulsado) {
         espacio.usado = true
@@ -767,6 +794,7 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
         const m = g.aMundo(x, y)
         mano = { id: asa.id, dx: asa.p[0] - m.x, dy: asa.p[1] - m.y }
         elegida = asa.id
+          estado.current.onSeleccion?.(idDeAsa(estado.current.s, asa.id), ev.shiftKey)
         sucio.current = true
         cursor()
         return
@@ -781,7 +809,10 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
         if (!asa) return
         const m = g.aMundo(x, y)
         let p = [asa.eje === 'y' ? asa.p[0] : m.x + mano.dx, asa.eje === 'x' ? asa.p[1] : m.y + mano.dy]
-        if (prefsRef.current.ajustar) p = p.map((c, i) => ((i === 0 && asa.eje === 'y') || (i === 1 && asa.eje === 'x') ? c : Math.round(c / prefsRef.current.paso) * prefsRef.current.paso))
+        if (prefsRef.current.ajustar) {
+          const ajustado = ajustarPunto(p, g.escena)
+          p = ajustado.map((c, i) => ((i === 0 && asa.eje === 'y') || (i === 1 && asa.eje === 'x') ? p[i] : c))
+        }
         aplicar(inter.mover(asa.id, { p, mayus: ev.shiftKey }, estado.current.s))
         return
       }
@@ -800,12 +831,7 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
       const dy = ev.clientY - arrastre.y
       if (Math.abs(dx) + Math.abs(dy) > 3) arrastre.movido = true
       if (!navegable) return
-      const ux = dx / g.escalaX
-      const uy = dy / g.escalaY
-      g.ventana = {
-        x: [g.ventana.x[0] - ux, g.ventana.x[1] - ux],
-        y: [g.ventana.y[0] + uy, g.ventana.y[1] + uy],
-      }
+      g.desplazar(dx, dy)
       arrastre.x = ev.clientX
       arrastre.y = ev.clientY
       sucio.current = true
@@ -821,6 +847,10 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
       if (arrastre && !arrastre.movido && elegida) {
         elegida = null
         sucio.current = true
+      }
+      if (arrastre && !arrastre.movido && estado.current.vista.objetoEn) {
+        const p = local(ev)
+        estado.current.onSeleccion?.(estado.current.vista.objetoEn(g.aMundo(p.x,p.y),estado.current.s),ev.shiftKey)
       }
       const alPulsar = estado.current.vista.alPulsar
       if (arrastre && !arrastre.movido && alPulsar) {
@@ -869,12 +899,7 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
       if (!navegable) return
       ev.preventDefault()
       const r = canvas.getBoundingClientRect()
-      const c = g.aMundo(ev.clientX - r.left, ev.clientY - r.top)
-      const k = Math.exp(ev.deltaY * 0.0012)
-      g.ventana = {
-        x: [c.x + (g.ventana.x[0] - c.x) * k, c.x + (g.ventana.x[1] - c.x) * k],
-        y: [c.y + (g.ventana.y[0] - c.y) * k, c.y + (g.ventana.y[1] - c.y) * k],
-      }
+      g.acercarEn(ev.clientX - r.left, ev.clientY - r.top, Math.exp(ev.deltaY * 0.0012))
       sucio.current = true
     }
     canvas.addEventListener('pointerdown', abajo)
@@ -883,7 +908,8 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
     canvas.addEventListener('pointercancel', () => (arrastre = null))
     canvas.addEventListener('wheel', rueda, { passive: false })
     canvas.addEventListener('dblclick', doble)
-    canvas.addEventListener('contextmenu', contextual)
+    const contextualLocal=(ev:MouseEvent)=>{const p=local(ev),id=asaEn(p.x,p.y),obj=id?idDeAsa(estado.current.s,id):estado.current.vista.objetoEn?.(g.aMundo(p.x,p.y),estado.current.s);estado.current.onActivar?.();if(obj)estado.current.onSeleccion?.(obj,false);contextual(ev)}
+    canvas.addEventListener('contextmenu', contextualLocal)
     canvas.addEventListener('pointerleave', fuera)
     window.addEventListener('keydown', tecla)
 
@@ -926,16 +952,21 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
         }
       }
       const anima = v.animada?.(st) ?? false
-      if (sucio.current || anima) {
+      if (sucio.current || anima || leerEscena(st).rastros.ids.length) {
         sucio.current = false
         g.mostrarEjes = prefsRef.current.ejes
         g.mostrarNombres = prefsRef.current.nombres
         g.mostrarRejilla = prefsRef.current.rejilla
+        g.escena = escenaCompatible(leerEscena(st))
         g.limpiar()
+        decoracion.fondo(g)
+        ultimoInstante = tAnim
         v.dibujar(g, st, tAnim)
-        asas = v.interaccion?.asas(st) ?? []
+        decoracion.guias(g)
+        asas = (v.interaccion?.asas(st) ?? []).filter(a => !propiedades(st,idDeAsa(st,a.id)).bloqueado).map(a => ({ ...a, color: propiedades(st,idDeAsa(st,a.id)).color || a.color }))
         if (encima && !asas.some((a) => a.id === encima)) encima = null
         if (elegida && !asas.some((a) => a.id === elegida)) elegida = null
+        rastros.pintar(g,asas,st,tAnim)
         pintarAsas2d(g, asas, mano?.id ?? encima ?? elegida)
       }
       requestAnimationFrame(bucle)
@@ -944,26 +975,55 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
 
     // Órdenes del menú Vista: encuadrar vuelve a la ventana de partida; acercar escala desde el centro
     const quitarOrdenes = alOrdenVista((o) => {
+          if (o.orden === 'svg') {
+            if (o.lado !== (lado ?? 'A')) return
+            const canvasSVG = document.createElement('canvas')
+            canvasSVG.width = g.ancho; canvasSVG.height = g.alto
+            const svg = contextoSVG(canvasSVG.getContext('2d')!,g.ancho,g.alto)
+            const pintor = new Pintor2D(svg.ctx)
+            pintor.ancho = g.ancho; pintor.alto = g.alto; pintor.ventana = structuredClone(g.ventana)
+            pintor.escena = g.escena; pintor.mostrarEjes = g.mostrarEjes; pintor.mostrarRejilla = g.mostrarRejilla; pintor.mostrarNombres = g.mostrarNombres
+            pintor.limpiar()
+            decoracion.fondo(pintor)
+            estado.current.vista.dibujar(pintor,estado.current.s,ultimoInstante)
+            decoracion.guias(pintor)
+            pintarAsas2d(pintor, asas, null)
+            o.fn(svg.svg())
+            return
+          }
+
           if (o.orden === 'captura') {
             if (o.lado === (lado ?? 'A')) o.fn(canvas)
             return
           }
-          if (secundario || !navegable) return
-          const cx = (g.ventana.x[0] + g.ventana.x[1]) / 2
-          const cy = (g.ventana.y[0] + g.ventana.y[1]) / 2
-          if (o.orden === 'encuadrar') {
-            g.ventana = v0.ventana ? { x: [...v0.ventana.x], y: [...v0.ventana.y] } : { x: [-5, 5], y: [-5, 5] }
-            primeraVez = true
+          if (o.orden === 'leerVentana') {
+            if (o.lado === (lado ?? 'A')) o.fn({ x: [...g.ventana.x], y: [...g.ventana.y] })
+            return
           }
-          else if (o.orden === 'acercar')
-            g.ventana = {
-              x: [cx + (g.ventana.x[0] - cx) * o.factor, cx + (g.ventana.x[1] - cx) * o.factor],
-              y: [cy + (g.ventana.y[0] - cy) * o.factor, cy + (g.ventana.y[1] - cy) * o.factor],
-            }
+          if (secundario || !navegable) return
+          if (o.orden === 'encuadrar') {
+            g.ventana = partida()
+            primeraVez = true
+          } else if (o.orden === 'ventana') {
+            if (o.lado !== (lado ?? 'A')) return
+            g.ventana = { x: [...o.x], y: [...o.y] }
+            primeraVez = true
+          } else if (o.orden === 'acercar') g.acercarEn(g.ancho / 2, g.alto / 2, o.factor)
           else return
           medir()
           sucio.current = true
         })
+
+    alCambiarEscena.current = (antes, ahora) => {
+      g.escena = escenaCompatible(ahora)
+      if (!navegable) return
+      if (JSON.stringify(antes.encuadre) !== JSON.stringify(ahora.encuadre)) {
+        g.ventana = partida()
+        primeraVez = true
+        medir()
+      } else if (!libre() && (antes.proporcion !== ahora.proporcion || antes.logX !== ahora.logX || antes.logY !== ahora.logY)) g.igualarEscala()
+      sucio.current = true
+    }
 
     return () => {
       vivo = false
@@ -976,7 +1036,7 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
       canvas.removeEventListener('wheel', rueda)
       canvas.removeEventListener('dblclick', doble)
       canvas.removeEventListener('pointerleave', fuera)
-      canvas.removeEventListener('contextmenu', contextual)
+      canvas.removeEventListener('contextmenu', contextualLocal)
       window.removeEventListener('keydown', tecla)
     }
   }, [vista])
@@ -984,6 +1044,14 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
   useEffect(() => {
     sucio.current = true
   }, [s, prefs])
+
+  const firmaEscena = JSON.stringify(leerEscena(s))
+  const escenaAntes = useRef(firmaEscena)
+  useEffect(() => {
+    if (escenaAntes.current === firmaEscena) return
+    alCambiarEscena.current(JSON.parse(escenaAntes.current), JSON.parse(firmaEscena))
+    escenaAntes.current = firmaEscena
+  }, [firmaEscena])
 
   return (
     <>

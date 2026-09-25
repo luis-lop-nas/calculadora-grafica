@@ -1,4 +1,7 @@
 import { useEffect } from 'react'
+import { escritorio } from './escritorio'
+const mac = escritorio ? escritorio.plataforma === 'darwin' : /Mac/.test(navigator.platform)
+const atajo = (s: string) => mac ? s : s.replaceAll('⌘', 'Ctrl+').replaceAll('⌥', 'Alt+').replaceAll('⇧', 'Mayús+')
 
 /** Hoja con todos los atajos (⌘/), como la de Illustrator o Blender. */
 const GRUPOS: Array<[string, Array<[string, string]>]> = [
@@ -6,6 +9,10 @@ const GRUPOS: Array<[string, Array<[string, string]>]> = [
     'General',
     [
       ['⌘K', 'Buscar módulo'],
+      ['Q · clic derecho', 'Edición rápida de objetos'],
+      ['1–8 · Esc', 'Elegir sector del menú radial · cerrar'],
+      ['F9', 'Ajustar último cálculo'],
+      ['⌥ + clic derecho', 'Menú contextual nativo completo'],
       ['⇧⌘P', 'Buscar orden (cualquier entrada de los menús)'],
       ['⌘Z · ⇧⌘Z', 'Deshacer · Rehacer'],
       ['⌘S · ⇧⌘S', 'Guardar · Guardar como'],
@@ -79,7 +86,7 @@ export function HojaAtajos({ onCerrar }: { onCerrar: () => void }) {
                 {filas.map(([k, v]) => (
                   <div key={k + v}>
                     <dt>
-                      <kbd>{k}</kbd>
+                      <kbd>{atajo(k)}</kbd>
                     </dt>
                     <dd>{v}</dd>
                   </div>

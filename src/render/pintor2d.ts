@@ -1,4 +1,5 @@
 import { varCss } from './tema'
+import { ESCENA_INICIAL, type AjustesEscena } from '../nucleo/escena'
 
 export interface Ventana {
   x: [number, number]
@@ -18,6 +19,8 @@ export class Pintor2D {
   mostrarEjes = true
   mostrarNombres = true
   mostrarRejilla = true
+  /** Menú Escena: escala log, unidades π, rejilla polar, posición de los ejes… */
+  escena: AjustesEscena = ESCENA_INICIAL
   /** Trozo del lienzo en el que se está dibujando, en píxeles. */
   private vx = 0
   private vy = 0
@@ -64,25 +67,75 @@ export class Pintor2D {
 
   /** Ajusta la ventana para que una unidad del mundo mida lo mismo en x y en y. */
   igualarEscala() {
+    // con un eje logarítmico no hay «misma unidad» en los dos
+    if (this.escena.logX || this.escena.logY) return
     const { x, y } = this.ventana
     const w = this.vw || this.ancho
     const h = this.vh || this.alto
-    const e = Math.max((x[1] - x[0]) / w, (y[1] - y[0]) / h)
+    const r = this.escena.proporcion === 'personalizada' ? this.escena.razon : 1
+    const e = Math.max((x[1] - x[0]) / w, (y[1] - y[0]) / h / r)
     const cx = (x[0] + x[1]) / 2
     const cy = (y[0] + y[1]) / 2
     this.ventana = {
       x: [cx - (e * w) / 2, cx + (e * w) / 2],
-      y: [cy - (e * h) / 2, cy + (e * h) / 2],
+      y: [cy - (e * h * r) / 2, cy + (e * h * r) / 2],
     }
   }
 
   X(x: number) {
     const [a, b] = this.ventana.x
+    if (this.escena.logX) return this.vx + ((lg(x) - lg(a)) / (lg(b) - lg(a))) * this.vw
     return this.vx + ((x - a) / (b - a)) * this.vw
   }
   Y(y: number) {
     const [a, b] = this.ventana.y
+    if (this.escena.logY) return this.vy + this.vh - ((lg(y) - lg(a)) / (lg(b) - lg(a))) * this.vh
     return this.vy + this.vh - ((y - a) / (b - a)) * this.vh
+  }
+
+  /** Un eje logarítmico solo ve x > 0: si la ventana incluye el 0 o negativos, se corre a positivos. */
+  sanearVentana() {
+    const arreglar = (iv: [number, number]): [number, number] => {
+      if (iv[0] > 0) return iv
+      if (iv[1] <= 0) return [0.1, 1000]
+      return [Math.max(iv[1] * 1e-3, 1e-6), iv[1]]
+    }
+    if (this.escena.logX) this.ventana = { ...this.ventana, x: arreglar(this.ventana.x) }
+    if (this.escena.logY) this.ventana = { ...this.ventana, y: arreglar(this.ventana.y) }
+  }
+
+  /** Desplaza la vista tantos píxeles (arrastre): en log se mueve por décadas, no por unidades. */
+  desplazar(dpx: number, dpy: number) {
+    const mover = (iv: [number, number], d: number, log: boolean): [number, number] => {
+      if (!log) return [iv[0] + d * (iv[1] - iv[0]), iv[1] + d * (iv[1] - iv[0])]
+      const [a, b] = [lg(iv[0]), lg(iv[1])]
+      return [10 ** (a + d * (b - a)), 10 ** (b + d * (b - a))]
+    }
+    this.ventana = {
+      x: mover(this.ventana.x, -dpx / (this.vw || this.ancho), this.escena.logX),
+      y: mover(this.ventana.y, dpy / (this.vh || this.alto), this.escena.logY),
+    }
+  }
+
+  /** Acerca (k < 1) o aleja (k > 1) dejando quieto el píxel (px, py). */
+  acercarEn(px: number, py: number, k: number) {
+    const c = this.aMundo(px, py)
+    const escalar = (iv: [number, number], m: number, log: boolean): [number, number] => {
+      if (!log) return [m + (iv[0] - m) * k, m + (iv[1] - m) * k]
+      const lm = lg(m)
+      return [10 ** (lm + (lg(iv[0]) - lm) * k), 10 ** (lm + (lg(iv[1]) - lm) * k)]
+    }
+    this.ventana = { x: escalar(this.ventana.x, c.x, this.escena.logX), y: escalar(this.ventana.y, c.y, this.escena.logY) }
+  }
+
+  /**
+   * Parámetro para muestrear una función de x a lo ancho de la ventana: lineal, o por décadas si
+   * el eje X es logarítmico (si no, las décadas de la izquierda se quedarían sin muestras).
+   */
+  muestreoX(): { a: number; b: number; x: (u: number) => number } {
+    const [a, b] = this.ventana.x
+    if (this.escena.logX) return { a: lg(a), b: lg(b), x: (u) => 10 ** u }
+    return { a, b, x: (u) => u }
   }
   /** Píxeles por unidad del mundo en x. */
   get escalaX() {
@@ -93,9 +146,11 @@ export class Pintor2D {
   }
   aMundo(px: number, py: number) {
     const { x, y } = this.ventana
+    const fx = (px - this.vx) / this.vw
+    const fy = 1 - (py - this.vy) / this.vh
     return {
-      x: x[0] + ((px - this.vx) / this.vw) * (x[1] - x[0]),
-      y: y[0] + (1 - (py - this.vy) / this.vh) * (y[1] - y[0]),
+      x: this.escena.logX ? 10 ** (lg(x[0]) + fx * (lg(x[1]) - lg(x[0]))) : x[0] + fx * (x[1] - x[0]),
+      y: this.escena.logY ? 10 ** (lg(y[0]) + fy * (lg(y[1]) - lg(y[0]))) : y[0] + fy * (y[1] - y[0]),
     }
   }
 
@@ -109,6 +164,7 @@ export class Pintor2D {
     this.vw = this.ancho
     this.vh = this.alto
     this.ctx.clearRect(0, 0, this.ancho, this.alto)
+    if (this.escena.fondo) { this.ctx.fillStyle = this.escena.fondo; this.ctx.fillRect(0,0,this.ancho,this.alto) }
   }
 
   /**
@@ -125,100 +181,189 @@ export class Pintor2D {
     this.trazarEjes(opts, false)
   }
 
+  /**
+   * Marcas de un eje: las gruesas con su número y las finas (con su opacidad, que se funde al
+   * alejarse). Números a pasos bonitos, múltiplos de π, o décadas si el eje es logarítmico.
+   */
+  private marcas(eje: 'x' | 'y', pasoComun?: number): { paso: number; gruesas: Array<{ v: number; t: string }>; finas: Array<{ v: number; alfa: number }> } {
+    const [a, b] = eje === 'x' ? this.ventana.x : this.ventana.y
+    const log = eje === 'x' ? this.escena.logX : this.escena.logY
+    const pi = (eje === 'x' ? this.escena.unidadX : this.escena.unidadY) === 'pi'
+    const largo = eje === 'x' ? this.vw || this.ancho : this.vh || this.alto
+    const gruesas: Array<{ v: number; t: string }> = []
+    const finas: Array<{ v: number; alfa: number }> = []
+    if (log) {
+      const [la, lb] = [lg(a), lg(b)]
+      const pxDecada = largo / Math.max(1e-9, lb - la)
+      // una década de cada 1, 2, 5… según lo apretadas que vayan
+      const salto = pxDecada >= 45 ? 1 : pasoBonito(45 / pxDecada)
+      for (let k = Math.ceil(la / salto) * salto; k <= lb + 1e-9; k += salto) gruesas.push({ v: 10 ** k, t: potencia10(Math.round(k)) })
+      const alfa = 0.5 * fundido(pxDecada * (lg(2) - lg(1)))
+      if (salto === 1 && alfa > 0.01)
+        for (let k = Math.floor(la); k <= Math.ceil(lb); k++) for (let m = 2; m <= 9; m++) finas.push({ v: m * 10 ** k, alfa })
+      return { paso: salto, gruesas, finas }
+    }
+    const e = largo / (b - a)
+    const grados = (eje === 'x' ? this.escena.unidadX : this.escena.unidadY) === 'grados'
+    const fijo = eje === 'x' ? this.escena.pasoX : this.escena.pasoY
+    const paso = Math.max((b-a)/1000, fijo || pasoComun || (pi || grados ? pasoPi(90 / e) : pasoBonito(90 / e)))
+    const n = pi ? 2 : subdivisiones(paso)
+    const alfa = 0.5 * fundido((paso / n) * e)
+    for (let k = Math.ceil(a / paso); k * paso <= b; k++) gruesas.push({ v: k * paso, t: grados ? `${Number((k * paso * 180 / Math.PI).toPrecision(6))}°` : pi ? rotulaPi(k * paso) : rotula(k * paso, paso) })
+    if (alfa > 0.01)
+      for (let k = Math.ceil((a * n) / paso); (k * paso) / n <= b; k++) if (k % n) finas.push({ v: (k * paso) / n, alfa })
+    return { paso, gruesas, finas }
+  }
+
   private trazarEjes(opts: { etiquetaX?: string; etiquetaY?: string }, conRejilla: boolean) {
     const { ctx } = this
+    const esc = this.escena
+    this.sanearVentana()
     const rejilla = conRejilla && this.mostrarRejilla
-    // un paso por eje: si no, una ventana alta y estrecha se llena de números
+    const mx = this.marcas('x')
+    // a escala 1:1 el mismo paso en los dos ejes: celdas cuadradas aunque un redondeo las separe
     const ex = Math.abs(this.escalaX || 1)
     const ey = Math.abs(this.escalaY || 1)
-    const pasoX = pasoBonito(90 / ex)
-    // a escala 1:1 el mismo paso en los dos ejes: celdas cuadradas aunque un redondeo las separe
-    const pasoY = Math.abs(ex - ey) < 0.02 * ex ? pasoX : pasoBonito(90 / ey)
+    const mismoPaso = !esc.logX && !esc.logY && esc.unidadX === esc.unidadY && Math.abs(ex - ey) < 0.02 * ex
+    const my = this.marcas('y', mismoPaso ? mx.paso : undefined)
     ctx.save()
     ctx.lineWidth = 1
     ctx.font = `11px ${varCss('--mono') || 'monospace'}`
     ctx.fillStyle = this.color('--ink-soft')
 
-    if (rejilla) {
+    const polar = esc.sistema === 'polar' && !esc.logX && !esc.logY
+    if (rejilla && polar) this.rejillaPolar(esc.pasoX || mx.paso)
+    else if (rejilla && esc.sistema === 'isometrico' && !esc.logX && !esc.logY) this.rejillaIsometrica(esc.pasoX || mx.paso)
+    else if (rejilla) {
       ctx.strokeStyle = this.color('--grid')
-      const lineas = (paso: number, alfa: number, saltar: number) => {
-        if (alfa <= 0.01) return
+      const vertical = (v: number) => {
+        const px = Math.round(this.X(v)) + 0.5
+        ctx.moveTo(px, this.vy)
+        ctx.lineTo(px, this.vy + this.vh)
+      }
+      const horizontal = (v: number) => {
+        const py = Math.round(this.Y(v)) + 0.5
+        ctx.moveTo(this.vx, py)
+        ctx.lineTo(this.vx + this.vw, py)
+      }
+      const trazar = (vs: Array<{ v: number }>, alfa: number, linea: (v: number) => void) => {
+        if (!vs.length || alfa <= 0.01) return
         ctx.globalAlpha = alfa
         ctx.beginPath()
-        for (let k = Math.ceil(this.ventana.x[0] / paso); k * paso <= this.ventana.x[1]; k++) {
-          if (saltar && k % saltar === 0) continue
-          const px = Math.round(this.X(k * paso)) + 0.5
-          ctx.moveTo(px, this.vy)
-          ctx.lineTo(px, this.vy + this.vh)
-        }
+        for (const m of vs) linea(m.v)
         ctx.stroke()
       }
-      const lineasY = (paso: number, alfa: number, saltar: number) => {
-        if (alfa <= 0.01) return
-        ctx.globalAlpha = alfa
-        ctx.beginPath()
-        for (let k = Math.ceil(this.ventana.y[0] / paso); k * paso <= this.ventana.y[1]; k++) {
-          if (saltar && k % saltar === 0) continue
-          const py = Math.round(this.Y(k * paso)) + 0.5
-          ctx.moveTo(this.vx, py)
-          ctx.lineTo(this.vx + this.vw, py)
-        }
-        ctx.stroke()
-      }
-      const nx = subdivisiones(pasoX)
-      const ny = subdivisiones(pasoY)
-      lineas(pasoX / nx, 0.5 * fundido((pasoX / nx) * Math.abs(this.escalaX)), nx)
-      lineasY(pasoY / ny, 0.5 * fundido((pasoY / ny) * Math.abs(this.escalaY)), ny)
-      lineas(pasoX, 0.75, 0)
-      lineasY(pasoY, 0.75, 0)
+      trazar(mx.finas, mx.finas[0]?.alfa ?? 0, vertical)
+      trazar(my.finas, my.finas[0]?.alfa ?? 0, horizontal)
+      trazar(mx.gruesas, 0.75, vertical)
+      trazar(my.gruesas, 0.75, horizontal)
       ctx.globalAlpha = 1
     }
 
-    // ejes, pegados al borde si el cero queda fuera de la ventana
-    const x0 = Math.max(this.vx + 24, Math.min(this.vx + this.vw - 24, this.X(0)))
-    const y0 = Math.max(this.vy + 18, Math.min(this.vy + this.vh - 18, this.Y(0)))
-    if (!this.mostrarEjes) {
+    // ejes: en el origen (pegados al borde si el cero queda fuera) o en el borde, como una caja;
+    // un eje logarítmico no tiene cero, así que el otro eje va siempre al borde
+    const caja = esc.posicion === 'borde'
+    const x0 =
+      caja || esc.logX
+        ? this.vx + 44
+        : Math.max(this.vx + 24, Math.min(this.vx + this.vw - 24, this.X(esc.posicion === 'cruce' ? esc.cruceX : 0)))
+    const y0 =
+      caja || esc.logY
+        ? this.vy + this.vh - 22
+        : Math.max(this.vy + 18, Math.min(this.vy + this.vh - 18, this.Y(esc.posicion === 'cruce' ? esc.cruceY : 0)))
+    if (!this.mostrarEjes || (!esc.ejeX && !esc.ejeY)) {
       ctx.restore()
       return
     }
-    ctx.strokeStyle = this.color('--ink-soft')
+    ctx.strokeStyle = esc.colorEjes || this.color('--ink-soft')
     ctx.globalAlpha = 0.75
     ctx.beginPath()
-    ctx.moveTo(this.vx, Math.round(y0) + 0.5)
-    ctx.lineTo(this.vx + this.vw, Math.round(y0) + 0.5)
-    ctx.moveTo(Math.round(x0) + 0.5, this.vy)
-    ctx.lineTo(Math.round(x0) + 0.5, this.vy + this.vh)
+    if (esc.ejeX) {
+      ctx.moveTo(this.vx, Math.round(y0) + 0.5)
+      ctx.lineTo(this.vx + this.vw, Math.round(y0) + 0.5)
+    }
+    if (esc.ejeY) {
+      ctx.moveTo(Math.round(x0) + 0.5, this.vy)
+      ctx.lineTo(Math.round(x0) + 0.5, this.vy + this.vh)
+    }
     ctx.stroke()
     ctx.globalAlpha = 1
 
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'top'
-    for (let v = Math.ceil(this.ventana.x[0] / pasoX) * pasoX; v <= this.ventana.x[1]; v += pasoX) {
-      if (Math.abs(v) < pasoX / 2) continue
-      ctx.fillText(rotula(v, pasoX), this.X(v), y0 + 5)
+    // el cero se salta donde se cruzan los ejes; en la caja se rotula
+    const cruce = (v: number, paso: number, log: boolean) => !caja && !log && Math.abs(v) < paso / 2
+    if (esc.ejeX) {
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
+      for (const m of mx.gruesas) {
+        const px = this.X(m.v)
+        // un número pegado al borde saldría cortado
+        if (!cruce(m.v, mx.paso, esc.logX) && px > this.vx + 10 && px < this.vx + this.vw - 10) ctx.fillText(m.t, px, y0 + 5)
+      }
     }
-    ctx.textAlign = 'right'
-    ctx.textBaseline = 'middle'
-    for (let v = Math.ceil(this.ventana.y[0] / pasoY) * pasoY; v <= this.ventana.y[1]; v += pasoY) {
-      if (Math.abs(v) < pasoY / 2) continue
-      ctx.fillText(rotula(v, pasoY), x0 - 6, this.Y(v))
+    if (esc.ejeY) {
+      ctx.textAlign = 'right'
+      ctx.textBaseline = 'middle'
+      for (const m of my.gruesas) {
+        const py = this.Y(m.v)
+        if (!cruce(m.v, my.paso, esc.logY) && py > this.vy + 6 && py < this.vy + this.vh - 6) ctx.fillText(m.t, x0 - 6, py)
+      }
     }
 
-    if (this.mostrarNombres && (opts.etiquetaX || opts.etiquetaY)) {
+    const etX = esc.rotuloX || opts.etiquetaX
+    const etY = esc.rotuloY || opts.etiquetaY
+    if (this.mostrarNombres && (etX || etY)) {
       ctx.font = `italic 19px ${varCss('--serif') || 'serif'}`
       ctx.fillStyle = this.color('--ink-soft')
-      if (opts.etiquetaX) {
+      if (etX && esc.ejeX) {
         ctx.textAlign = 'right'
         ctx.textBaseline = 'bottom'
-        ctx.fillText(opts.etiquetaX, this.vx + this.vw - 10, y0 - 6)
+        ctx.fillText(etX, this.vx + this.vw - 10, y0 - 6)
       }
-      if (opts.etiquetaY) {
+      if (etY && esc.ejeY) {
         ctx.textAlign = 'left'
         ctx.textBaseline = 'top'
-        ctx.fillText(opts.etiquetaY, x0 + 8, this.vy + 8)
+        ctx.fillText(etY, x0 + 8, this.vy + 8)
       }
     }
     ctx.restore()
+  }
+
+  private rejillaPolar(paso: number) {
+    const { ctx } = this
+    const rMax = Math.max(...this.ventana.x.flatMap(x => this.ventana.y.map(y => Math.hypot(x,y))))
+    paso = Math.max(paso, rMax / 300)
+    ctx.save()
+    ctx.beginPath(); ctx.rect(this.vx, this.vy, this.vw, this.vh); ctx.clip()
+    ctx.strokeStyle = this.color('--grid'); ctx.globalAlpha = 0.75
+    ctx.beginPath()
+    for (let r = paso; r <= rMax; r += paso) {
+      ctx.moveTo(this.X(r), this.Y(0))
+      ctx.ellipse(this.X(0), this.Y(0), r*Math.abs(this.escalaX), r*Math.abs(this.escalaY), 0, 0, 2*Math.PI)
+    }
+    for (let a = 0; a < 360; a += this.escena.pasoAngular) {
+      const t = a*Math.PI/180
+      ctx.moveTo(this.X(0), this.Y(0)); ctx.lineTo(this.X(rMax*Math.cos(t)), this.Y(rMax*Math.sin(t)))
+    }
+    ctx.stroke(); ctx.restore()
+  }
+
+  private rejillaIsometrica(paso: number) {
+    const { ctx } = this
+    const { x, y } = this.ventana
+    const h = Math.sqrt(3)/2
+    const r = Math.max(...[...x,...y].map(Math.abs))*3 + paso
+    paso = Math.max(paso, r / 500)
+    ctx.save(); ctx.beginPath(); ctx.rect(this.vx,this.vy,this.vw,this.vh); ctx.clip()
+    ctx.strokeStyle = this.color('--grid'); ctx.globalAlpha = 0.65; ctx.beginPath()
+    for (let k = Math.floor(-r/paso); k*paso <= r; k++) {
+      const b = k*paso
+      ctx.moveTo(this.X(x[0]),this.Y(b*h)); ctx.lineTo(this.X(x[1]),this.Y(b*h))
+      for (const signo of [-1,1]) {
+        ctx.moveTo(this.X(b+signo*y[0]/(2*h)),this.Y(y[0]))
+        ctx.lineTo(this.X(b+signo*y[1]/(2*h)),this.Y(y[1]))
+      }
+    }
+    ctx.stroke(); ctx.restore()
   }
 
   /** Curva a partir de puntos del mundo. */
@@ -232,8 +377,15 @@ export class Pintor2D {
     ctx.lineCap = 'round'
     if (discontinua) ctx.setLineDash([5, 5])
     ctx.beginPath()
-    ctx.moveTo(this.X(pts[0][0]), this.Y(pts[0][1]))
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(this.X(pts[i][0]), this.Y(pts[i][1]))
+    let conectado = false
+    let py = 0
+    for (const [x,y] of pts) {
+      const X = this.X(x), Y = this.Y(y)
+      if (!Number.isFinite(X) || !Number.isFinite(Y)) { conectado = false; continue }
+      if (!conectado || Math.abs(Y-py) > this.alto*4) ctx.moveTo(X,Y)
+      else ctx.lineTo(X,Y)
+      conectado = true; py = Y
+    }
     ctx.stroke()
     ctx.restore()
   }
@@ -286,17 +438,18 @@ export class Pintor2D {
   }
 
   funcion(f: (x: number) => number, color: string, grosor = 2, muestras = 500) {
-    const [a, b] = this.ventana.x
+    const m = this.muestreoX()
     const pts: Array<[number, number]> = []
     for (let i = 0; i <= muestras; i++) {
-      const x = a + ((b - a) * i) / muestras
+      const x = m.x(m.a + ((m.b - m.a) * i) / muestras)
       const y = f(x)
-      if (Number.isFinite(y)) pts.push([x, y])
+      pts.push([x, y])
     }
     this.curva(pts, color, grosor)
   }
 
   punto(x: number, y: number, color: string, r = 4) {
+    if (!Number.isFinite(this.X(x)) || !Number.isFinite(this.Y(y))) return
     const { ctx } = this
     ctx.save()
     ctx.fillStyle = color
@@ -460,4 +613,35 @@ function rotula(v: number, paso: number) {
   const dec = Math.max(0, -Math.floor(Math.log10(paso)))
   // «1» y «1.5», no «1.0» y «1.5»
   return v.toFixed(Math.min(4, dec)).replace(/\.?0+$/, (m) => (m.includes('.') || dec ? '' : m))
+}
+
+const lg = Math.log10
+
+/** Paso en múltiplos de π: π/12, π/6, π/4, π/2, π, 2π, 5π… el primero que no apriete los números. */
+function pasoPi(bruto: number) {
+  const k = bruto / Math.PI
+  for (const c of [1 / 12, 1 / 6, 1 / 4, 1 / 2]) if (k <= c) return c * Math.PI
+  return pasoBonito(Math.max(k, 1)) * Math.PI
+}
+
+/** «π/2», «3π/4», «−2π»: fracción de π con denominador hasta 12. */
+function rotulaPi(v: number) {
+  const k = v / Math.PI
+  if (Math.abs(k) < 1e-9) return '0'
+  for (const d of [1, 2, 3, 4, 6, 12]) {
+    const n = Math.round(k * d)
+    if (Math.abs(n / d - k) > 1e-6) continue
+    const signo = n < 0 ? '−' : ''
+    const m = Math.abs(n)
+    return `${signo}${m === 1 ? '' : m}π${d === 1 ? '' : `/${d}`}`
+  }
+  return `${k.toFixed(2)}π`
+}
+
+const SUPER: Record<string, string> = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' }
+
+/** 10ᵏ: de 0,001 a 1000 con cifras; fuera, en potencia. */
+function potencia10(k: number) {
+  if (k >= -3 && k <= 3) return String(10 ** k)
+  return `10${String(k).replace(/./g, (c) => SUPER[c] ?? c)}`
 }

@@ -1,0 +1,36 @@
+name: Escritorio macOS y Linux
+on: [push, pull_request]
+jobs:
+  escritorio:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run pruebas && npm run mate && npm run pruebas:escritorio && npm run pruebas:herramientas && npm run pruebas:laboratorio
+      - run: npm run build
+      - if: runner.os == 'Linux'
+        run: xvfb-run -a node comprobar/app.mjs && xvfb-run -a node comprobar/menus.mjs && xvfb-run -a env NATIVO=1 node comprobar/laboratorio.mjs
+      - if: runner.os == 'macOS'
+        run: node comprobar/app.mjs && node comprobar/menus.mjs && NATIVO=1 node comprobar/laboratorio.mjs
+      - run: npm run app:empaquetar
+      - if: runner.os == 'Linux'
+        run: xvfb-run -a npm run comprobar:paquete
+      - if: runner.os == 'macOS'
+        run: npm run comprobar:paquete
+      - if: runner.os == 'Linux'
+        run: node electron/empaquetar.mjs linux --distribuir
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: calculadora-linux
+          path: |
+            release/*.AppImage
+            release/*.deb

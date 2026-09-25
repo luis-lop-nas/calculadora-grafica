@@ -1,14 +1,33 @@
+import { MenuRapido, abrirMenuRapido, leerFavoritos, claveOrden, type AccionRapida } from './MenuRapido'
+import { CabeceraPanel } from './CabeceraPanel'
+import { leerAnimacion, useAnimacionParametro } from './animarParametro'
+import { BarraWeb } from './BarraWeb'
+import { PanelResultados, leerResultados } from './Resultados'
+import { ImportarImagen } from './ImportarImagen'
+import { menuObjetos, menuSeleccion } from './menuObjetos'
+import { DialogoValores, type SolicitudValores } from './DialogoValores'
+import { ImportarCSV } from './ImportarCSV'
+import { descargarTexto, escaparHTML } from './archivos'
+import { serializarEntradas as serieEntradas, buscarComando } from './comandos'
+import { actualizarDerivados, desvincularEdiciones, fuenteParaHerramienta, leerDependencias } from './derivados'
+import { HERRAMIENTAS_CALCULO, numeroHerramienta, numeroFuente, type Herramienta, type ResultadoHerramienta } from '../lib/herramientas'
+import { DialogoHerramienta } from './DialogoHerramienta'
+import { Inspector } from './Inspector'
+import { CLAVE_OBJETOS, conIdentidad, leerPropiedades, idDeAsa, objetosModulo, ejecutarObjetos } from './objetos'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MODULOS } from './registro'
 import { Navegacion } from './Navegacion'
 import { Lienzo2D, Lienzo3D, type Enlace } from './lienzos'
 import { Formula, Lecturas, RanuraResultado } from './controles'
 import { AREAS_CORTAS, type Capa, type EntradaMenu, type ModuloAny, type Vista } from './tipos'
-import { escritorio, type CapaMenu, type EntradaSerie, type Orden } from './escritorio'
-import { animacion, ContextoVista, espacio, guardarPrefs, leerPrefs, ordenVista, type OrdenVista, type PrefsVista } from './vista'
+import { escritorio, type CapaMenu, type Orden } from './escritorio'
+import { animacion, ContextoVista, espacio, guardarPrefs, leerPrefs, validarPrefs, ordenVista, type OrdenVista, type PrefsVista } from './vista'
 import { HojaAtajos } from './Atajos'
 import { fusionar, HERRAMIENTAS } from './barra'
 import { aplanar, PaletaOrdenes, type OrdenPaleta } from './Ordenes'
+import { CLAVE_ESCENA, leerEscena, parcheEscena, prefsEscena } from './escena'
+import { menuEscena, menuVistaEscena } from './menuEscena'
+import { DialogoEscena } from './DialogoEscena'
 
 /** ¿El foco está en un campo de texto? Ahí ⌘Z y compañía son los del propio campo. */
 const enCampo = () => !!(document.activeElement as HTMLElement | null)?.matches?.('input, textarea, select, [contenteditable="true"]')
@@ -73,15 +92,6 @@ function empezarGrabacion(id: string, alTerminar: () => void): Promise<MediaReco
     if (!hecho) listo(null)
   })
 }
-
-const serieEntradas = (es: EntradaMenu<any>[] | undefined): EntradaSerie[] =>
-  (es ?? []).map((e) => ({
-    t: e.t,
-    tipo: e.tipo ?? 'accion',
-    activo: !!e.activo,
-    desactivado: !!e.desactivado,
-    ...(e.hijos ? { hijos: serieEntradas(e.hijos) } : {}),
-  }))
 
 const serieCapas = (cs: Capa<any>[]): CapaMenu[] =>
   cs.map((c) => ({
@@ -172,7 +182,7 @@ function compatible(base: unknown, valor: unknown): boolean {
   // un diccionario vacío al empezar (deslizadores por nombre) admite cualquier clave
   if (base && typeof base === 'object' && Object.keys(base).length === 0) return !!valor && typeof valor === 'object' && !Array.isArray(valor)
   if (base && typeof base === 'object') {
-    return !!valor && typeof valor === 'object' && Object.entries(valor).every(([k, v]) => k in base && compatible((base as Record<string, unknown>)[k], v))
+    return !!valor && typeof valor === 'object' && Object.entries(valor).every(([k, v]) => (k === '_id' && typeof v === 'string') || (k in base && compatible((base as Record<string, unknown>)[k], v)))
   }
   return valor === base
 }
@@ -182,6 +192,12 @@ function estadoGuardado(base: Record<string, unknown>, valor: unknown) {
   const limpio: Record<string, unknown> = {}
   for (const [clave, dato] of Object.entries(valor)) {
     if (clave in base && compatible(base[clave], dato)) limpio[clave] = dato
+    // la escena del menú Escena no está en el estado inicial de ningún módulo: se valida aparte
+    else if (clave === '_animacion') limpio[clave] = leerAnimacion({ _animacion: dato })
+    else if (clave === '_resultados') limpio[clave] = leerResultados({ _resultados: dato })
+    else if (clave === '_derivados') limpio[clave] = leerDependencias({ _derivados: dato })
+    else if (clave === CLAVE_OBJETOS) limpio[clave] = leerPropiedades({ [CLAVE_OBJETOS]: dato })
+    else if (clave === CLAVE_ESCENA) limpio[clave] = leerEscena({ [CLAVE_ESCENA]: dato })
   }
   return limpio
 }
@@ -193,7 +209,7 @@ function estadosDe(guardado: Guardado) {
   const base: Record<string, any> = {}
   for (const m of MODULOS) {
     const guardadoModulo = guardado.version && guardado.version !== VERSION_ESTADO ? {} : estadoGuardado(m.inicial, guardado.estados?.[m.id])
-    base[m.id] = { ...m.inicial, ...guardadoModulo }
+    base[m.id] = actualizarDerivados(conIdentidad({ ...m.inicial, ...guardadoModulo }))
   }
   return base
 }
@@ -213,7 +229,7 @@ function estadosBDe(guardado: Guardado) {
   const base: Record<string, any> = {}
   for (const m of MODULOS) {
     const g = guardado.estadosB?.[m.id]
-    if (g) base[m.id] = { ...m.inicial, ...estadoGuardado(m.inicial, g) }
+    if (g) base[m.id] = actualizarDerivados(conIdentidad({ ...m.inicial, ...estadoGuardado(m.inicial, g) }))
   }
   return base
 }
@@ -225,7 +241,37 @@ export default function App() {
   const [giro, setGiro] = useState(false)
   const [, tic] = useState(0)
   const [atajos, setAtajos] = useState(false)
+  const [solicitud, setSolicitud] = useState<SolicitudValores | null>(null)
+  const [importarImagen, setImportarImagen] = useState(false)
+  const [verResultados, setVerResultados] = useState(false)
+  const [verHistorial, setVerHistorial] = useState(false)
+  const [importarCSV, setImportarCSV] = useState(false)
+  const [camposRepetidos,setCamposRepetidos] = useState<Record<string,string>|undefined>()
+  const [herramienta, setHerramienta] = useState<Herramienta | null>(null)
+  const [ultimoResultado, setUltimoResultado] = useState<{ r: ResultadoHerramienta; campos: Record<string,string> } | null>(null)
+  const [inspector, setInspector] = useState(false)
+  const [panelAcoplado, setPanelAcoplado] = useState(false)
+  useEffect(()=>{if(inspector){setVerResultados(false);setVerHistorial(false)}},[inspector])
+  const [selecciones, setSelecciones] = useState<Record<string,string[]>>({})
+  const [rapido,setRapido] = useState<{x:number;y:number}|null>(null)
+  useEffect(()=>{
+    let puntero={x:window.innerWidth/2,y:window.innerHeight/2}
+    const mover=(e:PointerEvent)=>{puntero={x:e.clientX,y:e.clientY}}
+    const abrir=(e:Event)=>setRapido((e as CustomEvent).detail)
+    const tecla=(e:KeyboardEvent)=>{if(e.key.toLowerCase()==='q'&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&!enCampo()&&!document.querySelector('[role=dialog]')){e.preventDefault();setRapido(puntero)}}
+    window.addEventListener('pointermove',mover);window.addEventListener('calculadora:menu-rapido',abrir);document.addEventListener('keydown',tecla)
+    return()=>{window.removeEventListener('pointermove',mover);window.removeEventListener('calculadora:menu-rapido',abrir);document.removeEventListener('keydown',tecla)}
+  },[])
   const [ordenes, setOrdenes] = useState(false)
+  const [ordenesNativas, setOrdenesNativas] = useState<OrdenPaleta[] | null>(null)
+  useEffect(()=>{
+    if((!ordenes && !rapido) || !escritorio)return
+    let vigente=true
+    const nativo = escritorio
+    nativo.ordenes().then(os=>{if(vigente)setOrdenesNativas(os.map(o=>({...o,hacer:()=>{void nativo.ejecutarOrden(o.id)}})))}).catch(()=>{})
+    return()=>{vigente=false;setOrdenesNativas(null)}
+  },[ordenes,rapido])
+  const [dialogoEscena, setDialogoEscena] = useState<{ x: [number, number]; y: [number, number] } | null>(null)
   // menú Animación: el reloj común de los lienzos lee `animacion`; aquí se guarda para el menú
   const [anim, setAnim] = useState({ pausado: false, velocidad: 1 })
   useEffect(() => {
@@ -255,22 +301,87 @@ export default function App() {
   const moduloB = useMemo(() => MODULOS.find((m) => m.id === cmp.idB)!, [cmp.idB])
   const sA = estados[id]
   const setA = (parche: Partial<any>) =>
-    setEstados((e) => ({ ...e, [id]: { ...e[id], ...parche } }))
+    setEstados((e) => ({ ...e, [id]: actualizarDerivados(desvincularEdiciones(e[id],conIdentidad({ ...e[id], ...parche }))) }))
   const sB = estadosB[cmp.idB] ?? (cmp.idB === id ? sA : moduloB.inicial)
   const setB = (parche: Partial<any>) =>
-    setEstadosB((e) => ({ ...e, [cmp.idB]: { ...(e[cmp.idB] ?? sB), ...parche } }))
+    setEstadosB((e) => ({ ...e, [cmp.idB]: actualizarDerivados(desvincularEdiciones(e[cmp.idB] ?? sB,conIdentidad({ ...(e[cmp.idB] ?? sB), ...parche }))) }))
+  useAnimacionParametro(modulo,sA,setA)
+  useAnimacionParametro(moduloB,sB,setB,cmp.activo)
   const editandoB = cmp.activo && cmp.editando === 'B'
   const moduloP = editandoB ? moduloB : modulo
   const s = editandoB ? sB : sA
   const set = editandoB ? setB : setA
+
+  const claveSeleccion = `${editandoB ? 'B' : 'A'}:${moduloP.id}`
+  const resultadoActual = leerResultados(s).at(-1)?.r
+  useEffect(()=>{setUltimoResultado(null);setHerramienta(null);setCamposRepetidos(undefined)},[claveSeleccion])
+  const objetos = objetosModulo(moduloP, s)
+  const seleccion = (selecciones[claveSeleccion] ?? []).filter(id => objetos.some(o => o.id === id))
+  const principal = moduloP.seleccion?.actual(s)
+  useEffect(()=>{
+    if(principal===undefined)return
+    setSelecciones(prev=>{
+      const actual=prev[claveSeleccion]??[]
+      if(principal ? actual.includes(principal) : actual.length===0)return prev
+      return {...prev,[claveSeleccion]:principal?[principal]:[]}
+    })
+  },[principal,claveSeleccion])
+  const elegirObjetos = (ids: string[]) => {
+    setSelecciones(x => ({ ...x, [claveSeleccion]: ids }))
+    const p = moduloP.seleccion?.poner(ids.at(-1)??null,s) ?? objetos.find(o => o.id === ids.at(-1))?.seleccionar?.(s)
+    if (p) set(p)
+  }
+
+  useEffect(() => {
+    const copiar = (e: ClipboardEvent) => {
+      if (enCampo() || !Array.isArray(s.filas)) return
+      const elegidos = objetos.filter(o => seleccion.includes(o.id) && o.fuente !== undefined)
+      if (!elegidos.length || !e.clipboardData) return
+      e.preventDefault()
+      const datos = JSON.stringify({ tipo: 'calculadora-objetos', version: 1, filas: elegidos.map(o => ({ src: o.fuente, visible: o.visible !== false })) })
+      e.clipboardData.setData('application/x-calculadora-objetos', datos)
+      e.clipboardData.setData('text/plain', datos)
+      if (e.type === 'cut') set(ejecutarObjetos(s, objetos, elegidos.map(o => o.id), 'eliminar'))
+    }
+    const pegar = (e: ClipboardEvent) => {
+      if (enCampo() || !Array.isArray(s.filas)) return
+      try {
+        const datos = JSON.parse(e.clipboardData?.getData('application/x-calculadora-objetos') || e.clipboardData?.getData('text/plain') || '')
+        if (datos.tipo !== 'calculadora-objetos' || datos.version !== 1 || !Array.isArray(datos.filas) || datos.filas.length > 1000) return
+        const filas = datos.filas.filter((f:any) => typeof f?.src === 'string' && f.src.length < 10000).map((f:any) => ({src:f.src,visible:f.visible !== false}))
+        e.preventDefault();set({filas:[...s.filas,...filas]})
+      } catch { /* otro formato de portapapeles */ }
+    }
+    document.addEventListener('copy',copiar);document.addEventListener('cut',copiar);document.addEventListener('paste',pegar)
+    return () => {document.removeEventListener('copy',copiar);document.removeEventListener('cut',copiar);document.removeEventListener('paste',pegar)}
+  }, [s, seleccion.join('|'), moduloP])
+
+  const objetosTeclado = useRef({s,set,objetos,seleccion,elegirObjetos})
+  objetosTeclado.current={s,set,objetos,seleccion,elegirObjetos}
+  useEffect(()=>{
+    const tecla=(e:KeyboardEvent)=>{
+      if(enCampo() || document.querySelector('[role="dialog"], .paleta'))return
+      const t=objetosTeclado.current,mod=e.metaKey||e.ctrlKey,k=e.key.toLowerCase()
+      if(mod && k==='i' && !escritorio){e.preventDefault();setInspector(true)}
+      else if(mod && k==='a'){e.preventDefault();t.elegirObjetos(t.objetos.map(o=>o.id))}
+      else if((mod&&k==='d') || (!mod&&(k==='delete'||k==='backspace'))) {
+        const op=mod?'duplicar':'eliminar'
+        if(!t.objetos.some(o=>t.seleccion.includes(o.id)&&(op==='duplicar'?o.duplicar:o.quitar)))return
+        e.preventDefault();e.stopPropagation();t.set(ejecutarObjetos(t.s,t.objetos,t.seleccion,op))
+      }
+    }
+    document.addEventListener('keydown',tecla)
+    return()=>document.removeEventListener('keydown',tecla)
+  },[])
 
   // Historial por módulo: cada gesto (un arrastre, una tecla) se agrupa en un paso cuando el
   // estado lleva 400 ms quieto. Deshacer actúa sobre el módulo abierto (lado A).
   const historial = useRef<Record<string, Historia>>({})
   const pendiente = useRef<{ id: string; t: number } | null>(null)
   const restaurando = useRef(false)
-  const estadosRef = useRef(estados)
-  estadosRef.current = estados
+  const todosEstados = { ...Object.fromEntries(Object.entries(estados).map(([k,v]) => [`A:${k}`,v])), ...Object.fromEntries(Object.entries(estadosB).map(([k,v]) => [`B:${k}`,v])) }
+  const estadosRef = useRef(todosEstados)
+  estadosRef.current = todosEstados
   const [, versionHistoria] = useState(0)
   const historiaDe = (m: string) => (historial.current[m] ??= { pasado: [], futuro: [], ultimo: estadosRef.current[m] })
   const confirmar = () => {
@@ -288,37 +399,38 @@ export default function App() {
     versionHistoria((v) => v + 1)
   }
   useEffect(() => {
-    historiaDe(id)
-  }, [id])
+    historiaDe(claveSeleccion)
+  }, [claveSeleccion])
   useEffect(() => {
     if (restaurando.current) {
       restaurando.current = false
       return
     }
-    const h = historiaDe(id)
-    if (estados[id] === h.ultimo) return
-    if (pendiente.current && pendiente.current.id !== id) confirmar()
+    const h = historiaDe(claveSeleccion)
+    if (s === h.ultimo) return
+    if (pendiente.current && pendiente.current.id !== claveSeleccion) confirmar()
     if (pendiente.current) clearTimeout(pendiente.current.t)
-    pendiente.current = { id, t: window.setTimeout(confirmar, 400) }
-  }, [estados])
+    pendiente.current = { id: claveSeleccion, t: window.setTimeout(confirmar, 400) }
+  }, [estados, estadosB, claveSeleccion])
   const viajar = (atras: boolean) => {
     confirmar()
-    const h = historiaDe(id)
+    const h = historiaDe(claveSeleccion)
     const origen = atras ? h.pasado : h.futuro
     if (!origen.length) return
     const destino = origen.pop()
-    ;(atras ? h.futuro : h.pasado).push(estadosRef.current[id])
+    ;(atras ? h.futuro : h.pasado).push(estadosRef.current[claveSeleccion])
     h.ultimo = destino
     restaurando.current = true
-    setEstados((e) => ({ ...e, [id]: destino }))
+    if (editandoB) setEstadosB(e => ({ ...e, [cmp.idB]: destino }))
+    else setEstados(e => ({ ...e, [id]: destino }))
     versionHistoria((v) => v + 1)
   }
   const deshacer = () => viajar(true)
   const rehacer = () => viajar(false)
-  const hist = historial.current[id]
-  const puedeDeshacer = !!hist?.pasado.length || (!!pendiente.current && pendiente.current.id === id)
+  const hist = historial.current[claveSeleccion]
+  const puedeDeshacer = !!hist?.pasado.length || (!!pendiente.current && pendiente.current.id === claveSeleccion)
   const puedeRehacer = !!hist?.futuro.length
-  const restablecer = () => setEstados((e) => ({ ...e, [id]: structuredClone(modulo.inicial) }))
+  const restablecer = () => {set({...conIdentidad(structuredClone(moduloP.inicial)),_escena:leerEscena(moduloP.inicial),_objetos:{},_derivados:[],_resultados:[],_animacion:null});setSelecciones(v=>({...v,[claveSeleccion]:[]}))}
 
   const empezarComparar = () => {
     // la primera vez, B es una copia de A: el modo «mismo módulo con otros parámetros»
@@ -495,7 +607,33 @@ export default function App() {
         setCmp((c) => ({ ...c, ...(dato as Partial<Comparar>) }))
       }
     } else if (orden === 'atajos') setAtajos((v) => !v)
+    else if (orden === 'resultados') {setVerResultados(v=>!v);setInspector(false);setVerHistorial(false)}
+    else if (orden === 'historial') { setVerHistorial(v=>!v); setInspector(false); setVerResultados(false) }
+    else if (orden === 'ajustes') setSolicitud({titulo:'Ajustes de la aplicación',campos:[{id:'tema',texto:'Tema',valor:prefs.tema,opciones:['sistema','claro','oscuro']}],aplicar:({tema})=>cambiarPrefs({tema:tema as PrefsVista['tema']})})
+    else if (orden === 'espacioTrabajo') {
+      if(dato==='guardar') { setSolicitud({titulo:'Guardar espacio de trabajo',campos:[{id:'nombre',texto:'Nombre',valor:'Mi espacio'}],aplicar:({nombre})=>{if(!nombre.trim())throw new Error('Escribe un nombre');localStorage.setItem('calculadora:espacio',JSON.stringify({nombre,prefs,inspector,panelAcoplado}))}}) }
+      else if(dato==='recuperar') { try { const v=JSON.parse(localStorage.getItem('calculadora:espacio')??'null');if(v){cambiarPrefs(validarPrefs(v.prefs));setInspector(!!v.inspector);setPanelAcoplado(!!v.panelAcoplado)} } catch {} }
+      else { cambiarPrefs({presentacion:dato==='presentacion'});setInspector(dato==='geometria');if(dato==='comparacion'&&!cmp.activo)empezarComparar() }
+    }
+    else if (orden === 'importarImagen') setImportarImagen(true)
+    else if (orden === 'importarCSV') setImportarCSV(true)
+    else if (orden === 'svg') ordenVista({ orden: 'svg', lado: editandoB ? 'B' : 'A', fn: svg => descargarTexto(`calculadora-${moduloP.id}.svg`,svg,'image/svg+xml') })
+    else if (orden === 'informe') {
+      const r = resultadoActual
+      const rows = r?.filas ?? lecturas ?? []
+      const contenido = `<!doctype html><html lang="es"><meta charset="utf-8"><title>Resultados de Calculadora</title><body><h1>${escaparHTML(moduloP.corto ?? moduloP.resumen)}</h1><p>${escaparHTML(r?.metodo ?? '')}</p><pre>${escaparHTML(r?.fuente ?? r?.tex ?? '')}</pre><table>${rows.map(([a,b]) => `<tr><th>${escaparHTML(a)}</th><td>${escaparHTML(b)}</td></tr>`).join('')}</table></body></html>`
+      descargarTexto('resultados-calculadora.html',contenido,'text/html')
+    }
+    else if (orden === 'rapido') abrirMenuRapido()
+    else if (orden === 'seleccionarTodo') {if(enCampo())document.execCommand('selectAll');else elegirObjetos(objetos.map(o=>o.id))}
+    else if (orden === 'propiedades') setInspector(v => !v)
     else if (orden === 'ordenes') setOrdenes((v) => !v)
+    else if (orden === 'animarParametro') {
+      const ps=moduloP.parametrosAnimables?.(s)??[]
+      if(!ps.length)return
+      const a=leerAnimacion(s),p=ps.find(p=>p.id===a?.parametro)??ps[0]
+      setSolicitud({titulo:'Animar parámetro',campos:[{id:'parametro',texto:'Parámetro',valor:p.id,opciones:ps.map(p=>p.id)},{id:'desde',texto:'Desde',valor:String(a?.desde??p.min)},{id:'hasta',texto:'Hasta',valor:String(a?.hasta??p.max)},{id:'duracion',texto:'Duración (segundos)',valor:String(a?.duracion??4)},{id:'modo',texto:'Repetición',valor:a?.modo??'ida y vuelta',opciones:['una vez','bucle','ida y vuelta']}],aplicar:c=>{const a=leerAnimacion({_animacion:{...c,desde:numeroHerramienta(c.desde),hasta:numeroHerramienta(c.hasta),duracion:numeroHerramienta(c.duracion),activa:true}});if(!a)throw new Error('Rango creciente y duración mínima de 0,1 segundos');set({_animacion:a});setAnim(v=>({...v,pausado:false}))}})
+    }
     else if (orden === 'animacion') {
       if (dato === 'paso') {
         animacion.pasos++
@@ -521,14 +659,17 @@ export default function App() {
         })
     }
     else if (orden === 'menuModulo' && dato && typeof dato === 'object') {
-      const { grupo, ruta } = dato as { grupo: 'anadir' | 'ejemplos' | 'acciones' | 'herramientas'; ruta: number[] }
+      const { grupo, ruta, id: comandoId } = dato as { grupo: 'anadir' | 'ejemplos' | 'acciones' | 'herramientas' | 'escena' | 'vistaEscena' | 'objeto' | 'seleccion' | 'animacionExtra'; ruta?: number[]; id?: string }
       const propio = moduloP.menu?.(s)
-      let lista = grupo === 'herramientas' ? fusionar(HERRAMIENTAS, propio?.herramientas) : propio?.[grupo]
+      let lista = grupo === 'herramientas' ? herramientasMenu : grupo === 'escena' ? escenaMenu : grupo === 'vistaEscena' ? vistaEscenaMenu : grupo === 'objeto' ? objetoMenu : grupo === 'seleccion' ? seleccionMenu : grupo === 'animacionExtra' ? animacionExtraMenu : propio?.[grupo]
       let e: EntradaMenu<any> | undefined
-      for (const i of ruta) {
+      if (comandoId) e = buscarComando(lista ?? [], comandoId)
+      for (const i of ruta ?? []) {
         e = lista?.[i]
+        if (e?.desactivado) return
         lista = e?.hijos
       }
+      if (e?.desactivado) return
       const p = e?.hacer?.(s)
       if (p) set(p)
     } else if (orden === 'capa' && dato && typeof dato === 'object') {
@@ -558,21 +699,78 @@ export default function App() {
     return quitar
   }, [])
 
-  const hayLienzo = vistaA.tipo !== 'html'
+  const hayLienzo = (editandoB ? vistaB : vistaA).tipo !== 'html'
   const hayLecturas = !!lecturas?.length
   const hayFormula = !!formula?.length
   const vistaP = editandoB ? vistaB : vistaA
-  const animado = (vistaP.tipo === '3d' ? !!vistaP.animar : vistaP.tipo === '2d' ? !!vistaP.animada?.(s) : false) || (!!s && 'jugando' in s)
+  const animado = (vistaP.tipo === '3d' ? !!vistaP.animar : vistaP.tipo === '2d' ? !!vistaP.animada?.(s) : false) || (!!s && 'jugando' in s) || !!leerAnimacion(s)?.activa
   animadoRef.current = animado
   const transformable = vistaP.tipo !== 'html' && !!vistaP.interaccion?.objeto
   // capas y entradas propias del módulo que se edita; se mandan como texto para no reconstruir el menú sin motivo
-  const capasMenu = JSON.stringify(serieCapas(moduloP.capas?.(s) ?? []))
+  const capasMenu = JSON.stringify(serieCapas(objetos))
   const menuPropio = moduloP.menu?.(s)
+  const herramientasComunes = Object.fromEntries(HERRAMIENTAS_CALCULO.map(h => [h.id, { t: h.nombre, hacer: () => { setUltimoResultado(null); setCamposRepetidos(undefined); setHerramienta(h) } }]))
+  const herramientasMenu = fusionar(HERRAMIENTAS, { ...menuPropio?.herramientas, ...herramientasComunes })
+  const ladoP: 'A' | 'B' = editandoB ? 'B' : 'A'
+  const vistaTipo = (editandoB ? vistaB : vistaA).tipo
+  const contextoEscena = {
+    s,
+    tipo: vistaTipo,
+    logaritmica: vistaP.tipo === '2d' && !!vistaP.logaritmica,
+    prefs: prefsEscena(s, prefs),
+    cambiarPrefs: (p: Partial<PrefsVista>) => set(parcheEscena(s, { vista: { ...leerEscena(s).vista, ...p } })),
+    editar: () => ordenVista({ orden: 'leerVentana', lado: ladoP, fn: (v) => setDialogoEscena(v) }),
+    imagen: () => setImportarImagen(true),
+    guia: () => setSolicitud({titulo:'Añadir guía',campos:[{id:'eje',texto:'Orientación',valor:'vertical',opciones:['vertical','horizontal']},{id:'valor',texto:'Coordenada',valor:'0'}],aplicar:({eje,valor})=>set(parcheEscena(s,{guias:[...leerEscena(s).guias,{eje:eje==='vertical'?'x':'y',valor:numeroHerramienta(valor)}]}))}),
+    texto: () => setSolicitud({titulo:'Añadir anotación',campos:[{id:'texto',texto:'Texto',valor:''},{id:'x',texto:'X',valor:'0'},{id:'y',texto:'Y',valor:'0'}],aplicar:({texto,x,y})=>{if(!texto.trim())throw new Error('Escribe un texto');set(parcheEscena(s,{textos:[...leerEscena(s).textos,{texto,x:numeroHerramienta(x),y:numeroHerramienta(y)}]}))}}),
+    guardarVista: () =>
+      ordenVista({
+        orden: 'leerVentana',
+        lado: ladoP,
+        fn: (v) => {
+          const vistas = leerEscena(s).vistas
+          setSolicitud({ titulo: 'Guardar vista', campos: [{id:'nombre',texto:'Nombre',valor:`Vista ${vistas.length+1}`}], aplicar: ({nombre}) => { if (!nombre.trim()) throw new Error('Escribe un nombre'); set(parcheEscena(s,{vistas:[...vistas,{nombre:nombre.trim(),...v}]})) } })
+        },
+      }),
+    renombrarVista: (i: number) => { const vistas=leerEscena(s).vistas; setSolicitud({ titulo: 'Renombrar vista', campos: [{id:'nombre',texto:'Nombre',valor:vistas[i].nombre}], aplicar: ({nombre}) => { if(!nombre.trim()) throw new Error('Escribe un nombre'); set(parcheEscena(s,{vistas:vistas.map((v,j)=>j===i?{...v,nombre:nombre.trim()}:v)})) } }) },
+    irAVista: (v: { x: [number, number]; y: [number, number] }) => ordenVista({ orden: 'ventana', lado: ladoP, x: v.x, y: v.y }),
+  }
+  const escenaMenu = menuEscena(contextoEscena)
+  const vistaEscenaMenu = menuVistaEscena(contextoEscena)
+  const contextoObjetos = { s, objetos, seleccion, elegir: elegirObjetos, propiedades: () => setInspector(true), ordenar: moduloP.id === 'grafica' }
+  const objetoMenu = [{id:'objeto.rapido',t:'Edición rápida (Q)',hacer:()=>abrirMenuRapido()},...menuObjetos(contextoObjetos), ...menuPropio?.objeto ?? []]
+  const ultimoCalculo = leerResultados(s).at(-1)
+  const ajustarUltimo = () => {
+    const h = HERRAMIENTAS_CALCULO.find(h=>h.id===ultimoCalculo?.herramienta)
+    if(h && ultimoCalculo){setCamposRepetidos(ultimoCalculo.campos);setUltimoResultado(null);setHerramienta(h)}
+  }
+  const ajustarRef = useRef(ajustarUltimo);ajustarRef.current=ajustarUltimo
+  useEffect(()=>{if(escritorio)return;const tecla=(e:KeyboardEvent)=>{if(e.key==='F9'&&!enCampo()&&!document.querySelector('[role=dialog]')){e.preventDefault();ajustarRef.current()}};document.addEventListener('keydown',tecla);return()=>document.removeEventListener('keydown',tecla)},[])
+  const seleccionMenu: EntradaMenu<any>[] = [...menuSeleccion(contextoObjetos),{id:'edicion.ajustarCalculo',t:'Ajustar último cálculo…',atajo:'F9',desactivado:!ultimoCalculo,hacer:ajustarUltimo}]
+  const rastro = leerEscena(s).rastros
+  const idsRastreables = vistaP.tipo==='2d' ? (vistaP.interaccion?.asas(s)??[]).map(a=>idDeAsa(s,a.id)).filter(id=>seleccion.includes(id)) : []
+  const animacionExtraMenu: EntradaMenu<any>[] = [
+    ...menuPropio?.animacion ?? [],
+    {id:'animacion.parametro',t:'Animar parámetro…',desactivado:!moduloP.parametrosAnimables?.(s).length,hacer:()=>alOrden.current('animarParametro',undefined)},
+    {id:'animacion.detenerParametro',t:'Detener animación de parámetro',desactivado:!leerAnimacion(s)?.activa,hacer:()=>({_animacion:{...leerAnimacion(s),activa:false}})},
+    {id:'animacion.rastros',t:'Rastros de puntos',hijos:[
+      {id:'rastros.activar',t:'Activar en puntos seleccionados',desactivado:!idsRastreables.length,hacer:()=>parcheEscena(s,{rastros:{...rastro,ids:[...new Set([...rastro.ids,...idsRastreables])]}})},
+      {id:'rastros.duracion',t:'Persistencia…',desactivado:vistaP.tipo!=='2d',hacer:()=>setSolicitud({titulo:'Persistencia del rastro',campos:[{id:'segundos',texto:'Segundos',valor:String(rastro.segundos)}],aplicar:({segundos})=>{const n=numeroHerramienta(segundos);if(n<=0||n>120)throw new Error('Duración entre 0 y 120 segundos');set(parcheEscena(s,{rastros:{...rastro,segundos:n}}))}})},
+      {id:'rastros.borrar',t:'Borrar rastros',desactivado:!rastro.ids.length,hacer:()=>parcheEscena(s,{rastros:{...rastro,revision:rastro.revision+1}})},
+      {id:'rastros.desactivar',t:'Desactivar rastros',desactivado:!rastro.ids.length,hacer:()=>parcheEscena(s,{rastros:{...rastro,ids:[]}})},
+    ]},
+  ]
+
   const menuMenu = JSON.stringify({
+    objeto: serieEntradas(objetoMenu),
+    seleccion: serieEntradas(seleccionMenu),
+    animacionExtra: serieEntradas(animacionExtraMenu),
     anadir: serieEntradas(menuPropio?.anadir),
     ejemplos: serieEntradas(menuPropio?.ejemplos),
     acciones: serieEntradas(menuPropio?.acciones),
-    herramientas: serieEntradas(fusionar(HERRAMIENTAS, menuPropio?.herramientas)),
+    herramientas: serieEntradas(herramientasMenu),
+    escena: serieEntradas(escenaMenu),
+    vistaEscena: serieEntradas(vistaEscenaMenu),
   })
   useEffect(() => {
     escritorio?.estado({
@@ -583,7 +781,7 @@ export default function App() {
       hayLienzo,
       hayLecturas,
       modificado,
-      tipo: vistaA.tipo,
+      tipo: vistaP.tipo,
       hayFormula,
       puedeDeshacer,
       puedeRehacer,
@@ -594,6 +792,7 @@ export default function App() {
       nombreModulo: moduloP.corto ?? moduloP.resumen,
       capas: JSON.parse(capasMenu),
       animado,
+      parametrosAnimables: !!moduloP.parametrosAnimables?.(s).length,
       pausado: anim.pausado,
       velocidad: anim.velocidad,
       grabando,
@@ -603,21 +802,37 @@ export default function App() {
   }, [id, cmp.activo, cmp.disposicion, cmp.enlazar, cmp.idB, giro, es3D, hayLienzo, hayLecturas, modificado, vistaA.tipo, hayFormula, puedeDeshacer, puedeRehacer, prefs, moduloP, capasMenu, menuMenu, animado, anim, grabando, transformable])
   const listaOrdenes = (): OrdenPaleta[] => {
     const ejecutar = (e: EntradaMenu<any>) => {
+      if (e.desactivado) return
       const p = e.hacer?.(s)
       if (p) set(p)
     }
-    const pref = (camino: string[], clave: 'ejes' | 'nombres' | 'rejilla' | 'ajustar' | 'leyenda' | 'formula' | 'lecturas' | 'presentacion'): OrdenPaleta => ({
+    const pref = (camino: string[], clave: 'leyenda' | 'formula' | 'lecturas' | 'presentacion'): OrdenPaleta => ({
       camino,
       activo: prefs[clave],
       hacer: () => cambiarPrefs({ [clave]: !prefs[clave] }),
     })
     return [
+      { camino: ['Ventana','Resultados y pasos'], hacer: () => alOrden.current('resultados',undefined) },
+      { camino: ['Ayuda','Buscar orden…'], hacer: () => setOrdenes(true) },
+      { camino: ['Ayuda','Atajos de teclado'], hacer: () => setAtajos(true) },
+      ...['png','csv','json'].map(dato=>({camino:['Archivo','Exportar',dato.toUpperCase()],hacer:()=>alOrden.current(dato as Orden,undefined)})),
+      ...aplanar(animacionExtraMenu, ['Animación'], ejecutar),
+      { camino: ['Animación','Reproducir / pausar'], desactivado: !animado, hacer: () => alOrden.current('animacion',{pausado:!anim.pausado}) },
+      { camino: ['Animación','Avanzar fotograma'], desactivado: !animado, hacer: () => alOrden.current('animacion','paso') },
+      { camino: ['Animación','Volver al inicio'], hacer: () => alOrden.current('animacion','reiniciar') },
+      { camino: ['Ventana','Historial'], hacer: () => alOrden.current('historial',undefined) },
+      { camino: ['Calculadora','Ajustes…'], hacer: () => alOrden.current('ajustes',undefined) },
+      ...['estudio','geometria','presentacion','comparacion','guardar','recuperar'].map(dato => ({camino:['Ventana','Espacios de trabajo',dato],hacer:()=>alOrden.current('espacioTrabajo',dato)})),
+      { camino: ['Archivo','Importar','Imagen de fondo…'], desactivado: vistaP.tipo !== '2d', hacer: () => setImportarImagen(true) },
+      { camino: ['Archivo','Importar','Datos CSV en Gráficas…'], hacer: () => setImportarCSV(true) },
+      { camino: ['Archivo','Exportar','SVG…'], desactivado: vistaP.tipo !== '2d', hacer: () => alOrden.current('svg', undefined) },
+      { camino: ['Archivo','Exportar','Informe de resultados…'], hacer: () => alOrden.current('informe', undefined) },
+      ...aplanar(objetoMenu, ['Objeto'], ejecutar),
+      ...aplanar(seleccionMenu, ['Edición'], ejecutar),
       ...aplanar(menuPropio?.anadir, ['Objeto', 'Añadir'], ejecutar),
-      ...aplanar(fusionar(HERRAMIENTAS, menuPropio?.herramientas), ['Herramientas'], ejecutar),
-      pref(['Escena', 'Ejes', 'Mostrar ejes'], 'ejes'),
-      pref(['Escena', 'Ejes', 'Nombres de los ejes'], 'nombres'),
-      pref(['Escena', 'Rejilla', 'Mostrar rejilla'], 'rejilla'),
-      pref(['Escena', 'Rejilla', 'Ajustar a la rejilla'], 'ajustar'),
+      ...aplanar(herramientasMenu, ['Herramientas'], ejecutar),
+      ...aplanar(escenaMenu, ['Escena'], ejecutar),
+      ...aplanar(vistaEscenaMenu, ['Vista'], ejecutar),
       { camino: ['Vista', 'Encuadrar todo'], hacer: () => ordenVista({ orden: 'encuadrar' }) },
       pref(['Vista', 'Mostrar', 'Leyenda'], 'leyenda'),
       pref(['Vista', 'Mostrar', 'Fórmula'], 'formula'),
@@ -630,6 +845,20 @@ export default function App() {
       { camino: ['Módulo', 'Restablecer el módulo'], hacer: restablecer },
     ]
   }
+  const accionesRapidas=():AccionRapida[]=>{
+    const lista=listaOrdenes(),favoritos=leerFavoritos()
+    const objeto=(id:string):OrdenPaleta|undefined=>{const e=buscarComando(objetoMenu,id);return e?{camino:['Objeto',e.t],desactivado:e.desactivado,hacer:()=>{const p=e.hacer?.(s);if(p)set(p)}}:undefined}
+    return [
+      {nombre:'Propiedades',icono:'⚙',orden:objeto('objeto.propiedades')},
+      {nombre:'Añadir',icono:'＋',hijos:lista.filter(o=>o.camino[0]==='Objeto'&&o.camino[1]==='Añadir')},
+      {nombre:'Duplicar',icono:'▣',orden:objeto('objeto.duplicar')},
+      {nombre:'Ocultar',icono:'◉',orden:objeto('objeto.ocultar')},
+      {nombre:'Eliminar',icono:'×',orden:objeto('objeto.eliminar')},
+      {nombre:'Bloquear',icono:'▧',orden:objeto('objeto.bloquear')},
+      {nombre:'Herramientas',icono:'ƒ',hijos:lista.filter(o=>o.camino[0]==='Herramientas')},
+      {nombre:'Favoritos',icono:'★',hijos:(ordenesNativas??lista).filter(o=>favoritos.includes(claveOrden(o)))},
+    ]
+  }
   // superponer solo tiene sentido con dos lienzos del mismo tipo
   const superpuesto = cmp.activo && cmp.disposicion === 'encima' && vistaA.tipo === vistaB.tipo && vistaA.tipo !== 'html'
 
@@ -640,9 +869,17 @@ export default function App() {
     const fijar = lado === 'A' ? setA : setB
     const llave = `${lado}:${m.id}:${v.tipo}:${v.clave ?? ''}:${superpuesto}`
     const extras = {
+      onActivar: () => {if(cmp.activo)setCmp(c=>({...c,editando:lado}))},
       enlace: cmp.activo && cmp.enlazar ? enlace.current : null,
       secundario: superpuesto && lado === 'B',
       lado,
+      onSeleccion: (idObjeto: string | null, multiple: boolean) => {
+        if (cmp.activo) setCmp(c => ({ ...c, editando: lado }))
+        const clave = `${lado}:${m.id}`
+        setSelecciones(v => ({ ...v, [clave]: idObjeto ? multiple ? [...new Set([...(v[clave] ?? []), idObjeto])] : [idObjeto] : [] }))
+        const p = m.seleccion?.poner(idObjeto,st) ?? objetosModulo(m,st).find(o => o.id === idObjeto)?.seleccionar?.(st)
+        if (p) fijar(p)
+      },
     }
     if (v.tipo === 'html')
       return (
@@ -651,14 +888,14 @@ export default function App() {
         </div>
       )
     return (
-      <>
+      <ContextoVista.Provider value={{ prefs: prefsEscena(st, prefs), cambiar: (p) => fijar(parcheEscena(st, { vista: { ...leerEscena(st).vista, ...p } })) }}>
         {v.tipo === '3d' ? (
           <Lienzo3D key={llave} vista={v} s={st} set={fijar} giro={giro} transparente={superpuesto && lado === 'B'} {...extras} />
         ) : (
           <Lienzo2D key={llave} vista={v} s={st} set={fijar} {...extras} />
         )}
         {prefs.leyenda && m.leyenda && !(superpuesto && lado === 'B') && <div className="leyenda">{m.leyenda(st)}</div>}
-      </>
+      </ContextoVista.Provider>
     )
   }
   const resultado =
@@ -676,13 +913,17 @@ export default function App() {
 
   return (
     <ContextoVista.Provider value={contextoVista}>
-    <div className="app">
+    <div className={`app${escritorio ? '' : ' con-barra-web'}${panelAcoplado && (inspector || verResultados || verHistorial) ? ' panel-acoplado' : ''}`}>
+      {!escritorio && <BarraWeb ordenes={listaOrdenes()} />}
       <Navegacion
         modulos={MODULOS}
         id={id}
         onElegir={setId}
         acciones={
           <>
+            <button type="button" className="tog" onClick={() => setOrdenes(true)}>Órdenes</button>
+            <button type="button" className="tog" onClick={()=>abrirMenuRapido()}>Edición rápida</button>
+            <button type="button" className="tog" aria-pressed={inspector} onClick={() => setInspector(v => !v)}>Objetos</button>
             <button
               type="button"
               className="tog"
@@ -737,6 +978,7 @@ export default function App() {
           </RanuraResultado.Provider>
 
           {!moduloP.resultadoEnPanel && resultado}
+          {resultadoActual && <section className="grupo resultado" aria-label="Último cálculo"><b>Último cálculo</b><p>{resultadoActual.metodo}</p>{resultadoActual.tex && <Formula tex={[resultadoActual.tex]} />}{resultadoActual.filas && <Lecturas filas={resultadoActual.filas} />}</section>}
         </aside>
 
         <div className={`escenario${cmp.activo ? ` doble ${superpuesto ? 'encima' : 'lado'} edita-${cmp.editando}` : ''}`}>
@@ -803,8 +1045,29 @@ export default function App() {
           )}
         </div>
       </div>
+      {solicitud && <DialogoValores solicitud={solicitud} onCerrar={()=>setSolicitud(null)} />}
+
+      {verResultados && <PanelResultados acoplado={panelAcoplado} alternar={()=>setPanelAcoplado(v=>!v)} resultados={leerResultados(s)} cerrar={()=>setVerResultados(false)} borrar={id=>set({_resultados:leerResultados(s).filter(r=>r.id!==id)})} abrirCAS={fuente=>{setEstados(e=>({...e,cas:conIdentidad({...e.cas,filas:[...e.cas.filas,{src:fuente}]})}));setId('cas');setCmp(c=>({...c,activo:false,editando:'A'}));setVerResultados(false)}} />}
+      {verHistorial && <section className="inspector" aria-label="Historial"><CabeceraPanel titulo={`Historial · ${moduloP.corto}`} cierre="Cerrar historial" cerrar={()=>setVerHistorial(false)} acoplado={panelAcoplado} alternar={()=>setPanelAcoplado(v=>!v)}/><p>{hist?.pasado.length??0} pasos anteriores · {hist?.futuro.length??0} pasos posteriores</p><button disabled={!puedeDeshacer} onClick={deshacer}>Deshacer</button><button disabled={!puedeRehacer} onClick={rehacer}>Rehacer</button>{hist?.pasado.map((_,i)=><button className="paso-historia" key={i} onClick={()=>{confirmar();const h=historiaDe(claveSeleccion);const actual=h.ultimo;const destino=h.pasado[i];h.futuro.push(actual,...h.pasado.slice(i+1).reverse());h.pasado=h.pasado.slice(0,i);h.ultimo=destino;restaurando.current=true;if(editandoB)setEstadosB(e=>({...e,[cmp.idB]:destino}));else setEstados(e=>({...e,[id]:destino}));versionHistoria(v=>v+1)}}>Volver al paso {i+1}</button>)}</section>}
+      {importarImagen && <ImportarImagen onCerrar={()=>setImportarImagen(false)} onImportar={imagen=>{set(parcheEscena(s,{imagen}));setImportarImagen(false)}} />}
+      {importarCSV && <ImportarCSV onCerrar={() => setImportarCSV(false)} onImportar={puntos => { setEstados(e => ({ ...e, grafica: conIdentidad({ ...e.grafica, filas: [...e.grafica.filas, ...puntos.map(([x,y]) => ({src:`(${numeroFuente(x)},${numeroFuente(y)})`,visible:true}))] }) })); setId('grafica'); setCmp(c => ({ ...c, activo:false, editando:'A' })); setImportarCSV(false) }} />}
+      {herramienta && <DialogoHerramienta key={herramienta.id + claveSeleccion} herramienta={herramienta} iniciales={camposRepetidos} fuente={fuenteParaHerramienta(s,objetos.find(o => seleccion.includes(o.id))?.fuente ?? objetos.find(o => o.fuente)?.fuente ?? '')} onCerrar={() => setHerramienta(null)} onResultado={(r, campos) => {setUltimoResultado({r,campos});set({_resultados:[...leerResultados(s),{id:crypto.randomUUID(),herramienta:herramienta.id,nombre:herramienta.nombre,campos,r}].slice(-20)})}} onInsertarLista={Array.isArray(s.filas) ? fuentes=>{set({filas:[...s.filas,...fuentes.map(src=>({src,visible:true,_id:`obj-${crypto.randomUUID()}`}))]});setHerramienta(null);setInspector(true)} : undefined} onInsertar={Array.isArray(s.filas) ? (src) => { const nuevo = `obj-${crypto.randomUUID()}`; const origen = objetos.find(o => seleccion.includes(o.id)); set({ filas: [...s.filas, { src, visible: true, _id: nuevo }], ...(origen?.fuente && ultimoResultado && ultimoResultado.campos.f === fuenteParaHerramienta(s,origen.fuente) && s.filas.some((f:any) => f._id === origen.id) ? { _derivados: [...leerDependencias(s), { objeto: nuevo, origen: origen.id, operacion: herramienta.id, campos: ultimoResultado.campos }] } : {}) }); setHerramienta(null); setInspector(true) } : undefined} />}
+      {inspector && <Inspector acoplado={panelAcoplado} alternar={()=>setPanelAcoplado(v=>!v)} objetos={objetos} seleccion={seleccion} elegir={elegirObjetos} s={s} set={set} cerrar={() => setInspector(false)} />}
       {atajos && <HojaAtajos onCerrar={() => setAtajos(false)} />}
-      {ordenes && <PaletaOrdenes ordenes={listaOrdenes()} onCerrar={() => setOrdenes(false)} />}
+      {rapido && <MenuRapido {...rapido} acciones={accionesRapidas()} cerrar={()=>setRapido(null)} buscar={()=>setOrdenes(true)} nativo={escritorio?.contextual} />}
+      {ordenes && <PaletaOrdenes ordenes={ordenesNativas ?? listaOrdenes()} onCerrar={() => setOrdenes(false)} />}
+      {dialogoEscena && (
+        <DialogoEscena
+          ventana={dialogoEscena}
+          escena={leerEscena(s)}
+          onCerrar={() => setDialogoEscena(null)}
+          onAplicar={(p) => {
+            set(parcheEscena(s, p))
+            if (p.encuadre) ordenVista({ orden: 'ventana', lado: ladoP, ...p.encuadre })
+            setDialogoEscena(null)
+          }}
+        />
+      )}
     </div>
     </ContextoVista.Provider>
   )

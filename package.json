@@ -12,9 +12,17 @@
     "mate": "tsx src/nucleo/pruebas-matematicas.ts",
     "app": "npm run build && env -u ELECTRON_RUN_AS_NODE electron .",
     "app:dev": "node electron/dev.mjs",
-    "app:empaquetar": "npm run build && electron-builder --mac dir",
+    "app:empaquetar": "npm run build && node electron/empaquetar.mjs",
     "comprobar:app": "npm run build && node comprobar/app.mjs",
-    "app:instalar": "npm run app:empaquetar && node electron/instalar.mjs"
+    "app:instalar": "npm run app:empaquetar && node electron/instalar.mjs",
+    "app:empaquetar:mac": "npm run build && node electron/empaquetar.mjs mac",
+    "app:empaquetar:linux": "npm run build && node electron/empaquetar.mjs linux",
+    "app:distribuir:linux": "npm run build && node electron/empaquetar.mjs linux --distribuir",
+    "pruebas:escritorio": "node --test comprobar/plataforma.test.cjs",
+    "pruebas:herramientas": "tsx src/nucleo/pruebas-herramientas.ts",
+    "comprobar:menus": "npm run build && node comprobar/menus.mjs",
+    "comprobar:paquete": "node comprobar/empaquetado.mjs",
+    "pruebas:laboratorio": "tsx src/nucleo/pruebas-laboratorio.ts"
   },
   "dependencies": {
     "katex": "^0.16.11",
@@ -46,9 +54,11 @@
       "dist/**/*",
       "electron/main.cjs",
       "electron/preload.cjs",
+      "electron/plataforma.cjs",
       "README.md",
       "package.json",
-      "!node_modules/**/*"
+      "!node_modules/**/*",
+      "build/icon.png"
     ],
     "mac": {
       "category": "public.app-category.education",
@@ -65,11 +75,40 @@
       {
         "ext": "calc",
         "name": "Sesión de Calculadora",
-        "role": "Editor"
+        "role": "Editor",
+        "mimeType": "application/x-calculadora"
       }
     ],
     "asarUnpack": [
       "README.md"
-    ]
-  }
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "executableName": "calculadora",
+      "category": "Education",
+      "icon": "build/icon.png",
+      "mimeTypes": [
+        "application/x-calculadora"
+      ],
+      "desktop": {
+        "entry": {
+          "Name": "Calculadora gráfica",
+          "Categories": "Education;Math;Science;",
+          "StartupWMClass": "es.luichi.calculadora"
+        }
+      },
+      "syncDesktopName": true
+    },
+    "deb": {
+      "maintainer": "Calculadora"
+    }
+  },
+  "description": "Calculadora gráfica de matemáticas y física para macOS y Linux",
+  "author": {
+    "name": "Calculadora"
+  },
+  "desktopName": "es.luichi.calculadora.desktop"
 }

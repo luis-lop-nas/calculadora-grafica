@@ -39,7 +39,7 @@ await p.reload({ waitUntil: 'networkidle' })
 await p.waitForTimeout(900)
 
 // La lista sale de la propia paleta (⌘K vacía), así un módulo nuevo nunca se queda sin recorrer.
-await p.keyboard.press('Meta+k')
+await p.keyboard.press((process.platform === 'darwin' ? 'Meta+k' : 'Control+k'))
 await p.waitForTimeout(200)
 const TODOS = await p.$$eval('.paleta li[id^="modulo-"]', (lis) => lis.map((li) => li.id.slice('modulo-'.length)))
 await p.keyboard.press('Escape')
@@ -48,7 +48,7 @@ console.log(`${MODULOS.length} de ${TODOS.length} módulos`)
 
 for (const id of MODULOS) {
   const antes = errores.length
-  await p.keyboard.press('Meta+k')
+  await p.keyboard.press((process.platform === 'darwin' ? 'Meta+k' : 'Control+k'))
   await p.waitForTimeout(150)
   const primero = await p.$(`.paleta li#modulo-${id}`)
   if (!primero) {

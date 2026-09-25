@@ -1,3 +1,4 @@
+import { ESCENA_INICIAL, type AjustesEscena } from '../nucleo/escena'
 import * as THREE from 'three'
 import { varCss } from './tema'
 
@@ -22,6 +23,7 @@ export class Escena3D {
    * la cámara escalan con él: un orbital de n=4 mide ~50 a₀, no ~1.
    */
   escala = 1
+  ajustes: AjustesEscena = ESCENA_INICIAL
   rejillaCompleta = false
   giro = false
   /** Superposiciones del menú Vista: las respeta `ejes()`. */
@@ -344,19 +346,19 @@ export class Escena3D {
     }
     const p = (a: number[], b: number[]) => [new THREE.Vector3(...a), new THREE.Vector3(...b)]
     const g = new THREE.BufferGeometry().setFromPoints([
-      ...p([-largo, 0, 0], [largo, 0, 0]),
-      ...p([0, -largo, 0], [0, largo, 0]),
-      ...p([0, 0, -largo], [0, 0, largo]),
+      ...(this.ajustes.ejeX ? p([-largo, 0, 0], [largo, 0, 0]) : []),
+      ...(this.ajustes.ejeY ? p([0, -largo, 0], [0, largo, 0]) : []),
+      ...(this.ajustes.ejeZ ? p([0, 0, -largo], [0, 0, largo]) : []),
     ])
     const ejes = this.add(new THREE.LineSegments(g, this.matLinea(0.32)))
     ejes.renderOrder = -1
     ejes.userData.referencia = true
     ejes.visible = this.mostrarEjes
-    if (etiquetas && this.mostrarNombres) {
+    if (etiquetas && this.mostrarNombres && this.mostrarEjes) {
       const d = largo + 0.13
-      this.rotulo(etiquetas[0], [d, 0, 0]).userData.referencia = true
-      this.rotulo(etiquetas[1], [0, d, 0]).userData.referencia = true
-      this.rotulo(etiquetas[2], [0, 0, d]).userData.referencia = true
+      if (this.ajustes.ejeX) this.rotulo(this.ajustes.rotuloX || etiquetas[0], [d, 0, 0]).userData.referencia = true
+      if (this.ajustes.ejeY) this.rotulo(this.ajustes.rotuloY || etiquetas[1], [0, d, 0]).userData.referencia = true
+      if (this.ajustes.ejeZ) this.rotulo(this.ajustes.rotuloZ || etiquetas[2], [0, 0, d]).userData.referencia = true
     }
   }
 
@@ -368,7 +370,7 @@ export class Escena3D {
   suelo() {
     if (!this.mostrarRejilla) return
     const horizontal = this.conZArriba ? 'xy' : 'xz'
-    const planos = this.rejillaCompleta ? (['xy', 'xz', 'yz'] as const) : [horizontal]
+    const planos = this.ajustes.planos3d ?? (this.rejillaCompleta ? (['xy', 'xz', 'yz'] as const) : [horizontal])
     for (const plano of planos) {
       const mat = new THREE.ShaderMaterial({
         uniforms: {

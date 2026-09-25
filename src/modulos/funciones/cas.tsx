@@ -5,7 +5,7 @@ import { Atajos, Boton, Expresion, Grupo, Nota } from '../../nucleo/controles'
 import { ejecutar, type ResultadoFila } from '../../lib/cas/cas'
 
 interface S {
-  filas: Array<{ src: string }>
+  filas: Array<{ src: string; _id?: string }>
 }
 
 const EJEMPLOS = [
@@ -36,7 +36,7 @@ const html = (tex: string) => ({ __html: katex.renderToString(tex, { displayMode
 
 function anadir(s: S, src: string): Partial<S> {
   const ultima = s.filas[s.filas.length - 1]
-  if (ultima && !ultima.src.trim()) return { filas: s.filas.map((f, i) => (i === s.filas.length - 1 ? { src } : f)) }
+  if (ultima && !ultima.src.trim()) return { filas: s.filas.map((f, i) => (i === s.filas.length - 1 ? { ...f, src } : f)) }
   return { filas: [...s.filas, { src }] }
 }
 
@@ -56,7 +56,7 @@ function Panel({ s, set }: PropsPanel<S>) {
                 piezas={PIEZAS}
                 comprobar={() => rs[i]?.error ?? null}
                 previa={() => rs[i]?.entrada ?? null}
-                onChange={(src) => set({ filas: s.filas.map((g, k) => (k === i ? { src } : g)) })}
+                onChange={(src) => set({ filas: s.filas.map((g, k) => (k === i ? { ...g, src } : g)) })}
               />
               <button type="button" className="quitar-fila" aria-label="Quitar" onClick={() => set({ filas: s.filas.filter((_, k) => k !== i) })}>
                 ×
@@ -120,18 +120,9 @@ export default definir<S>({
     return {
       anadir: [
         fila('Fila vacía', ''),
-        fila('Derivar', 'derivar(x^3 sin(x), x)'),
-        fila('Integrar (primitiva)', 'integrar(x e^x, x)'),
-        fila('Integral definida', 'integrar(x^2, x, 0, 1)'),
-        fila('Límite', 'limite((1+1/x)^x, x, inf)'),
-        fila('Serie de Taylor', 'taylor(cos(x), x, 0, 6)'),
-        fila('Resolver una ecuación', 'resolver(x^2 = 2, x)'),
-        fila('Sistema lineal', 'resolver({x+y=3, x-y=1}, {x, y})'),
-        fila('Simplificar', 'simplificar((x^2-1)/(x+1))'),
-        fila('Factorizar', 'factorizar(x^2-5x+6)'),
-        fila('Desarrollar', 'desarrollar((x+2)^3)'),
+        fila('Expresión', 'x^2'),
+        fila('Ecuación', 'x^2 = 2'),
         fila('Definir una función', 'f(x) := x^2'),
-        fila('Transformada de Laplace', 'laplace(sin(t))'),
       ],
       ejemplos: EJEMPLOS.map((e) => fila(e.t, e.e)),
       acciones: [accion<S>('Borrar todas las filas', () => ({ filas: [{ src: '' }] }))],

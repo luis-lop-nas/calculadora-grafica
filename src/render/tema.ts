@@ -1,5 +1,6 @@
 /** Lee una variable CSS del tema activo. */
 export function varCss(nombre: string): string {
+  if (!nombre.startsWith('--')) return nombre
   return getComputedStyle(document.documentElement).getPropertyValue(nombre).trim()
 }
 

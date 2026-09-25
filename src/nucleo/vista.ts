@@ -40,12 +40,22 @@ export const PREFS_INICIALES: PrefsVista = {
 
 const CLAVE = 'calculadora:vista'
 
+export function validarPrefs(g: unknown): PrefsVista {
+  const p = { ...PREFS_INICIALES }
+  if (!g || typeof g !== 'object') return p
+  for (const k of Object.keys(p) as Array<keyof PrefsVista>) {
+    const v = (g as Record<string, unknown>)[k]
+    if (k === 'tema') { if (v === 'sistema' || v === 'claro' || v === 'oscuro') p.tema = v }
+    else if (k === 'paso') { if (typeof v === 'number' && Number.isFinite(v) && v > 0) p.paso = v }
+    else if (typeof v === 'boolean') p[k] = v
+  }
+  return p
+}
+
 export function leerPrefs(): PrefsVista {
   try {
     const g = JSON.parse(localStorage.getItem(CLAVE) ?? '{}')
-    const p: Record<string, unknown> = { ...PREFS_INICIALES }
-    for (const [k, v] of Object.entries(g ?? {})) if (k in p && typeof v === typeof (PREFS_INICIALES as any)[k]) p[k] = v
-    return p as unknown as PrefsVista
+    return validarPrefs(g)
   } catch {
     return { ...PREFS_INICIALES }
   }
@@ -66,11 +76,16 @@ export const ContextoVista = createContext<{ prefs: PrefsVista; cambiar: (p: Par
 
 /** Órdenes puntuales a los lienzos: no son estado, se ejecutan una vez. */
 export type OrdenVista =
+  | { orden: 'svg'; lado: 'A' | 'B'; fn: (svg: string) => void }
   | { orden: 'punto'; modo: '3d' | 'x' | 'y' | 'z' | 'iso' }
   | { orden: 'encuadrar' }
   | { orden: 'acercar'; factor: number }
   /** Entrega el canvas recién pintado (para copiarlo o exportarlo). */
   | { orden: 'captura'; lado: 'A' | 'B'; fn: (canvas: HTMLCanvasElement) => void }
+  /** Pone una ventana del mundo (Escena ▸ Vistas guardadas) en el lienzo 2D de ese lado. */
+  | { orden: 'ventana'; lado: 'A' | 'B'; x: [number, number]; y: [number, number] }
+  /** Entrega la ventana que se está viendo (para guardarla o editarla). */
+  | { orden: 'leerVentana'; lado: 'A' | 'B'; fn: (v: { x: [number, number]; y: [number, number] }) => void }
 
 const bus = new EventTarget()
 

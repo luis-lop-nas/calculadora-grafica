@@ -1,3 +1,6 @@
+import { CONSTRUCCIONES } from '../../nucleo/barra'
+import { propiedades } from '../../nucleo/objetos'
+import { leerEscena, ajustarPunto } from '../../nucleo/escena'
 import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
 import { accion, casilla, submenu } from '../../nucleo/menu'
 import { Atajos, Boton, Grupo, Interruptor, Rango } from '../../nucleo/controles'
@@ -80,7 +83,7 @@ function valores(s: S) {
 /** Escala del último dibujo: el clic necesita saber cuántas unidades son 10 px. */
 let escalaActual = 50
 
-const ajustar = (s: S, p: P): P => (s.ajustar ? { x: Math.round(p.x * 2) / 2, y: Math.round(p.y * 2) / 2 } : p)
+const ajustar = (s: S, p: P): P => { const [x,y] = ajustarPunto([p.x,p.y], leerEscena(s)); return { x, y } }
 const redondeo = (v: number) => Math.round(v * 1000) / 1000
 
 /** Lo que hay bajo el ratón: primero los puntos, luego lo demás. */
@@ -292,7 +295,7 @@ function dibujarValor(g: Pintor2D, v: Valor, color: string, grosor: number) {
 
 function dibujar(g: Pintor2D, s: S) {
   escalaActual = g.escalaX
-  if (s.ejes) g.ejes({ etiquetaX: 'x', etiquetaY: 'y' })
+  g.ejes({ etiquetaX: 'x', etiquetaY: 'y' })
   const vals = valores(s)
   const elegidos = new Set(s.pendientes)
   const orden = ['poligono', 'lugar', 'conica', 'circ', 'arco', 'linea']
@@ -301,10 +304,14 @@ function dibujar(g: Pintor2D, s: S) {
       const v = vals.get(o.id)!
       if (!o.visible || v.k !== k) continue
       const sel = elegidos.has(o.id)
-      dibujarValor(g, v, g.color(sel ? '--pos' : COLOR[k]), sel ? 3.2 : 1.8)
+      const estilo = propiedades(s,o.id)
+      g.ctx.save(); g.ctx.globalAlpha = estilo.opacidad ?? 1
+      if (estilo.discontinuo) g.ctx.setLineDash([6,4])
+      dibujarValor(g, v, estilo.color || g.color(sel ? '--pos' : COLOR[k]), estilo.grosor ?? (sel ? 3.2 : 1.8))
+      g.ctx.restore()
       if (s.etiquetas && k !== 'poligono' && k !== 'lugar') {
         const q = etiquetaEn(v)
-        if (q) g.texto(o.id, q.x, q.y, g.color(COLOR[k]), { dx: 6, dy: -8, fuente: `italic 16px ${varCss('--serif') || 'serif'}` })
+        if (q) g.texto(propiedades(s,o.id).nombre || o.id, q.x, q.y, g.color(COLOR[k]), { dx: 6, dy: -8, fuente: `italic 16px ${varCss('--serif') || 'serif'}` })
       }
     }
   }
@@ -333,7 +340,7 @@ function dibujar(g: Pintor2D, s: S) {
   for (const o of s.objs) {
     const v = vals.get(o.id)!
     if (!o.visible || v.k !== 'punto') continue
-    const arrastrable = o.def === 'libre' || o.def === 'sobre'
+    const arrastrable = (o.def === 'libre' || o.def === 'sobre') && !propiedades(s,o.id).bloqueado
     const sel = elegidos.has(o.id)
     if (!(s.herramienta === 'mover' && arrastrable) || sel) {
       g.punto(v.p.x, v.p.y, g.color('--panel'), sel ? 7 : 5.5)
@@ -445,14 +452,8 @@ function Panel({ s, set }: PropsPanel<S>) {
           </div>
         )}
         <div className="interruptores">
-          <Interruptor activo={s.ajustar} onChange={(ajustar) => set({ ajustar })}>
-            Ajustar a la rejilla
-          </Interruptor>
           <Interruptor activo={s.etiquetas} onChange={(etiquetas) => set({ etiquetas })}>
             Nombres
-          </Interruptor>
-          <Interruptor activo={s.ejes} onChange={(ejes) => set({ ejes })}>
-            Ejes
           </Interruptor>
         </div>
         <div className="fila-botones">
@@ -501,14 +502,16 @@ export default definir<S>({
   },
   menu: (s) => ({
     // Añadir = coger la herramienta; luego se pulsa en el lienzo (como en GeoGebra)
-    anadir: GRUPOS.filter((g) => g !== 'Mover').map((g) =>
+    anadir: GRUPOS.filter((g) => !['Mover','Medidas','Especiales','Transformar'].includes(g)).map((g) =>
       submenu<S>(
         g,
         Object.entries(HERRAMIENTAS)
-          .filter(([, h]) => h.grupo === g)
+          .filter(([k, h]) => h.grupo === g && !CONSTRUCCIONES.includes(k))
           .map(([k, h]) => ({ t: h.nombre, tipo: 'radio' as const, activo: s.herramienta === k, hacer: () => ({ herramienta: k, grupo: g, pendientes: [] }) })),
       ),
     ),
+    herramientas: Object.fromEntries(CONSTRUCCIONES.map(k=>[`geometria.${k}`,{t:HERRAMIENTAS[k].nombre,tipo:'radio' as const,activo:s.herramienta===k,hacer:()=>({herramienta:k,grupo:HERRAMIENTAS[k].grupo,pendientes:[]})}])),
+    objeto: [submenu<S>('Transformaciones geométricas',Object.entries(HERRAMIENTAS).filter(([,h])=>h.grupo==='Transformar').map(([k,h])=>({t:h.nombre,tipo:'radio' as const,activo:s.herramienta===k,hacer:()=>({herramienta:k,grupo:h.grupo,pendientes:[]})})))],
     ejemplos: EJEMPLOS.map((e) => accion<S>(e.t, () => ({ objs: e.objs, pendientes: [], herramienta: 'mover', grupo: 'Mover' }))),
     acciones: [
       { t: 'Herramienta Mover', tipo: 'radio', activo: s.herramienta === 'mover', hacer: () => ({ herramienta: 'mover', grupo: 'Mover', pendientes: [] }) },
@@ -522,6 +525,7 @@ export default definir<S>({
     tipo: '2d',
     ventana: { x: [-7, 7], y: [-5, 5] },
     alPulsar,
+    objetoEn: (p,s) => s.herramienta === 'mover' ? bajo(s,p) : null,
     interaccion: {
       asas,
       mover,

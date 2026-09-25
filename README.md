@@ -15,12 +15,12 @@ npm run dev     # abre http://localhost:5173
 su forma cerrada o con un segundo método independiente. `npm run comprobar` abre todos los módulos
 (la lista sale de la propia paleta) en un Chromium de verdad, captura cada uno en `comprobar/tiros/`
 y falla si alguno suelta un error; `SOLO=fourier,control` recorre solo esos.
-`npm run comprobar:app` hace lo mismo en la app de Mac desde su menú Módulo, y además guarda y
+`npm run comprobar:app` hace lo mismo en la app de escritorio desde su menú Módulo, y además guarda y
 reabre un `.calc`, exporta PNG y CSV, y prueba una casilla de Vista y deshacer/rehacer.
 
-## App de Mac
+## App de macOS y Linux
 
-La misma aplicación, también como app nativa (Electron) con barra de menús de macOS. La web no cambia.
+La aplicación usa Electron con menús del sistema en macOS y Linux. La web tiene una barra propia con las mismas categorías y operaciones compartidas. En Linux los atajos usan Ctrl y Alt.
 
 ```bash
 npm run app:instalar    # empaqueta «Calculadora.app», la instala en Aplicaciones y la abre
@@ -30,6 +30,19 @@ npm run app             # compila dist/ y abre la app sin empaquetar (en la barr
 
 Para actualizar la instalada: `git pull && npm run app:instalar`. Se firma «ad hoc» (sin cuenta de
 desarrollador): en Apple Silicon una app sin ninguna firma no arranca.
+
+En Linux, `npm run app:instalar` instala la aplicación en el directorio de aplicaciones del usuario, registra el lanzador y la asociación `.calc`. Para generar los paquetes:
+
+```bash
+npm run app:empaquetar:linux     # directorio ejecutable
+npm run app:distribuir:linux    # AppImage y .deb
+# Ambas arquitecturas, después de compilar:
+node electron/empaquetar.mjs linux --distribuir --x64 --arm64
+```
+
+El instalador elige la arquitectura local. Los ejecutables Linux necesitan un entorno gráfico Linux; generarlos desde macOS no comprueba su ejecución. La tarea de GitHub Actions hace las comprobaciones de escritorio bajo Xvfb en Ubuntu.
+
+El [estado de implementación](docs/estado-implementacion.md) distingue las funciones actuales de las ampliaciones del [plan completo](docs/plan-menu-nativo.md).
 
 Menús, al estilo de Photoshop o Blender, en este orden: Archivo · Edición · Objeto · Herramientas ·
 Escena · Vista · Animación · Módulo · Ventana · Ayuda. El esqueleto es **fijo**: lo que el módulo
@@ -42,13 +55,13 @@ abierto no sabe hacer sale en gris, no desaparece.
   fórmula en LaTeX, lecturas.
 - **Objeto**: **Añadir ▸** lo que el módulo sabe crear (en Gráficas función, punto, deslizador,
   región, paramétrica, polar…; en Espacio 3D puntos, superficies, curvas y sólidos; en Regla y
-  compás las herramientas por grupos; puntos, soluciones, órbitas, focos…), **Transformar ▸**
+  compás los objetos básicos; puntos, soluciones, órbitas, focos…), **Transformar ▸**
   (mover a pasos de la rejilla y girar ±15° / ±90° en X, Y o Z las figuras que se agarran enteras),
   **Eliminar ▸**, ocultar todo y mostrar todo ⌥⌘3.
 - **Herramientas**: análisis sobre lo dibujado, por categorías fijas — Estudio de la función
   (raíces, asíntotas, extremos, inflexiones, estudio completo, tabla), Derivación (f′, tangente),
   Integración (área, sumas de Riemann), Límites y series (Taylor), Intersecciones, Multivariable
-  (plano tangente, gradiente, curvas de nivel, cortes). Hoy las aportan Gráficas y Superficies.
+  (plano tangente, gradiente, curvas de nivel, cortes). También hay 95 operaciones comunes con entrada de parámetros y resultados: álgebra, matrices, coordenadas, métricas, datos, familias, cálculo multivariable y señales. Los métodos numéricos indican su alcance.
 - **Escena**: **Ejes ▸** mostrar y nombres; **Rejilla ▸** mostrar, en los tres planos, **ajustar a
   la rejilla** ⇧⌘' y su **paso** (0,1 · 0,25 · 0,5 · 1, que también usa Mayús al arrastrar).
 - **Vista**: **Punto de vista ▸** partida, desde X/Y/Z, isométrica y **proyección ortográfica**
@@ -64,8 +77,7 @@ abierto no sabe hacer sale en gris, no desaparece.
   Matrices, base de Hilbert, dimensión de onda y calor…); **Restablecer el módulo**.
 - **Ventana ▸ Capas**: cada cosa dibujada con su **muestra de color** y su nombre (y coordenadas o
   tipo al lado); en su submenú, Mostrar, **Solo esta** y Eliminar.
-- **Clic derecho** en un lienzo: Añadir, Capas, Transformar, punto de vista, encuadrar, ejes,
-  rejilla, mostrar, reproducir, copiar y exportar la imagen, deshacer.
+- **Q o clic derecho** en un lienzo: menú radial con Propiedades, Añadir, Duplicar, Ocultar, Eliminar, Bloquear, Herramientas y Favoritos. Las estrellas de Buscar orden guardan favoritos. **Alt/⌥ + clic derecho** conserva el menú contextual nativo. **Edición ▸ Ajustar último cálculo (F9)** recupera los parámetros del cálculo más reciente.
 - **Ayuda**: **Buscar orden ⇧⌘P** (paleta: cualquier entrada escribiendo su nombre, también en la
   web), **atajos de teclado ⌘/** y esta guía; Desarrollo ▸. El buscador de Ayuda de macOS también
   encuentra cualquier entrada.
@@ -78,7 +90,7 @@ sesiones se guardan como documentos `.calc` (el mismo JSON del autoguardado; tam
 Un módulo entra en esos menús declarando `capas(s)` (nombre, color, visible, `alternar`,
 `quitar`) y `menu(s)` (`anadir`, `ejemplos`, `acciones` y `herramientas`, esta última por id del
 esqueleto de `src/nucleo/barra.ts`, p. ej. `'derivacion.tangente'`), con las ayudas de
-`src/nucleo/menu.ts` (`capaVer`, `casilla`, `radios`…). Los declaran los 45 módulos.
+`src/nucleo/menu.ts` (`capaVer`, `casilla`, `radios`…). Los declaran los módulos que tienen objetos o acciones propias.
 
 Piezas: `electron/main.cjs` (ventanas, menú, diálogos), `electron/preload.cjs` (el puente que la
 página ve como `window.escritorio`) y `src/nucleo/escritorio.ts` (sus tipos; en la web no existe).
@@ -284,3 +296,15 @@ dependen del tiempo.
 Todo el color sale de variables CSS en `src/estilos.css` (`--accent`, `--pos`, `--neg`, `--aux`…),
 con claro y oscuro. Los módulos las leen con `e.color('--pos')` o `g.color('--pos')`, así que
 cambiar la paleta no toca ni un módulo.
+
+## Laboratorio de física
+
+En **Física ▸ Laboratorio de física**, elige una pieza y pulsa el lienzo para colocarla. Arrastra sus puntos o edita las coordenadas; el menú Escena controla la rejilla y el ajuste. Las masas, velocidades, fuerzas, enlaces y propiedades ópticas están en el panel izquierdo. El menú radial y el inspector común permiten duplicar, ocultar, renombrar, estilizar y eliminar.
+
+- **Newton 2D**: cuerpos circulares, anclajes, rampas, fuerzas constantes y muelles de Hooke con amortiguación. Gravedad, restitución y fricción con superficies. Reproducción, pausa, reinicio, exploración temporal, trayectorias y vectores. La simulación usa RK4 y contactos discretos; no incluye rotación de sólidos ni contacto continuo a alta velocidad.
+- **Óptica geométrica**: emisores, espejos planos, lentes delgadas paraxiales, interfaces refractantes y pantallas; Snell y reflexión total. Hasta 16 interacciones por rayo; no incluye difracción.
+- **Lagrange**: escribe coordenadas, L, parámetros, condiciones iniciales y posiciones para dibujar; se obtienen las ecuaciones de Euler–Lagrange y la trayectoria. «Generar Lagrangiano de la escena» convierte uno o dos cuerpos móviles conservativos; indica cuándo las colisiones o amortiguación impiden la conversión.
+
+Los ejemplos incluyen tiro parabólico, rampa, choque elástico, masa y muelle, lente, refracción y péndulo. Todo se guarda con el documento. Ocultar una pieza solo cambia su visibilidad: para retirarla del modelo, elimínala. Al eliminar un cuerpo se retiran también las fuerzas y muelles conectados; Deshacer los recupera.
+
+Validación adicional: `npm run pruebas:laboratorio`, `node comprobar/laboratorio.mjs` con Vite abierto, y `NATIVO=1 node comprobar/laboratorio.mjs` para escritorio. `npm run comprobar:paquete` comprueba el ejecutable empaquetado de la plataforma local.

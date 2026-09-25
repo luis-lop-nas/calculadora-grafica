@@ -8,7 +8,7 @@ import type { Param } from '../../lib/objetos2d'
 import { analizarFilas3, circunradio, cortarMalla, recortarACaja, type Analisis3, type Objeto3, type V3 } from '../../lib/objetos3d'
 
 interface S {
-  filas: Array<{ src: string; visible: boolean }>
+  filas: Array<{ src: string; visible: boolean; _id?: string }>
   params: Record<string, Param>
   /** Semilado de la caja [−L, L]³ donde se dibujan las superficies. */
   L: number
@@ -294,7 +294,7 @@ export default definir<S>({
       const o = an.objetos[i] as { k: string; nombre?: string | null } | undefined
       const texto = f.src.length > 42 ? `${f.src.slice(0, 40)}…` : f.src || '(vacía)'
       return {
-        id: `F${i}`,
+        id: f._id ?? `F${i}`,
         nombre: o?.nombre ? `${o.nombre}: ${texto}` : texto,
         color: colorDe(i),
         detalle: o?.k === 'error' ? 'error' : undefined,

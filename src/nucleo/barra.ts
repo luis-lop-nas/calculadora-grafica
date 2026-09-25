@@ -1,3 +1,5 @@
+import { HERRAMIENTAS_CALCULO } from '../lib/herramientas'
+import { HERRAMIENTAS as GEOMETRIA } from '../lib/geometria'
 import type { EntradaMenu } from './tipos'
 
 /**
@@ -10,6 +12,8 @@ export interface NodoBarra {
   t: string
   hijos?: NodoBarra[]
 }
+
+export const CONSTRUCCIONES = ['medio','interseccion','centro','perpendicular','paralela','mediatriz','bisectriz','tangente','incirculo','compas','angulo','distancia','area','perimetro','pendiente','lugar']
 
 export const HERRAMIENTAS: NodoBarra[] = [
   {
@@ -46,9 +50,9 @@ export const HERRAMIENTAS: NodoBarra[] = [
     hijos: [{ id: 'series.taylor', t: 'Polinomio de Taylor' }],
   },
   {
-    id: 'intersecciones',
-    t: 'Intersecciones',
-    hijos: [{ id: 'intersecciones.cortes', t: 'Cortes entre curvas' }],
+    id: 'construccion',
+    t: 'Construcción y medida',
+    hijos: [{ id: 'intersecciones.cortes', t: 'Cortes entre curvas' }, ...CONSTRUCCIONES.map(id=>({id:`geometria.${id}`,t:GEOMETRIA[id].nombre}))],
   },
   {
     id: 'multivariable',
@@ -62,6 +66,12 @@ export const HERRAMIENTAS: NodoBarra[] = [
   },
 ]
 
+for (const h of HERRAMIENTAS_CALCULO) {
+  let grupo = HERRAMIENTAS.find(g => g.t === h.grupo)
+  if (!grupo) { grupo = { id: `grupo.${encodeURIComponent(h.grupo)}`, t: h.grupo, hijos: [] }; HERRAMIENTAS.push(grupo) }
+  grupo.hijos!.push({ id: h.id, t: h.nombre })
+}
+
 export type Herramientas<S> = Partial<Record<string, EntradaMenu<S>>>
 
 /** Esqueleto + lo que aporta el módulo: el texto es siempre el del esqueleto. */
@@ -69,7 +79,7 @@ export function fusionar<S>(nodos: NodoBarra[], propias: Herramientas<S> | undef
   return nodos.map((n) => {
     if (n.hijos) return { t: n.t, hijos: fusionar(n.hijos, propias) }
     const e = propias?.[n.id]
-    return e ? { ...e, t: n.t } : { t: n.t, desactivado: true }
+    return e ? { ...e, id: n.id, t: n.t } : { id: n.id, t: n.t, desactivado: true }
   })
 }
 

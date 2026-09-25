@@ -7,6 +7,7 @@ import { analizar, compilarNodo, tex, variablesDe, type FuncionUsuario, type Nod
  */
 
 export interface Fila {
+  _id?: string
   src: string
   visible: boolean
 }

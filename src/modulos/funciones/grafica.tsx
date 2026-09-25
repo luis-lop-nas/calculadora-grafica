@@ -1,3 +1,5 @@
+import { relojLienzo } from '../../nucleo/vista'
+import { propiedades, ordenarObjetos } from '../../nucleo/objetos'
 import { useEffect, useRef } from 'react'
 import { definir, type Asa, type Capa, type PropsPanel } from '../../nucleo/tipos'
 import { accion, capaVer, casilla, radios } from '../../nucleo/menu'
@@ -156,6 +158,12 @@ function asas(s: S): Asa[] {
 
 /* ---------- dibujo ---------- */
 
+/** Traza y = f(x) a lo ancho de la ventana; con el eje X logarítmico, muestreando por décadas. */
+function trazoX(g: Pintor2D, f: (x: number) => number, n: number, color: string, grosor: number, discontinua = false) {
+  const m = g.muestreoX()
+  trazo(g, (u) => [m.x(u), f(m.x(u))], m.a, m.b, n, color, grosor, discontinua)
+}
+
 /**
  * Traza una curva muestreada. Un salto grande entre dos muestras se comprueba
  * con el punto medio: si no cae entre ambas, es una asíntota y se corta el trazo.
@@ -177,7 +185,7 @@ function trazo(g: Pintor2D, p: (u: number) => [number, number], a: number, b: nu
   for (let i = 0; i <= n; i++) {
     const u = a + ((b - a) * i) / n
     const q = p(u)
-    if (!Number.isFinite(q[0]) || !Number.isFinite(q[1])) {
+    if (!Number.isFinite(q[0]) || !Number.isFinite(q[1]) || (g.escena.logX && q[0]<=0) || (g.escena.logY && q[1]<=0)) {
       prev = null
       continue
     }
@@ -258,6 +266,9 @@ function region(g: Pintor2D, conds: Condicion[], color: string) {
 
 function sombra(g: Pintor2D, arriba: F1, abajo: F1, a: number, b: number, color: string) {
   const { ctx } = g
+  if(g.escena.logX){a=Math.max(a,g.ventana.x[0]);b=Math.max(b,a)}
+  const suelo = g.escena.logY ? g.ventana.y[0] : 0
+  const py = (y:number) => g.Y(g.escena.logY ? Math.max(suelo,y) : y)
   const n = 400
   ctx.save()
   ctx.fillStyle = color
@@ -266,12 +277,12 @@ function sombra(g: Pintor2D, arriba: F1, abajo: F1, a: number, b: number, color:
   for (let i = 0; i <= n; i++) {
     const x = a + ((b - a) * i) / n
     const y = arriba(x)
-    ctx[i ? 'lineTo' : 'moveTo'](g.X(x), g.Y(Number.isFinite(y) ? y : 0))
+    ctx[i ? 'lineTo' : 'moveTo'](g.X(x), py(Number.isFinite(y) ? y : suelo))
   }
   for (let i = n; i >= 0; i--) {
     const x = a + ((b - a) * i) / n
     const y = abajo(x)
-    ctx.lineTo(g.X(x), g.Y(Number.isFinite(y) ? y : 0))
+    ctx.lineTo(g.X(x), py(Number.isFinite(y) ? y : suelo))
   }
   ctx.closePath()
   ctx.fill()
@@ -289,9 +300,11 @@ function rectangulos(g: Pintor2D, f: F1, a: number, b: number, n: number, metodo
         return [y, y]
       })()
     if (!Number.isFinite(y0) || !Number.isFinite(y1)) continue
-    const pts: Array<[number, number]> = [[x, 0], [x, y0], [x + h, y1], [x + h, 0]]
+    if(g.escena.logX && x+h<=0)continue
+    const xx=g.escena.logX?Math.max(x,g.ventana.x[0]):x, suelo=g.escena.logY?g.ventana.y[0]:0
+    const pts: Array<[number, number]> = [[xx, suelo], [xx, g.escena.logY?Math.max(suelo,y0):y0], [x+h, g.escena.logY?Math.max(suelo,y1):y1], [x+h, suelo]]
     g.rellenar(pts, color, 0.22)
-    g.curva([...pts, [x, 0]], color, 1)
+    g.curva([...pts, pts[0]], color, 1)
   }
 }
 
@@ -319,7 +332,7 @@ function dibujar(g: Pintor2D, s: S) {
 
   if (fa && s.verTaylor) {
     const c = taylorNumerico(fa.o.f, s.x0, s.ordenTaylor)
-    if (c) trazo(g, (x) => [x, c.reduceRight((acc, ck) => acc * (x - s.x0) + ck, 0)], xa, xb, 900, g.color('--morado'), 1.8, true)
+    if (c) trazoX(g, (x) => c.reduceRight((acc, ck) => acc * (x - s.x0) + ck, 0), 900, g.color('--morado'), 1.8, true)
   }
 
   if (fa && s.verAsintotas) {
@@ -328,15 +341,19 @@ function dibujar(g: Pintor2D, s: S) {
     for (const o of as.oblicuas) g.curva([[xa, o.m * xa + o.b], [xb, o.m * xb + o.b]], g.color('--ink-soft'), 1.2, true)
   }
 
-  if (fa && s.verDerivada) trazo(g, (x) => [x, derivada(fa.o.f, x)], xa, xb, 900, g.color('--pos'), 1.4, true)
+  if (fa && s.verDerivada) trazoX(g, (x) => derivada(fa.o.f, x), 900, g.color('--pos'), 1.4, true)
 
-  an.objetos.forEach((o, i) => {
+  ordenarObjetos(s, an.objetos.map((o,i) => ({o,i})), ({i}) => s.filas[i]._id ?? `F${i}`).forEach(({o,i}) => {
     if (!ver(i)) return
-    const color = g.color(colorDe(i))
-    const grosor = fa?.i === i ? 2.6 : 2
+    const estilo = propiedades(s, s.filas[i]._id ?? `F${i}`)
+    const color = estilo.color || g.color(colorDe(i))
+    const grosor = estilo.grosor ?? (fa?.i === i ? 2.6 : 2)
+    g.ctx.save()
+    g.ctx.globalAlpha = estilo.opacidad ?? 1
+    if (estilo.discontinuo) g.ctx.setLineDash([6,4])
     switch (o.k) {
       case 'funcion':
-        trazo(g, (x) => [x, o.f(x)], xa, xb, 1400, color, grosor)
+        trazoX(g, o.f, 1400, color, grosor)
         break
       case 'funcionY':
         trazo(g, (y) => [o.f(y), y], ya, yb, 1000, color, grosor)
@@ -351,6 +368,7 @@ function dibujar(g: Pintor2D, s: S) {
         segmentos(g, contorno(o.F, g.ventana, NIVEL, Math.round(g.ancho / 4), Math.round(g.alto / 4)), color, grosor)
         break
     }
+    g.ctx.restore()
   })
 
   const fs = funciones(s, an)
@@ -430,8 +448,9 @@ function Deslizadores({ s, set, an }: PropsPanel<S> & { an: Analisis }) {
     let id = 0
     let prev = performance.now()
     const dir: Record<string, number> = {}
+    const reloj = relojLienzo()
     const paso = (ahora: number) => {
-      const dt = Math.min(0.1, (ahora - prev) / 1000)
+      const { dt } = reloj(Math.min(0.1, (ahora - prev) / 1000))
       prev = ahora
       let st = ref.current
       const a2 = analisis(st)
@@ -783,6 +802,7 @@ function lecturas(s: S): Array<[string, string]> {
 
 export default definir<S>({
   id: 'grafica',
+  parametrosAnimables: s => analisis(s).parametros.map(p=>{const P=param(s,analisis(s),p);return {id:p,nombre:p,min:P.min,max:P.max,poner:(v:number,t:S)=>fijar(t,analisis(t),p,{v,anim:false})}}),
   area: 'funciones',
   resumen: 'Gráficas: funciones, curvas, regiones y deslizadores',
   corto: 'Gráficas',
@@ -821,7 +841,7 @@ export default definir<S>({
       const texto = f.src.length > 42 ? `${f.src.slice(0, 40)}…` : f.src || '(vacía)'
       const tipo = !o ? '' : o.k === 'funcion' ? 'función' : o.k === 'punto' ? 'punto' : o.k === 'inecuacion' ? 'región' : o.k === 'deslizador' ? 'deslizador' : o.k === 'error' ? 'error' : o.k === 'vacio' ? '' : 'curva'
       return {
-        id: `F${i}`,
+        id: f._id ?? `F${i}`,
         nombre: texto,
         color: o?.k === 'deslizador' ? '--ink-soft' : colorDe(i),
         detalle: tipo || undefined,
@@ -946,7 +966,18 @@ export default definir<S>({
   },
   vista: {
     tipo: '2d',
+    logaritmica: true,
     ventana: { x: [-6, 6], y: [-4, 4] },
+    objetoEn: (p,s) => {
+      const an = analisis(s), w = ventanaActual.x[1]-ventanaActual.x[0], h = ventanaActual.y[1]-ventanaActual.y[0]
+      let mejor: string | null = null, distancia = 0.025
+      an.objetos.forEach((o,i) => {
+        if (!s.filas[i].visible) return
+        if (o.k === 'punto') { const d = Math.hypot((p.x-o.x)/w,(p.y-o.y)/h); if (d<distancia) {distancia=d;mejor=s.filas[i]._id??`F${i}`} }
+        if (o.k === 'funcion') for(let k=-10;k<=10;k++) {const x=p.x+k*w/1000,d=Math.hypot((p.x-x)/w,(p.y-o.f(x))/h);if(d<distancia){distancia=d;mejor=s.filas[i]._id??`F${i}`}}
+      })
+      return mejor
+    },
     interaccion: {
       asas,
       mover(id, t, s) {

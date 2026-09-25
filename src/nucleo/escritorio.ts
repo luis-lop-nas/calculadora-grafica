@@ -32,10 +32,22 @@ export type Orden =
   | 'menuModulo'
   /** Ayuda ▸ Buscar orden… */
   | 'ordenes'
+  | 'propiedades'
+  | 'rapido'
+  | 'seleccionarTodo'
+  | 'importarCSV'
+  | 'importarImagen'
+  | 'svg'
+  | 'informe'
+  | 'historial'
+  | 'resultados'
+  | 'ajustes'
+  | 'espacioTrabajo'
   /** dato: { id?: string, op: 'alternar' | 'quitar' | 'solo' | 'todas' | 'ninguna' } */
   | 'capa'
   /** dato: { pausado } | { velocidad } | 'paso' | 'reiniciar' */
   | 'animacion'
+  | 'animarParametro'
   /** dato: { op: 'mover' | 'girar', eje: 0 | 1 | 2, valor } */
   | 'transformar'
   | 'grabar'
@@ -61,13 +73,14 @@ export interface EstadoMenu {
   nombreModulo: string
   capas: CapaMenu[]
   /** Hay algo que se mueve solo (animar, animada o `jugando`). */
+  parametrosAnimables: boolean
   animado: boolean
   pausado: boolean
   velocidad: number
   grabando: boolean
   /** El módulo tiene una figura que se mueve y gira entera (Objeto ▸ Transformar). */
   transformable: boolean
-  menu: { anadir: EntradaSerie[]; ejemplos: EntradaSerie[]; acciones: EntradaSerie[]; herramientas: EntradaSerie[] }
+  menu: { animacionExtra: EntradaSerie[]; seleccion: EntradaSerie[]; objeto: EntradaSerie[]; anadir: EntradaSerie[]; ejemplos: EntradaSerie[]; acciones: EntradaSerie[]; herramientas: EntradaSerie[]; escena: EntradaSerie[]; vistaEscena: EntradaSerie[] }
 }
 
 /** Capa lista para el proceso principal: sin funciones, con el color ya resuelto (#rrggbb). */
@@ -82,8 +95,10 @@ export interface CapaMenu {
 }
 
 export interface EntradaSerie {
+  id?: string
   t: string
-  tipo: 'accion' | 'casilla' | 'radio'
+  tipo: 'accion' | 'casilla' | 'radio' | 'separador'
+  atajo?: string
   activo: boolean
   desactivado: boolean
   hijos?: EntradaSerie[]
@@ -97,6 +112,9 @@ export interface ModuloMenu {
 }
 
 interface Escritorio {
+  ordenes: () => Promise<Array<{ id:string;camino:string[];desactivado:boolean;activo?:boolean }>>
+  ejecutarOrden: (id:string) => Promise<boolean>
+  plataforma: string
   listo: (modulos: ModuloMenu[]) => Promise<unknown | null>
   estado: (estado: EstadoMenu) => void
   guardar: (contenido: string, como: boolean, nombre: string) => Promise<string | null>

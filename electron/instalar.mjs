@@ -15,8 +15,9 @@ import path from 'node:path'
 const NOMBRE = 'Calculadora.app'
 const ANTIGUA = 'Calculadora gráfica.app'
 if (process.platform !== 'darwin') {
-  console.error('La instalación solo tiene sentido en un Mac.')
-  process.exit(1)
+  if (process.platform !== 'linux') throw new Error('Plataforma no admitida')
+  await import('./instalar-linux.mjs')
+  process.exit(0)
 }
 // el nombre puede venir en NFD (á = a + ´): se compara normalizado
 const app = (dir) => readdirSync(dir).find((f) => f.normalize('NFC') === NOMBRE.normalize('NFC'))

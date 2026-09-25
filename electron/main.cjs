@@ -1,7 +1,12 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, net, protocol, shell } = require('electron')
 const fs = require('node:fs/promises')
 const path = require('node:path')
+const { documentosEnArgumentos, menuPlataforma, ordenesDelMenu } = require('./plataforma.cjs')
+const esMac = process.platform === 'darwin'
 const { pathToFileURL } = require('node:url')
+
+const perfilArgumento = process.argv.find(a => a.startsWith('--user-data-dir='))
+if (perfilArgumento) app.setPath('userData', path.resolve(perfilArgumento.slice('--user-data-dir='.length)))
 
 // en la app empaquetada el nombre sale del bundle; en desarrollo (Electron.app) esto cubre el resto
 app.setName('Calculadora gráfica')
@@ -26,7 +31,28 @@ protocol.registerSchemesAsPrivileged([
 /** Por ventana: documento abierto, lo que hay que cargar al arrancar y lo que el menú necesita saber. */
 const ventanas = new Map()
 let modulos = []
-let pendientesAlArrancar = []
+let pendientesAlArrancar = esMac ? [] : documentosEnArgumentos(process.argv.slice(app.isPackaged ? 1 : 2))
+let recientes = []
+let escrituraRecientes = Promise.resolve()
+function guardarRecientes() {
+  const texto = JSON.stringify(recientes)
+  escrituraRecientes = escrituraRecientes.catch(() => {}).then(() => fs.writeFile(path.join(app.getPath('userData'), 'recientes.json'), texto)).catch((error) => console.error('No se pudieron guardar recientes:', error.message))
+}
+if (!esMac) {
+  app.setDesktopName('es.luichi.calculadora.desktop')
+  if (!app.requestSingleInstanceLock()) app.quit()
+  app.on('second-instance', async (_event, argv, cwd) => {
+    const rutas = documentosEnArgumentos(argv.slice(app.isPackaged ? 1 : 2), cwd)
+    if (!app.isReady()) pendientesAlArrancar.push(...rutas)
+    else {
+      for (const ruta of rutas) await abrirRuta(ruta)
+      const win = BrowserWindow.getAllWindows().at(-1) ?? crearVentana()
+      if (win.isMinimized()) win.restore()
+      win.show()
+      win.focus()
+    }
+  })
+}
 
 function crearVentana(documento = null) {
   const win = new BrowserWindow({
@@ -37,6 +63,7 @@ function crearVentana(documento = null) {
     title: 'Calculadora gráfica',
     backgroundColor: '#0e0f12',
     titleBarStyle: 'default',
+    ...(!esMac ? { icon: path.join(__dirname, '..', 'build', 'icon.png'), autoHideMenuBar: false } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -69,10 +96,11 @@ function crearVentana(documento = null) {
 function marcarDocumento(win, ruta) {
   const v = ventanas.get(win.id)
   v.ruta = ruta
-  win.setRepresentedFilename(ruta)
+  if (esMac) win.setRepresentedFilename(ruta)
   win.setTitle(path.basename(ruta))
-  win.setDocumentEdited(false)
-  app.addRecentDocument(ruta)
+  if (esMac) win.setDocumentEdited(false)
+  if (esMac) app.addRecentDocument(ruta)
+  else { recientes = [ruta, ...recientes.filter((r) => r !== ruta)].slice(0, 15); guardarRecientes() }
 }
 
 /** Solo pregunta si hay un documento con nombre: lo demás ya lo cubre el autoguardado. */
@@ -163,13 +191,15 @@ function muestra(hex) {
 function entradasModulo(lista, grupo, ruta = []) {
   return (lista ?? []).map((e, i) => {
     const aqui = [...ruta, i]
+    if (e.tipo === 'separador') return { type: 'separator' }
     if (e.hijos) return { label: e.t, enabled: !e.desactivado, submenu: entradasModulo(e.hijos, grupo, aqui) }
     return {
       label: e.t,
       type: e.tipo === 'casilla' ? 'checkbox' : e.tipo === 'radio' ? 'radio' : 'normal',
       checked: e.activo,
       enabled: !e.desactivado,
-      click: alFoco('menuModulo', { grupo, ruta: aqui }),
+      ...(e.atajo ? { accelerator: e.atajo } : {}),
+      click: alFoco('menuModulo', e.id ? { grupo, id: e.id } : { grupo, ruta: aqui }),
     }
   })
 }
@@ -262,28 +292,8 @@ function piezasMenu(win) {
       casilla('Proyección ortográfica', 'ortografica', { accelerator: 'Shift+CmdOrCtrl+O', enabled: es3D }),
     ],
   }
-  const escena = [
-    { label: 'Ejes', submenu: [casilla('Mostrar ejes', 'ejes'), casilla('Nombres de los ejes', 'nombres')] },
-    {
-      label: 'Rejilla',
-      submenu: [
-        casilla('Mostrar rejilla', 'rejilla'),
-        casilla('En los tres planos (XY, XZ, YZ)', 'planos', { enabled: es3D }),
-        { type: 'separator' },
-        casilla('Ajustar a la rejilla', 'ajustar', { accelerator: "Shift+CmdOrCtrl+'" }),
-        {
-          label: 'Paso',
-          submenu: [0.1, 0.25, 0.5, 1].map((v) => ({
-            label: String(v).replace('.', ','),
-            type: 'radio',
-            checked: p.paso === v,
-            enabled: hay,
-            click: prefs({ paso: v }),
-          })),
-        },
-      ],
-    },
-  ]
+  // el menú Escena lo arma la página (menuEscena.ts): el mismo árbol sirve para la paleta ⇧⌘P
+  const escena = hay && e.menu?.escena?.length ? entradasModulo(e.menu.escena, 'escena') : [{ label: 'Sin ventana', enabled: false }]
   const mostrar = {
     label: 'Mostrar',
     submenu: [casilla('Leyenda', 'leyenda'), casilla('Fórmula', 'formula'), casilla('Lecturas', 'lecturas')],
@@ -350,6 +360,7 @@ function construirMenu() {
       label: 'Calculadora gráfica',
       submenu: [
         { role: 'about', label: 'Acerca de Calculadora gráfica' },
+        { label: 'Ajustes…', accelerator: 'CmdOrCtrl+,', enabled: hay, click: alFoco('ajustes') },
         { type: 'separator' },
         { role: 'services', label: 'Servicios' },
         { type: 'separator' },
@@ -373,9 +384,15 @@ function construirMenu() {
         { label: 'Volver a lo guardado', enabled: hay && !!ventanas.get(win.id)?.ruta && !!e.modificado, click: () => volverALoGuardado(win) },
         { type: 'separator' },
         {
+          label: 'Importar',
+          submenu: [{ label: 'Imagen de fondo…', enabled: hay && e.tipo === '2d', click: alFoco('importarImagen') }, { label: 'Datos CSV en Gráficas…', enabled: hay, click: alFoco('importarCSV') }],
+        },
+        {
           label: 'Exportar',
           submenu: [
             { label: 'Imagen PNG…', accelerator: 'CmdOrCtrl+E', enabled: lienzo, click: alFoco('png') },
+            { label: 'SVG…', enabled: lienzo && e.tipo === '2d', click: alFoco('svg') },
+            { label: 'Informe de resultados…', enabled: hay, click: alFoco('informe') },
             { label: 'PDF…', accelerator: 'CmdOrCtrl+Shift+E', enabled: hay, click: () => exportarPDF(win) },
             { type: 'separator' },
             { label: 'Lecturas (CSV)…', enabled: hay && e.hayLecturas, click: alFoco('csv') },
@@ -398,7 +415,8 @@ function construirMenu() {
         { role: 'cut', label: 'Cortar' },
         { role: 'copy', label: 'Copiar' },
         { role: 'paste', label: 'Pegar' },
-        { role: 'selectAll', label: 'Seleccionar todo' },
+        { label: 'Seleccionar todo', accelerator: 'CmdOrCtrl+A', click: alFoco('seleccionarTodo') },
+        ...entradasModulo(e.menu?.seleccion, 'seleccion'),
         {
           label: 'Copiar como',
           submenu: [
@@ -416,6 +434,7 @@ function construirMenu() {
       label: 'Objeto',
       submenu: [
         anadir,
+        ...entradasModulo(e.menu?.objeto, 'objeto'),
         transformar,
         { type: 'separator' },
         {
@@ -436,6 +455,7 @@ function construirMenu() {
       label: 'Vista',
       submenu: [
         puntoDeVista,
+        ...entradasModulo(e.menu?.vistaEscena, 'vistaEscena'),
         { label: 'Encuadrar todo', accelerator: 'CmdOrCtrl+0', enabled: lienzo, click: vista({ orden: 'encuadrar' }) },
         { label: 'Acercar', accelerator: 'CmdOrCtrl+Plus', enabled: lienzo, click: vista({ orden: 'acercar', factor: 0.8 }) },
         { label: 'Alejar', accelerator: 'CmdOrCtrl+-', enabled: lienzo, click: vista({ orden: 'acercar', factor: 1.25 }) },
@@ -478,7 +498,7 @@ function construirMenu() {
         },
       ],
     },
-    { label: 'Animación', submenu: animacion },
+    { label: 'Animación', submenu: [...entradasModulo(e.menu?.animacionExtra,'animacionExtra'), ...animacion] },
     { label: 'Módulo', submenu: menuModulos(e) },
     {
       role: 'windowMenu',
@@ -487,6 +507,10 @@ function construirMenu() {
         { role: 'minimize', label: 'Minimizar' },
         { role: 'zoom', label: 'Zoom' },
         { type: 'separator' },
+        { label: 'Resultados y pasos', enabled: hay, click: alFoco('resultados') },
+        { label: 'Historial', enabled: hay, click: alFoco('historial') },
+        { label: 'Espacios de trabajo', submenu: [['Estudio','estudio'],['Geometría','geometria'],['Presentación','presentacion'],['Comparación','comparacion'],['Guardar actual…','guardar'],['Recuperar guardado','recuperar']].map(([label,dato]) => ({label,enabled:hay,click:alFoco('espacioTrabajo',dato)})) },
+        { label: 'Propiedades y selección', enabled: hay, click: alFoco('propiedades') },
         { label: 'Capas', submenu: hay ? menuCapas(e) : [{ label: 'Sin ventana', enabled: false }] },
         { type: 'separator' },
         { role: 'front', label: 'Traer todo al frente' },
@@ -512,7 +536,7 @@ function construirMenu() {
       ],
     },
   ]
-  Menu.setApplicationMenu(Menu.buildFromTemplate(plantilla))
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menuPlataforma(plantilla, process.platform, recientes, abrirRuta, () => { recientes = []; guardarRecientes(); construirMenu() })))
 }
 
 async function volverALoGuardado(win) {
@@ -530,7 +554,7 @@ async function volverALoGuardado(win) {
   const documento = await leerDocumento(v.ruta)
   if (documento) {
     enviar(win, 'abrir', documento.datos)
-    win.setDocumentEdited(false)
+    if (esMac) win.setDocumentEdited(false)
   }
 }
 
@@ -545,6 +569,23 @@ async function exportarPDF(win) {
   const pdf = await win.webContents.printToPDF({ landscape: true, printBackground: true, pageSize: 'A4' })
   await fs.writeFile(r.filePath, pdf)
 }
+
+ipcMain.handle('ordenes', (ev) => {
+  const win = BrowserWindow.fromWebContents(ev.sender)
+  if (!win || win !== BrowserWindow.getFocusedWindow()) return []
+  return ordenesDelMenu(Menu.getApplicationMenu()).map(({ item, ...descriptor }) => descriptor)
+})
+ipcMain.handle('ejecutarOrden', (ev, id) => {
+  const win = BrowserWindow.fromWebContents(ev.sender)
+  if (!win || win !== BrowserWindow.getFocusedWindow() || typeof id !== 'string') return false
+  const orden = ordenesDelMenu(Menu.getApplicationMenu()).find(o => o.id === id)
+  if (!orden || orden.desactivado) return false
+  const item = orden.item
+  if (item.type === 'checkbox') item.checked = !item.checked
+  if (item.type === 'radio') item.checked = true
+  item.click(item, win)
+  return true
+})
 
 ipcMain.handle('listo', (ev, lista) => {
   if (Array.isArray(lista) && lista.length) modulos = lista
@@ -563,12 +604,13 @@ ipcMain.on('contextual', (ev) => {
   const { e, lienzo, es3D, puntoDeVista, escena, mostrar, reproducir, transformar, anadir } = piezasMenu(win)
   const plantilla = [
     ...(e.menu?.anadir?.length ? [anadir] : []),
+    { label: 'Objeto', submenu: entradasModulo(e.menu?.objeto, 'objeto') },
     ...((e.capas ?? []).length ? [{ label: 'Capas', submenu: menuCapas(e) }] : []),
     ...(e.transformable ? [transformar] : []),
     { type: 'separator' },
     ...(es3D ? [puntoDeVista] : []),
     { label: 'Encuadrar todo', enabled: lienzo, click: alFoco('vista', { orden: 'encuadrar' }) },
-    ...escena,
+    { label: 'Escena', submenu: escena },
     mostrar,
     ...(e.animado ? [{ type: 'separator' }, reproducir] : []),
     { type: 'separator' },
@@ -586,7 +628,8 @@ ipcMain.on('estado', (ev, estado) => {
   const v = win && ventanas.get(win.id)
   if (!v) return
   v.estado = estado
-  win.setDocumentEdited(!!v.ruta && !!estado.modificado)
+  if (esMac) win.setDocumentEdited(!!v.ruta && !!estado.modificado)
+  else win.setTitle(`${estado.modificado ? '• ' : ''}${v.ruta ? path.basename(v.ruta) : 'Calculadora gráfica'}`)
   if (win.isFocused()) construirMenu()
 })
 
@@ -606,7 +649,14 @@ ipcMain.handle('guardar', async (ev, { contenido, como, nombre }) => {
     }
     ruta = r.filePath
   }
-  await fs.writeFile(ruta, contenido, 'utf8')
+  const temporal = `${ruta}.tmp-${process.pid}-${Date.now()}`
+  try { await fs.writeFile(temporal, contenido, 'utf8'); await fs.rename(temporal, ruta) }
+  catch (error) {
+    await fs.unlink(temporal).catch(() => {})
+    v.cerrarSinPreguntar = false; v.cerrarTrasGuardar = false
+    dialog.showErrorBox('No se pudo guardar', error.message)
+    return null
+  }
   marcarDocumento(win, ruta)
   if (v.cerrarTrasGuardar) setImmediate(() => win.close())
   return ruta
@@ -620,6 +670,9 @@ app.on('open-file', (ev, ruta) => {
 })
 
 app.whenReady().then(async () => {
+  if (!esMac) {
+    try { const r = JSON.parse(await fs.readFile(path.join(app.getPath('userData'), 'recientes.json'), 'utf8')); recientes = Array.isArray(r) ? r.filter((s) => typeof s === 'string').slice(0, 15) : [] } catch {}
+  }
   protocol.handle('app', (req) => {
     const pedido = decodeURIComponent(new URL(req.url).pathname)
     const fichero = path.normalize(path.join(DIST, pedido === '/' ? 'index.html' : pedido))

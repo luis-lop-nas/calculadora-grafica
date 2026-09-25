@@ -120,6 +120,9 @@ export interface Vista3D<S> {
 
 /** Vista 2D sobre canvas con paneo y zoom en coordenadas del mundo. */
 export interface Vista2D<S> {
+  /** El render y la interacción de este módulo admiten coordenadas logarítmicas. */
+  logaritmica?: boolean
+  objetoEn?: (p: { x: number; y: number }, s: S) => string | null
   tipo: '2d'
   clave?: string
   /** Ventana inicial del mundo. */
@@ -159,8 +162,11 @@ export interface Capa<S> {
 
 /** Entrada de menú declarada por un módulo: acción, casilla, opción de radio o submenú. */
 export interface EntradaMenu<S> {
+  id?: string
   t: string
-  tipo?: 'accion' | 'casilla' | 'radio'
+  tipo?: 'accion' | 'casilla' | 'radio' | 'separador'
+  /** Atajo que muestra el menú nativo, en el formato de Electron ("Shift+CmdOrCtrl+'"). */
+  atajo?: string
   /** Marcada (casillas y radios). */
   activo?: boolean
   desactivado?: boolean
@@ -169,6 +175,10 @@ export interface EntradaMenu<S> {
 }
 
 export interface MenuModulo<S> {
+  /** Controles de simulación propios, dentro de Animación. */
+  animacion?: EntradaMenu<S>[]
+  /** Operaciones sobre objetos propias del módulo, fuera de Añadir. */
+  objeto?: EntradaMenu<S>[]
   /** Objeto ▸ Añadir */
   anadir?: EntradaMenu<S>[]
   /** Módulo ▸ Ejemplos */
@@ -180,6 +190,11 @@ export interface MenuModulo<S> {
 }
 
 export interface Modulo<S> {
+  /** Sincroniza la selección del panel propio con el lienzo y el inspector común. */
+  seleccion?: { actual: (s:S) => string | null; poner: (id:string|null,s:S) => Partial<S> }
+
+  /** Parámetros continuos que el módulo sabe modificar sin romper su estado. */
+  parametrosAnimables?: (s: S) => Array<{ id: string; nombre: string; min: number; max: number; poner: (valor: number, s: S) => Partial<S> }>
   id: string
   area: Area
   /** Título del panel; admite <i> para la cursiva serif del acento. */

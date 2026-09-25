@@ -21,6 +21,8 @@ export const radios = <S, V>(t: string, opciones: ReadonlyArray<{ v: V; t: strin
 
 export const submenu = <S>(t: string, hijos: EntradaMenu<S>[]): EntradaMenu<S> => ({ t, hijos })
 
+export const separador: EntradaMenu<any> = { t: '', tipo: 'separador' }
+
 /** Capa ligada a una casilla booleana del estado (`verX`). */
 export function capaVer<S>(s: S, clave: keyof S & string, nombre: string, color: string): Capa<S> {
   return {

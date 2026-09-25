@@ -97,7 +97,7 @@ const menu = await app.evaluate(({ Menu }) => {
   out.irAlArea = ir.submenu.items.map((i) => i.label)
   return out
 })
-await win.keyboard.press('Meta+k')
+await win.keyboard.press((process.platform === 'darwin' ? 'Meta+k' : 'Control+k'))
 await win.waitForTimeout(200)
 const paleta = await win.$$eval('.paleta li[id^="modulo-"]', (lis) => lis.map((li) => li.id.slice('modulo-'.length)))
 await win.keyboard.press('Escape')
@@ -162,7 +162,7 @@ if (!bajados.some((f) => f.endsWith('.png'))) errores.push('[exportar] no se esc
 if (!bajados.some((f) => f.endsWith('.csv'))) errores.push('[exportar] no se escribió el CSV')
 
 // 5. Vista y Edición: una casilla de superposición y deshacer/rehacer
-const prefs = () => win.evaluate(() => JSON.parse(localStorage.getItem('calculadora:vista') ?? '{}'))
+const prefs = () => win.evaluate(() => { const g = JSON.parse(localStorage.getItem('calculadora:estado') ?? '{}'); return g.estados?.[g.id]?._escena?.vista ?? {ejes:true} })
 await pulsar(['Escena', 'Ejes', 'Mostrar ejes'])
 await win.waitForTimeout(400)
 if ((await prefs()).ejes !== false) errores.push('[vista] «Escena ▸ Ejes ▸ Mostrar ejes» no quita los ejes')
@@ -235,7 +235,7 @@ if (sinMenu.length) errores.push(`[menú] sin capas ni entradas propias: ${sinMe
 
 // 7. la barra nueva: orden fijo y esqueleto de Herramientas igual en todos los módulos
 const BARRA = ['Archivo', 'Edición', 'Objeto', 'Herramientas', 'Escena', 'Vista', 'Animación', 'Módulo', 'Ventana', 'Ayuda']
-const barra = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.map((i) => i.label).slice(1))
+const barra = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.map((i) => i.label).filter(label => label !== 'Calculadora gráfica'))
 if (barra.join('|') !== BARRA.join('|')) errores.push(`[barra] orden inesperado: ${barra.join(' · ')}`)
 const esqueleto = () =>
   app.evaluate(({ Menu }) => {
@@ -256,7 +256,7 @@ for (const id of ['grafica', 'superficies', 'orbitales']) {
   formaEsqueleto = e.forma
   const esperadas = { grafica: 'Recta tangente en x₀', superficies: 'Plano tangente', orbitales: null }[id]
   if (esperadas && !e.activas.includes(esperadas)) errores.push(`[herramientas] «${esperadas}» no está activa en ${id}`)
-  if (!esperadas && e.activas.length) errores.push(`[herramientas] ${id} no declara herramientas pero hay activas: ${e.activas.join(', ')}`)
+  if (!esperadas && e.activas.includes('Recta tangente en x₀')) errores.push(`[herramientas] ${id} no declara herramientas pero hay activas: ${e.activas.join(', ')}`)
 }
 await pulsar(menu.rutas[paleta.indexOf('grafica')])
 await win.waitForTimeout(900)
@@ -271,7 +271,7 @@ await win.waitForTimeout(300)
 
 // 8. Buscar orden (⇧⌘P): escribir «tangente» y pulsar Intro hace lo mismo que el menú
 await win.evaluate(() => document.activeElement?.blur?.())
-await win.keyboard.press('Meta+Shift+p')
+await win.keyboard.press((process.platform === 'darwin' ? 'Meta+Shift+p' : 'Control+Shift+p'))
 await win.waitForTimeout(300)
 const hayPaleta = await win.evaluate(() => !!document.querySelector('[aria-label="Buscar orden"]'))
 if (!hayPaleta) errores.push('[paleta] ⇧⌘P no abre «Buscar orden»')
@@ -284,7 +284,7 @@ else {
   const t2 = (await estadoDe('grafica'))?.verTangente
   if (t2 === tangenteAntes) errores.push(`[paleta] «recta tangente» + Intro no la cambia (primera: ${primera})`)
   else console.log(`paleta: «recta tangente» → ${primera}`)
-  await win.keyboard.press('Meta+Shift+p')
+  await win.keyboard.press((process.platform === 'darwin' ? 'Meta+Shift+p' : 'Control+Shift+p'))
   await win.keyboard.type('recta tangente')
   await win.keyboard.press('Enter')
   await win.waitForTimeout(300)

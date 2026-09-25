@@ -48,6 +48,7 @@ import electrostatica from '../modulos/fisica/electrostatica'
 import magnetostatica from '../modulos/fisica/magnetostatica'
 import ondas from '../modulos/fisica/ondas'
 import difraccion from '../modulos/fisica/difraccion'
+import laboratorio from '../modulos/fisica/laboratorio'
 import geometrica from '../modulos/fisica/geometrica'
 import termodinamica from '../modulos/fisica/termodinamica'
 
@@ -64,6 +65,6 @@ export const MODULOS: ModuloAny[] = [
   superficies, parametricas, vectorial, teoremas,
   fourier, transformadaF, convolucionM, laplaceT, control, circuito, filtros,
   lagrangiano, orbitas, oscilaciones, solido, relatividad,
-  electrostatica, magnetostatica, ondas, difraccion, geometrica, termodinamica, unidades,
+  laboratorio, electrostatica, magnetostatica, ondas, difraccion, geometrica, termodinamica, unidades,
   orbitales, paquete, pozo,
 ]
