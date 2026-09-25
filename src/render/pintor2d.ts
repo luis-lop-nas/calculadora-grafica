@@ -129,8 +129,11 @@ export class Pintor2D {
     const { ctx } = this
     const rejilla = conRejilla && this.mostrarRejilla
     // un paso por eje: si no, una ventana alta y estrecha se llena de números
-    const pasoX = pasoBonito(90 / Math.abs(this.escalaX || 1))
-    const pasoY = pasoBonito(90 / Math.abs(this.escalaY || 1))
+    const ex = Math.abs(this.escalaX || 1)
+    const ey = Math.abs(this.escalaY || 1)
+    const pasoX = pasoBonito(90 / ex)
+    // a escala 1:1 el mismo paso en los dos ejes: celdas cuadradas aunque un redondeo las separe
+    const pasoY = Math.abs(ex - ey) < 0.02 * ex ? pasoX : pasoBonito(90 / ey)
     ctx.save()
     ctx.lineWidth = 1
     ctx.font = `11px ${varCss('--mono') || 'monospace'}`

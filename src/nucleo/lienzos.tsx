@@ -697,8 +697,19 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
       const p = canvas.parentElement
       if (!p) return
       const dpr = Math.min(2, window.devicePixelRatio || 1)
+      const [antesAncho, antesAlto] = [g.ancho, g.alto]
       g.ancho = p.clientWidth
       g.alto = p.clientHeight
+      // al cambiar de tamaño se conservan los px por unidad (se ve más o menos mundo): si no, la
+      // ventana se estira y la rejilla deja de ser cuadrada
+      if (navegable && !primeraVez && antesAncho > 0 && antesAlto > 0 && (antesAncho !== g.ancho || antesAlto !== g.alto)) {
+        const { x, y } = g.ventana
+        const cx = (x[0] + x[1]) / 2
+        const cy = (y[0] + y[1]) / 2
+        const mx = ((x[1] - x[0]) / 2) * (g.ancho / antesAncho)
+        const my = ((y[1] - y[0]) / 2) * (g.alto / antesAlto)
+        g.ventana = { x: [cx - mx, cx + mx], y: [cy - my, cy + my] }
+      }
       canvas.width = Math.round(g.ancho * dpr)
       canvas.height = Math.round(g.alto * dpr)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
