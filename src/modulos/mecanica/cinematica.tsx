@@ -1422,9 +1422,15 @@ export function formulasDe(s: S): string[] {
       const D = vy * vy + 2 * s.g * (m.y0 - m.r)
       const tSuelo = D >= 0 ? (vy + Math.sqrt(D)) / s.g : NaN
       if (primerChoque && Math.abs(primerChoque.y - m.r) < 1e-3 && Math.abs(primerChoque.t - tSuelo) < 1e-3)
-        out.push(String.raw`\text{llega al suelo: } t=\frac{v_{0y}+\sqrt{v_{0y}^2+2g(y_0-r)}}{g}=${texN(tSuelo, 3)}\ \mathrm{s},\quad \Delta x=${texN(vx * tSuelo, 3)}\ \mathrm{m},\quad |v|=${texN(Math.hypot(vx, vy - s.g * tSuelo), 3)}\ \mathrm{m/s}`)
+        out.push(
+          String.raw`\text{al suelo: } t=\frac{v_{0y}+\sqrt{v_{0y}^2+2g(y_0-r)}}{g}=${texN(tSuelo, 3)}\ \mathrm{s}`,
+          String.raw`\Delta x=v_{0x}\,t=${texN(vx * tSuelo, 3)}\ \mathrm{m},\quad |v|=${texN(Math.hypot(vx, vy - s.g * tSuelo), 3)}\ \mathrm{m/s}`,
+        )
       else if (primerChoque)
-        out.push(String.raw`\text{primer choque (con un obstáculo): } t=${texN(primerChoque.t, 3)}\ \mathrm{s}\ \text{en } (${texN(primerChoque.x)},\ ${texN(primerChoque.y)})\ \mathrm{m},\quad |v|=${texN(primerChoque.v ?? 0, 3)}\ \mathrm{m/s}`)
+        out.push(
+          String.raw`\text{primer choque (con un obstáculo): } t=${texN(primerChoque.t, 3)}\ \mathrm{s}`,
+          String.raw`(x,\ y)=(${texN(primerChoque.x)},\ ${texN(primerChoque.y)})\ \mathrm{m},\quad |v|=${texN(primerChoque.v ?? 0, 3)}\ \mathrm{m/s}`,
+        )
     }
   }
   if (s.aire === 'lineal') {

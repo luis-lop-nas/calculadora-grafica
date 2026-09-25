@@ -462,3 +462,7 @@ aside .tog:hover{color:var(--ink)}
 .ed-rejilla-paso{padding:4px 4px;font-size:11px;font-weight:600;color:var(--ink-soft)}
 .ed-objeto[aria-pressed="true"] path,.ed-modos button[aria-pressed="true"] path{stroke:currentColor}
 .eleccion{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-soft)}
+/* barra estrecha: los botones se quedan en su icono y el título pasa a su propia línea */
+.editor{container-type:inline-size}
+.ed-titulo{flex-wrap:wrap;row-gap:4px}
+@container (max-width:760px){.ed-boton .txt{display:none}.ed-modos{width:auto}.ed-modos span{display:none}}

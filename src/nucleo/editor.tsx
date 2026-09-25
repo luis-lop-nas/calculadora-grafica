@@ -173,7 +173,8 @@ export function BarraEditor({
   // teclado: flechas mueven, Supr quita, ⌘D duplica, Esc suelta; 1/2/3 cambian de modo
   useEffect(() => {
     const tecla = (ev: KeyboardEvent) => {
-      if (escribiendo(ev) || ev.altKey) return
+      // el lienzo ya la ha atendido (Supr sobre un asa): no borrar dos veces
+      if (escribiendo(ev) || ev.altKey || ev.defaultPrevented) return
       const cmd = ev.metaKey || ev.ctrlKey
       if (!cmd && (ev.key === '1' || ev.key === '2' || ev.key === '3')) {
         set({ modo: (['construir', 'editar', 'borrar'] as const)[+ev.key - 1] })
@@ -281,18 +282,18 @@ export function BarraEditor({
                   )}
                   {seleccion.voltear && (
                     <button type="button" className="ed-boton" onClick={seleccion.voltear} title="Voltear en horizontal">
-                      ⇋ Voltear
+                      ⇋<span className="txt"> Voltear</span>
                     </button>
                   )}
                   {seleccion.duplicar && (
                     <button type="button" className="ed-boton" onClick={seleccion.duplicar} title="Duplicar (⌘D)">
-                      ⧉ Duplicar
+                      ⧉<span className="txt"> Duplicar</span>
                     </button>
                   )}
-                  <button type="button" className="ed-boton peligro" onClick={seleccion.quitar} title="Quitar (Supr)">
-                    Quitar
+                  <button type="button" className="ed-boton peligro" onClick={seleccion.quitar} title="Quitar (Supr)" aria-label="Quitar">
+                    <Icono d={ICONO_MODO.borrar} tam={14} /><span className="txt"> Quitar</span>
                   </button>
-                  <button type="button" className="ed-boton" onClick={seleccion.soltar} title="Soltar (Esc)">
+                  <button type="button" className="ed-boton" onClick={seleccion.soltar} title="Soltar (Esc)" aria-label="Soltar">
                     ✕
                   </button>
                 </span>
@@ -318,7 +319,7 @@ export function BarraEditor({
             </option>
           ))}
         </select>
-        <button type="button" className="ed-boton" onClick={() => set({ barra: false })} title="Recoger el editor">
+        <button type="button" className="ed-boton" onClick={() => set({ barra: false })} title="Recoger el editor" aria-label="Recoger el editor">
           ▾
         </button>
       </div>
