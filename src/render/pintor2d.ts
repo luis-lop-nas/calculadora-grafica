@@ -162,12 +162,17 @@ export class Pintor2D {
       if (Math.abs(v) < pasoX / 2) continue
       ctx.fillText(rotula(v, pasoX), this.X(v), y0 + 5)
     }
-    ctx.textAlign = 'right'
     ctx.textBaseline = 'middle'
+    // si el eje vertical cae pegado al borde izquierdo, los números van a su derecha: a la izquierda se cortarían
+    const rotulosY: Array<[string, number]> = []
     for (let v = Math.ceil(this.ventana.y[0] / pasoY) * pasoY; v <= this.ventana.y[1]; v += pasoY) {
       if (Math.abs(v) < pasoY / 2) continue
-      ctx.fillText(rotula(v, pasoY), x0 - 6, this.Y(v))
+      rotulosY.push([rotula(v, pasoY), this.Y(v)])
     }
+    const ancho = Math.max(0, ...rotulosY.map(([t]) => ctx.measureText(t).width))
+    const dentro = x0 - 6 - ancho >= this.vx + 2
+    ctx.textAlign = dentro ? 'right' : 'left'
+    for (const [t, y] of rotulosY) ctx.fillText(t, dentro ? x0 - 6 : x0 + 6, y)
 
     if (this.mostrarNombres && (opts.etiquetaX || opts.etiquetaY)) {
       ctx.font = `italic 19px ${varCss('--serif') || 'serif'}`

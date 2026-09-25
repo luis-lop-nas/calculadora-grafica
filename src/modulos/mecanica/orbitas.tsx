@@ -267,6 +267,16 @@ export default definir<EstadoOrbitas>({
   titulo: 'Órbitas y <i>Kepler</i>',
   entradilla: 'Lanza un cuerpo alrededor de una masa central y compara con la cónica de Kepler.',
   inicial: { modo: 'orbita', mu: 1, r0: 1, v0: 1.2, gamma: 0, eps: 0, vueltas: 3, areas: true, r1: 1, r2: 2.5 },
+  ejemplos: [
+    { t: 'Órbita circular (v₀ = √(μ/r₀))', e: { modo: 'orbita', mu: 1, r0: 1, v0: 1, gamma: 0, eps: 0 } },
+    { t: 'Elipse (v₀ = 1,2)', e: { modo: 'orbita', mu: 1, r0: 1, v0: 1.2, gamma: 0, eps: 0 } },
+    { t: 'Velocidad de escape (v₀ = √(2μ/r₀))', e: { modo: 'orbita', mu: 1, r0: 1, v0: Math.SQRT2, gamma: 0, eps: 0 } },
+    { t: 'Hipérbola (v₀ = 1,6)', e: { modo: 'orbita', mu: 1, r0: 1, v0: 1.6, gamma: 0, eps: 0 } },
+    { t: 'Lanzamiento oblicuo (γ = 30°)', e: { modo: 'orbita', mu: 1, r0: 1, v0: 1.1, gamma: 30, eps: 0 } },
+    { t: 'Precesión del perihelio (ε/r³)', e: { modo: 'orbita', mu: 1, r0: 1, v0: 1.2, gamma: 0, eps: 0.02, vueltas: 6 } },
+    { t: 'Transferencia de Hohmann 1 → 2,5', e: { modo: 'hohmann', mu: 1, r1: 1, r2: 2.5 } },
+    { t: 'Hohmann a órbita alta (1 → 6,6)', e: { modo: 'hohmann', mu: 1, r1: 1, r2: 6.6 } },
+  ],
   Panel,
   capas: (s) => (s.modo === 'orbita' ? [capaFija<EstadoOrbitas>('o', 'Órbita y U_ef', '--accent'), capaFija<EstadoOrbitas>('p', 'Periapsides', '--neg'), capaVer(s, 'areas', 'Áreas iguales (2.ª ley)', '--pos')] : []),
   menu: (s) => ({

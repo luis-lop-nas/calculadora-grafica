@@ -47,6 +47,7 @@ import { resolver as resolverE, resolverSistema } from '../lib/cas/resolver'
 import { limite as limiteE, taylor as taylorE } from '../lib/cas/limites'
 import { integrar as integrarE } from '../lib/cas/integrar'
 import { clasificarConica, evaluar as evaluarGeo, evalConica, dist as distGeo, type Obj as ObjGeo } from '../lib/geometria'
+import { ejemploActivo } from './tipos'
 import { MODULOS } from './registro'
 import { uEn } from '../modulos/edp/laplace'
 import { analizarFilas3, cortarMalla, medidasSolido, recortarACaja } from '../lib/objetos3d'
@@ -1702,6 +1703,23 @@ seccion('Asas: ida y vuelta en todos los módulos')
     for (let k = 0; k < 512; k++) media += uEn(lap, x + r * Math.cos((2 * Math.PI * k) / 512), y + r * Math.sin((2 * Math.PI * k) / 512))
     cerca(`Laplace: media en |z − (${x}, ${y})| = ${r}`, media / 512, uEn(lap, x, y), 2e-3)
   }
+}
+
+seccion('Ejemplos del armazón: todos dan fórmulas y lecturas finitas')
+{
+  let n = 0
+  for (const m of MODULOS) {
+    for (const ej of m.ejemplos ?? []) {
+      const st = { ...m.inicial, ...ej.e }
+      const textos = [...(m.formula?.(st) ?? []), ...(m.lecturas?.(st) ?? []).map(([a, b]) => `${a} ${b}`)]
+      const malo = textos.find((t) => /NaN|Infinity|undefined/.test(t))
+      cierto(`${m.id}: ejemplo «${ej.t}»`, textos.length > 0 && !malo, malo ?? 'sin fórmulas ni lecturas')
+      // el ejemplo recién puesto sale marcado como activo
+      cierto(`${m.id}: «${ej.t}» queda marcado`, ejemploActivo(st, ej.e))
+      n++
+    }
+  }
+  cierto('hay ejemplos del armazón', n >= 40, String(n))
 }
 
 /* ═══════════ resumen ═══════════ */

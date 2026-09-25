@@ -259,6 +259,14 @@ export default definir<EstadoPozo>({
   titulo: 'Pozos y <i>efecto túnel</i>',
   entradilla: 'Estados ligados en 1D y transmisión a través de una barrera.',
   inicial: { sistema: 'finito', n: 1, V0: 8, a: 2, omega: 1, E: 4, densidad: false, transmision: false },
+  ejemplos: [
+    { t: 'Pozo infinito: estado fundamental', e: { sistema: 'infinito', n: 1, a: 2 } },
+    { t: 'Pozo infinito: n = 3', e: { sistema: 'infinito', n: 3, a: 2 } },
+    { t: 'Pozo finito', e: { sistema: 'finito', n: 1, V0: 8, a: 2 } },
+    { t: 'Pozo finito poco profundo (un solo nivel)', e: { sistema: 'finito', n: 1, V0: 0.5, a: 1 } },
+    { t: 'Oscilador armónico: n = 0', e: { sistema: 'armonico', n: 0, omega: 1 } },
+    { t: 'Barrera: efecto túnel (E < V₀)', e: { sistema: 'barrera', V0: 8, a: 1, E: 4, transmision: true } },
+  ],
   Panel,
   capas: (s) => [
     capaFija<EstadoPozo>('V', 'Potencial V(x)', '--ink-soft'),

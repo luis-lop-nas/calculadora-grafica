@@ -210,6 +210,14 @@ export default definir<S>({
   titulo: 'Orbitales y <i>estados ligados</i>',
   entradilla: 'Funciones de onda en 3D: arrastra para girar, rueda o pellizco para acercar.',
   inicial: { sistema: 'h', n: 3, l: 2, m: 0, nx: 2, ny: 1, nz: 3, modo: 'ambas', prob: 0.8, puntos: 50000, corte: false, sonda: [0.3, 0, 0.3] },
+  ejemplos: [
+    { t: 'Hidrógeno 1s', e: { sistema: 'h', n: 1, l: 0, m: 0 } },
+    { t: 'Hidrógeno 2s (un nodo radial)', e: { sistema: 'h', n: 2, l: 0, m: 0 } },
+    { t: 'Hidrógeno 2p', e: { sistema: 'h', n: 2, l: 1, m: 0 } },
+    { t: 'Hidrógeno 3d_z²', e: { sistema: 'h', n: 3, l: 2, m: 0 } },
+    { t: 'Hidrógeno 4f', e: { sistema: 'h', n: 4, l: 3, m: 0 } },
+    { t: 'Caja cúbica (2, 1, 1)', e: { sistema: 'caja', nx: 2, ny: 1, nz: 1 } },
+  ],
   Panel,
   capas: (s) => [
     capaFija<S>('pos', 'ψ > 0', '--pos'),

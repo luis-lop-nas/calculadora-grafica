@@ -20,6 +20,8 @@ export interface EstadoRelatividad {
 
 const BMAX = 0.95
 const NOMBRES = 'ABCDEFGH'
+/** Con |u| = c la rapidez es infinita: se escribe ∞, no «Infinity». */
+const finito = (x: number) => (Number.isFinite(x) ? x.toFixed(6) : x > 0 ? '∞' : '−∞')
 const f3 = (x: number) => (Math.abs(x) < 5e-13 ? 0 : x).toFixed(3)
 
 function Panel({ s, set }: PropsPanel<EstadoRelatividad>) {
@@ -240,8 +242,8 @@ function lecturas(s: EstadoRelatividad): Array<[string, string]> {
     filas.push(
       ['u = (u′ + β)/(1 + u′β)', u.toFixed(6)],
       ['Galileo u′ + β', (s.up + b).toFixed(6)],
-      ['atanh u', rapidez(u).toFixed(6)],
-      ['atanh u′ + atanh β', (rapidez(s.up) + rapidez(b)).toFixed(6)],
+      ['atanh u', finito(rapidez(u))],
+      ['atanh u′ + atanh β', finito(rapidez(s.up) + rapidez(b))],
     )
   }
   return filas
@@ -264,6 +266,14 @@ export default definir<EstadoRelatividad>({
     L0: 2,
     up: 0.7,
   },
+  ejemplos: [
+    { t: 'Diagrama de Minkowski (β = 0,5)', e: { modo: 'diagrama', beta: 0.5 } },
+    { t: 'Simultaneidad: β = 0,8', e: { modo: 'diagrama', beta: 0.8 } },
+    { t: 'Gemelos a β = 0,8 (γ = 5/3)', e: { modo: 'gemelos', beta: 0.8 } },
+    { t: 'Contracción: γ = 2 (β = √3/2)', e: { modo: 'contraccion', beta: Math.sqrt(3) / 2, L0: 1 } },
+    { t: 'Composición: 0,9 c + 0,9 c', e: { modo: 'velocidades', beta: 0.9, up: 0.9 } },
+    { t: 'La luz sigue a c (u′ = 1)', e: { modo: 'velocidades', beta: 0.6, up: 1 } },
+  ],
   Panel,
   capas: (s) =>
     s.modo === 'diagrama'

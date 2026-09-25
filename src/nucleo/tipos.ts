@@ -211,6 +211,11 @@ export interface Modulo<S> {
   capas?: (s: S) => Capa<S>[]
   /** Entradas propias para la barra de menús: Objeto ▸ Añadir, Módulo ▸ Ejemplos y acciones del módulo. */
   menu?: (s: S) => MenuModulo<S>
+  /**
+   * Ejemplos listos: el armazón pone el desplegable «Ejemplos…» arriba del panel (con el que
+   * está puesto marcado) y los añade a Módulo ▸ Ejemplos. Para módulos que no pintan los suyos.
+   */
+  ejemplos?: Array<{ t: string; e: Partial<S> }>
   pista?: string
   /**
    * Parejas preparadas para el modo Comparar con el mismo módulo en los dos
@@ -228,4 +233,17 @@ export type ModuloAny = Modulo<any>
 
 export function definir<S>(m: Modulo<S>): ModuloAny {
   return m as ModuloAny
+}
+
+/** ¿Tiene el estado puesto todo lo que fija el ejemplo? */
+export function ejemploActivo<S>(s: S, e: Partial<S>): boolean {
+  return Object.entries(e).every(([k, v]) => JSON.stringify((s as Record<string, unknown>)[k]) === JSON.stringify(v))
+}
+
+/** El menú del módulo con sus `ejemplos` añadidos a Módulo ▸ Ejemplos. */
+export function menuCompleto<S>(m: Modulo<S>, s: S): MenuModulo<S> {
+  const propio = m.menu?.(s) ?? {}
+  if (!m.ejemplos?.length) return propio
+  const ej: EntradaMenu<S>[] = m.ejemplos.map((x) => ({ t: x.t, tipo: 'radio', activo: ejemploActivo(s, x.e), hacer: () => x.e }))
+  return { ...propio, ejemplos: [...ej, ...(propio.ejemplos ?? [])] }
 }

@@ -238,6 +238,13 @@ export default definir<EstadoCircuito>({
   titulo: 'Circuitos <i>RLC</i>',
   entradilla: 'Carga y descarga con continua, o régimen permanente en alterna con sus fasores girando.',
   inicial: { tipo: 'serie', modo: 'transitorio', R: 1, L: 1, C: 0.25, A: 5, w: 2, x0: 0, y0: 0, tMax: 12 },
+  ejemplos: [
+    { t: 'RLC serie subamortiguado (α < ω₀)', e: { tipo: 'serie', modo: 'transitorio', R: 1, L: 1, C: 0.25 } },
+    { t: 'Amortiguamiento crítico (R = 2√(L/C))', e: { tipo: 'serie', modo: 'transitorio', R: 4, L: 1, C: 0.25 } },
+    { t: 'Sobreamortiguado', e: { tipo: 'serie', modo: 'transitorio', R: 8, L: 1, C: 0.25 } },
+    { t: 'Resonancia en alterna (ω = ω₀)', e: { tipo: 'serie', modo: 'alterna', R: 1, L: 1, C: 0.25, w: 2 } },
+    { t: 'RLC paralelo', e: { tipo: 'paralelo', modo: 'transitorio', R: 2, L: 1, C: 0.25 } },
+  ],
   Panel,
   menu: (s) => ({
     acciones: [

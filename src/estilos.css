@@ -461,3 +461,4 @@ aside .tog:hover{color:var(--ink)}
 .nota-editor{margin:0;font-size:12px;color:var(--ink-soft);line-height:1.5}
 .ed-rejilla-paso{padding:4px 4px;font-size:11px;font-weight:600;color:var(--ink-soft)}
 .ed-objeto[aria-pressed="true"] path,.ed-modos button[aria-pressed="true"] path{stroke:currentColor}
+.eleccion{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-soft)}

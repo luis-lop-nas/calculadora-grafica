@@ -148,7 +148,7 @@ export function Eleccion<T extends string>({
   onChange: (v: T) => void
 }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--ink-soft)' }}>
+    <label className="eleccion">
       {etiqueta}
       <select value={valor} onChange={(e) => onChange(e.target.value as T)}>
         {opciones.map((o) => (

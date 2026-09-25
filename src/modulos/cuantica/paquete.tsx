@@ -80,6 +80,12 @@ export default definir<S>({
   titulo: 'Paquete gaussiano',
   entradilla: 'Partícula libre en 1D: la hélice es ψ compleja y la curva gris su densidad.',
   inicial: { sigma: 2.5, k: 1.5, jugando: true, reinicios: 0 },
+  ejemplos: [
+    { t: 'Paquete estrecho (se ensancha deprisa)', e: { sigma: 0.8, k: 1.5 } },
+    { t: 'Paquete ancho (casi onda plana)', e: { sigma: 5, k: 1.5 } },
+    { t: 'Paquete rápido (k = 4)', e: { sigma: 2.5, k: 4 } },
+    { t: 'Paquete en reposo (k = 0)', e: { sigma: 2.5, k: 0 } },
+  ],
   Panel,
   menu: (s) => ({
     acciones: [

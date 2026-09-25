@@ -280,6 +280,15 @@ export default definir<EstadoOsc>({
   titulo: 'Oscilaciones y <i>modos normales</i>',
   entradilla: 'Masas y muelles: sus modos, cómo se superponen, y qué pasa cuando se les empuja.',
   inicial: { modo: 'cadena', N: 3, m: 1, k: 1, extremos: 'fijos', Mtxt: '1, 0; 0, 2', Ktxt: '3, -1; -1, 2', ver: 0, x0: '1, 0, 0', mf: 1, kf: 4, c: 0.2, F0: 1, W: 1.9, tMax: 60 },
+  ejemplos: [
+    { t: 'Dos masas entre paredes', e: { modo: 'cadena', N: 2, m: 1, k: 1, extremos: 'fijos', ver: 0, x0: '1, 0' } },
+    { t: 'Tres masas: modo 1 solo', e: { modo: 'cadena', N: 3, m: 1, k: 1, extremos: 'fijos', ver: 1, x0: '1, 0, 0' } },
+    { t: 'Cadena libre (hay un modo de ω = 0)', e: { modo: 'cadena', N: 4, m: 1, k: 1, extremos: 'libres', ver: 0, x0: '1, 0, 0, 0' } },
+    { t: 'Masas distintas (M y K escritas)', e: { modo: 'matrices', Mtxt: '1, 0; 0, 2', Ktxt: '3, -1; -1, 2', ver: 0 } },
+    { t: 'Forzado en resonancia (Ω = ω₀)', e: { modo: 'forzado', mf: 1, kf: 4, c: 0.2, F0: 1, W: 2 } },
+    { t: 'Forzado lejos de resonancia', e: { modo: 'forzado', mf: 1, kf: 4, c: 0.2, F0: 1, W: 4 } },
+    { t: 'Amortiguamiento fuerte', e: { modo: 'forzado', mf: 1, kf: 4, c: 3, F0: 1, W: 2 } },
+  ],
   Panel,
   menu: (s) => ({
     acciones: [

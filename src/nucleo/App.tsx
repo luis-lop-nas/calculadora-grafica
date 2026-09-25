@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MODULOS } from './registro'
 import { Navegacion } from './Navegacion'
 import { Lienzo2D, Lienzo3D, type Enlace } from './lienzos'
-import { Formula, Lecturas, RanuraResultado } from './controles'
-import { AREAS_CORTAS, type Capa, type EntradaMenu, type ModuloAny, type Vista } from './tipos'
+import { Atajos, Formula, Lecturas, RanuraResultado } from './controles'
+import { AREAS_CORTAS, ejemploActivo, menuCompleto, type Capa, type EntradaMenu, type ModuloAny, type Vista } from './tipos'
 import { escritorio, type CapaMenu, type EntradaSerie, type Orden } from './escritorio'
 import { animacion, ContextoVista, guardarPrefs, leerPrefs, ordenVista, type OrdenVista, type PrefsVista } from './vista'
 import { HojaAtajos } from './Atajos'
@@ -474,7 +474,7 @@ export default function App() {
     }
     else if (orden === 'menuModulo' && dato && typeof dato === 'object') {
       const { grupo, ruta } = dato as { grupo: 'anadir' | 'ejemplos' | 'acciones'; ruta: number[] }
-      let lista = moduloP.menu?.(s)?.[grupo]
+      let lista = menuCompleto(moduloP, s)[grupo]
       let e: EntradaMenu<any> | undefined
       for (const i of ruta) {
         e = lista?.[i]
@@ -517,7 +517,7 @@ export default function App() {
   const transformable = vistaP.tipo !== 'html' && !!vistaP.interaccion?.objeto
   // capas y entradas propias del módulo que se edita; se mandan como texto para no reconstruir el menú sin motivo
   const capasMenu = JSON.stringify(serieCapas(moduloP.capas?.(s) ?? []))
-  const menuPropio = moduloP.menu?.(s)
+  const menuPropio = menuCompleto(moduloP, s)
   const menuMenu = JSON.stringify({
     anadir: serieEntradas(menuPropio?.anadir),
     ejemplos: serieEntradas(menuPropio?.ejemplos),
@@ -655,6 +655,11 @@ export default function App() {
           )}
 
           <RanuraResultado.Provider value={resultado}>
+            {moduloP.ejemplos && moduloP.ejemplos.length > 0 && (
+              <div className="grupo">
+                <Atajos marcador="Ejemplos…" opciones={moduloP.ejemplos.map((x) => ({ t: x.t, activo: ejemploActivo(s, x.e), onClick: () => set(x.e) }))} />
+              </div>
+            )}
             <moduloP.Panel s={s} set={set} />
           </RanuraResultado.Provider>
 
