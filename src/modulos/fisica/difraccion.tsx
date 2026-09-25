@@ -65,7 +65,7 @@ function Panel({ s, set }: PropsPanel<EstadoDifraccion>) {
   return (
     <>
       <Grupo titulo="Óptica ondulatoria">
-        <Segmentado columnas={2} valor={s.modo} opciones={[{ v: 'rendijas', t: 'Rendijas y redes' }, { v: 'abertura', t: 'Tu abertura (FFT)' }, { v: 'pelicula', t: 'Película delgada' }, { v: 'michelson', t: 'Michelson' }]} onChange={(modo) => set({ modo })} />
+        <Segmentado valor={s.modo} opciones={[{ v: 'rendijas', t: 'Rendijas y redes' }, { v: 'abertura', t: 'Tu abertura (FFT)' }, { v: 'pelicula', t: 'Película delgada' }, { v: 'michelson', t: 'Michelson' }]} onChange={(modo) => set({ modo })} />
         {s.modo !== 'pelicula' && <Rango etiqueta="λ (nm)" valor={s.lambda} min={380} max={780} paso={1} formato={(v) => v.toFixed(0)} onChange={(lambda) => set({ lambda })} />}
       </Grupo>
       {s.modo === 'rendijas' && (

@@ -88,7 +88,7 @@ function Panel({ s, set }: PropsPanel<S>) {
 
       <Grupo titulo="Representación">
         <Segmentado
-          columnas={3}
+         
           valor={s.modo}
           opciones={[
             { v: 'dominio' as Modo, t: 'Dominio' },

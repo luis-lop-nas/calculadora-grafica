@@ -290,7 +290,7 @@ function Panel({ s, set }: PropsPanel<EstadoCalor>) {
     <>
       <Grupo titulo="Dimensiones">
         <Segmentado
-          columnas={3}
+         
           valor={s.dim}
           opciones={[
             { v: 1 as Dim, t: 'Barra 1D' },
@@ -316,7 +316,7 @@ function Panel({ s, set }: PropsPanel<EstadoCalor>) {
       {s.dim === 1 && (
         <Grupo titulo="Condiciones de contorno">
           <Segmentado
-            columnas={3}
+           
             valor={s.contorno}
             opciones={[
               { v: 'dirichlet' as Contorno, t: 'u = 0' },
@@ -355,7 +355,7 @@ function Panel({ s, set }: PropsPanel<EstadoCalor>) {
 
       <Grupo titulo="Temperatura inicial">
         <Segmentado
-          columnas={2}
+         
           valor={s.inicial}
           opciones={[
             { v: 'escalon' as Inicial, t: 'Escalón' },
@@ -384,7 +384,7 @@ function Panel({ s, set }: PropsPanel<EstadoCalor>) {
         )}
         {s.dim > 1 && (
           <Segmentado
-            columnas={3}
+           
             valor={s.color}
             opciones={[
               { v: 'fuego' as NombreMapa, t: 'Temperatura' },

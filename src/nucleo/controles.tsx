@@ -19,35 +19,20 @@ export function Segmentado<T extends string | number>({
   valor,
   opciones,
   onChange,
-  columnas,
 }: {
   valor: T
   opciones: Array<{ v: T; t: string }>
   onChange: (v: T) => void
-  columnas?: 2 | 3
 }) {
-  const n = opciones.length
-  if (n >= 5) {
-    const i = opciones.findIndex((o) => o.v === valor)
-    return (
-      <select className="desplegable" value={i} onChange={(e) => onChange(opciones[+e.target.value].v)}>
-        {opciones.map((o, j) => (
-          <option key={String(o.v)} value={j}>
-            {o.t}
-          </option>
-        ))}
-      </select>
-    )
-  }
-  const clase = n === 4 ? 'seg envuelve' : columnas === 3 && n === 3 ? 'seg tres' : 'seg'
+  const i = opciones.findIndex((o) => o.v === valor)
   return (
-    <div className={clase}>
-      {opciones.map((o) => (
-        <button key={String(o.v)} type="button" aria-pressed={o.v === valor} onClick={() => onChange(o.v)}>
+    <select className="desplegable" value={i} onChange={(e) => onChange(opciones[+e.target.value].v)}>
+      {opciones.map((o, j) => (
+        <option key={String(o.v)} value={j}>
           {o.t}
-        </button>
+        </option>
       ))}
-    </div>
+    </select>
   )
 }
 

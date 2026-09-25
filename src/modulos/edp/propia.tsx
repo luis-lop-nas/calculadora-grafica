@@ -319,7 +319,7 @@ function Panel({ s, set }: PropsPanel<S>) {
           onChange={(dominio: string) => set({ dominio })}
         />
         <Segmentado
-          columnas={3}
+         
           valor={s.contorno}
           opciones={[
             { v: 'dirichlet', t: 'Dirichlet' },
@@ -362,7 +362,7 @@ function Panel({ s, set }: PropsPanel<S>) {
           />
         )}
         <Segmentado
-          columnas={3}
+         
           valor={s.n}
           opciones={s.dim === 1 ? [{ v: 101, t: '101' }, { v: 201, t: '201' }, { v: 401, t: '401' }] : [{ v: 41, t: '41²' }, { v: 65, t: '65²' }, { v: 97, t: '97²' }]}
           onChange={(n) => set({ n })}

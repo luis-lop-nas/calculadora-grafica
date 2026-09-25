@@ -94,7 +94,7 @@ function Panel({ s, set }: PropsPanel<EstadoTransformada>) {
       </Grupo>
       <Grupo titulo="Qué mirar">
         <Segmentado
-          columnas={3}
+         
           valor={s.modo}
           opciones={[
             { v: 'espectro', t: 'Espectro' },
@@ -105,7 +105,7 @@ function Panel({ s, set }: PropsPanel<EstadoTransformada>) {
         />
         {s.modo === 'espectro' && (
           <Segmentado
-            columnas={3}
+           
             valor={s.ver}
             opciones={[
               { v: 'modulo', t: '|X|' },
@@ -120,7 +120,7 @@ function Panel({ s, set }: PropsPanel<EstadoTransformada>) {
         {s.modo === 'dft' && (
           <>
             <Segmentado
-              columnas={2}
+             
               valor={s.ventana}
               opciones={[
                 { v: 'rectangular', t: 'Rectangular' },

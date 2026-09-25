@@ -106,7 +106,7 @@ function Panel({ s, set }: PropsPanel<S>) {
     <>
       <Grupo titulo="Sistema">
         <Segmentado
-          columnas={2}
+         
           valor={s.sistema}
           opciones={[
             { v: 'h', t: 'Hidrógeno' },
@@ -161,7 +161,7 @@ function Panel({ s, set }: PropsPanel<S>) {
 
       <Grupo titulo="Representación">
         <Segmentado
-          columnas={3}
+         
           valor={s.modo}
           opciones={[
             { v: 'nube', t: 'Nube |ψ|²' },

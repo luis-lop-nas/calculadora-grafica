@@ -36,7 +36,7 @@ function Panel({ s, set }: PropsPanel<EstadoGeometrica>) {
   return (
     <>
       <Grupo titulo="Óptica geométrica">
-        <Segmentado columnas={3} valor={s.modo} opciones={[{ v: 'lentes', t: 'Lentes (ABCD)' }, { v: 'espejo', t: 'Espejo' }, { v: 'prisma', t: 'Prisma' }]} onChange={(modo) => set({ modo })} />
+        <Segmentado valor={s.modo} opciones={[{ v: 'lentes', t: 'Lentes (ABCD)' }, { v: 'espejo', t: 'Espejo' }, { v: 'prisma', t: 'Prisma' }]} onChange={(modo) => set({ modo })} />
       </Grupo>
       {s.modo === 'lentes' && (
         <Grupo titulo="Lentes delgadas">

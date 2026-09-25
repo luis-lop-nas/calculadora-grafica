@@ -21,7 +21,7 @@ function Panel({ s, set }: PropsPanel<S>) {
     <>
       <GrupoUI titulo="Estructura">
         <Segmentado
-          columnas={3}
+         
           valor={s.tipo}
           opciones={[
             { v: 'anillo', t: 'Anillo Zₙ' },

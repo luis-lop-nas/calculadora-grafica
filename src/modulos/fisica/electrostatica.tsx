@@ -56,7 +56,7 @@ function Panel({ s, set }: PropsPanel<EstadoElectro>) {
         ))}
       </Grupo>
       <Grupo titulo="Conductor a tierra">
-        <Segmentado columnas={3} valor={s.conductor} opciones={[{ v: 'ninguno', t: 'Ninguno' }, { v: 'plano', t: 'Plano x = 0' }, { v: 'esfera', t: 'Esfera' }]} onChange={(conductor) => set({ conductor })} />
+        <Segmentado valor={s.conductor} opciones={[{ v: 'ninguno', t: 'Ninguno' }, { v: 'plano', t: 'Plano x = 0' }, { v: 'esfera', t: 'Esfera' }]} onChange={(conductor) => set({ conductor })} />
         {s.conductor === 'esfera' && <Rango etiqueta="radio R" valor={s.R} min={0.3} max={2} paso={0.05} onChange={(R) => set({ R })} />}
         {s.conductor !== 'ninguno' && <Interruptor activo={s.verImagenes} onChange={(verImagenes) => set({ verImagenes })}>Ver las cargas imagen</Interruptor>}
       </Grupo>

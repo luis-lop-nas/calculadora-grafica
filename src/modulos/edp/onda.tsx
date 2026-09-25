@@ -197,7 +197,7 @@ function Panel({ s, set }: PropsPanel<EstadoOnda>) {
     <>
       <Grupo titulo="Dimensiones">
         <Segmentado
-          columnas={3}
+         
           valor={s.dim}
           opciones={[
             { v: 1 as Dim, t: 'Cuerda 1D' },
@@ -214,7 +214,7 @@ function Panel({ s, set }: PropsPanel<EstadoOnda>) {
         <>
           <Grupo titulo="Extremos de la cuerda">
             <Segmentado
-              columnas={3}
+             
               valor={s.contorno}
               opciones={[
                 { v: 'fijo-fijo' as ContornoOnda, t: 'Fijo-fijo' },
@@ -236,7 +236,7 @@ function Panel({ s, set }: PropsPanel<EstadoOnda>) {
 
           <Grupo titulo="Condición inicial u(x, 0)">
             <Segmentado
-              columnas={3}
+             
               valor={s.inicial}
               opciones={[
                 { v: 'pinzada' as Inicial, t: 'Pinzada' },
@@ -258,7 +258,7 @@ function Panel({ s, set }: PropsPanel<EstadoOnda>) {
 
           <Grupo titulo="Condición inicial u_t(x, 0)">
             <Segmentado
-              columnas={3}
+             
               valor={s.velocidad}
               opciones={[
                 { v: 'reposo' as Velocidad, t: 'En reposo' },

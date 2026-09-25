@@ -145,7 +145,7 @@ function Panel({ s, set }: PropsPanel<EstadoPozo>) {
     <>
       <Grupo titulo="Sistema">
         <Segmentado
-          columnas={2}
+         
           valor={s.sistema}
           opciones={[
             { v: 'infinito', t: 'Pozo infinito' },

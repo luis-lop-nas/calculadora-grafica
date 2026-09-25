@@ -98,7 +98,7 @@ function Panel({ s, set }: PropsPanel<EstadoSolido>) {
   return (
     <>
       <Grupo titulo="Sólido">
-        <Segmentado columnas={3} valor={s.modo} opciones={[{ v: 'tensor', t: 'Tensor' }, { v: 'euler', t: 'Libre' }, { v: 'peonza', t: 'Peonza' }]} onChange={(modo) => set({ modo })} />
+        <Segmentado valor={s.modo} opciones={[{ v: 'tensor', t: 'Tensor' }, { v: 'euler', t: 'Libre' }, { v: 'peonza', t: 'Peonza' }]} onChange={(modo) => set({ modo })} />
         {s.modo === 'tensor' && (
           <>
             <Atajos opciones={PIEZAS.map((p) => ({ t: p.t, activo: s.piezas === p.src, onClick: () => set({ piezas: p.src }) }))} />

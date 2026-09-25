@@ -128,13 +128,13 @@ function Panel({ s, set }: PropsPanel<EstadoOsc>) {
   return (
     <>
       <Grupo titulo="Sistema">
-        <Segmentado columnas={3} valor={s.modo} opciones={[{ v: 'cadena', t: 'Cadena' }, { v: 'matrices', t: 'M y K' }, { v: 'forzado', t: 'Forzado' }]} onChange={(modo) => set({ modo, ver: 0 })} />
+        <Segmentado valor={s.modo} opciones={[{ v: 'cadena', t: 'Cadena' }, { v: 'matrices', t: 'M y K' }, { v: 'forzado', t: 'Forzado' }]} onChange={(modo) => set({ modo, ver: 0 })} />
         {s.modo === 'cadena' && (
           <>
             <Rango etiqueta="masas N" valor={s.N} min={1} max={10} paso={1} formato={(v) => String(v)} onChange={(N) => set({ N: Math.round(N), ver: 0 })} />
             <Rango etiqueta="m" valor={s.m} min={0.1} max={5} paso={0.1} onChange={(m) => set({ m })} />
             <Rango etiqueta="k" valor={s.k} min={0.1} max={10} paso={0.1} onChange={(k) => set({ k })} />
-            <Segmentado columnas={2} valor={s.extremos} opciones={[{ v: 'fijos', t: 'extremos fijos' }, { v: 'libres', t: 'extremos libres' }]} onChange={(extremos) => set({ extremos })} />
+            <Segmentado valor={s.extremos} opciones={[{ v: 'fijos', t: 'extremos fijos' }, { v: 'libres', t: 'extremos libres' }]} onChange={(extremos) => set({ extremos })} />
           </>
         )}
         {s.modo === 'matrices' && (
@@ -146,7 +146,7 @@ function Panel({ s, set }: PropsPanel<EstadoOsc>) {
         {s.modo !== 'forzado' && (
           <>
             <Expresion etiqueta="x(0) =" valor={s.x0} variables={[]} onChange={(x0: string) => set({ x0 })} comprobar={() => null} />
-            <Segmentado columnas={3} valor={s.ver} opciones={[{ v: 0, t: 'todo' }, ...Array.from({ length: n }, (_, i) => ({ v: i + 1, t: `modo ${i + 1}` }))]} onChange={(ver) => set({ ver })} />
+            <Segmentado valor={s.ver} opciones={[{ v: 0, t: 'todo' }, ...Array.from({ length: n }, (_, i) => ({ v: i + 1, t: `modo ${i + 1}` }))]} onChange={(ver) => set({ ver })} />
           </>
         )}
         {s.modo === 'forzado' && (

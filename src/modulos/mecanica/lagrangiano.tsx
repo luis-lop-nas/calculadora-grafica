@@ -160,7 +160,7 @@ function Panel({ s, set }: PropsPanel<EstadoLagrangiano>) {
       <Resultado />
       <Grupo titulo="Ver">
         <Segmentado
-          columnas={3}
+         
           valor={s.vista}
           opciones={[
             { v: 'animacion', t: 'Movimiento' },

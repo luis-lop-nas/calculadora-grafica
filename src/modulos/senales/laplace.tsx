@@ -126,7 +126,7 @@ function Panel({ s, set }: PropsPanel<EstadoLaplaceT>) {
     <>
       <Grupo titulo="Qué calcular">
         <Segmentado
-          columnas={3}
+         
           valor={s.modo}
           opciones={[
             { v: 'directa', t: 'L{f}' },

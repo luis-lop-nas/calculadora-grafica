@@ -128,7 +128,7 @@ function Panel({ s, set }: PropsPanel<EstadoOrbitas>) {
   return (
     <>
       <Grupo titulo="Problema">
-        <Segmentado columnas={2} valor={s.modo} opciones={[{ v: 'orbita', t: 'Órbita' }, { v: 'hohmann', t: 'Transferencia de Hohmann' }]} onChange={(modo) => set({ modo })} />
+        <Segmentado valor={s.modo} opciones={[{ v: 'orbita', t: 'Órbita' }, { v: 'hohmann', t: 'Transferencia de Hohmann' }]} onChange={(modo) => set({ modo })} />
         <Rango etiqueta="μ = GM" valor={s.mu} min={0.1} max={10} paso={0.1} onChange={(mu) => set({ mu })} />
       </Grupo>
       <Resultado />

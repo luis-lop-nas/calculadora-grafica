@@ -153,7 +153,7 @@ function Panel({ s, set }: PropsPanel<EstadoLaplace>) {
 
       <Grupo titulo="Dato de contorno">
         <Segmentado
-          columnas={2}
+         
           valor={s.dato}
           opciones={[
             { v: 'seno', t: 'Armónico' },

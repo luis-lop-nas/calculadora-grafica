@@ -126,7 +126,7 @@ function Panel({ s, set }: PropsPanel<EstadoFiltro>) {
     <>
       <Grupo titulo="Filtro">
         <Segmentado
-          columnas={3}
+         
           valor={s.diseno}
           opciones={[
             { v: 'media', t: 'Media móvil' },
@@ -158,7 +158,7 @@ function Panel({ s, set }: PropsPanel<EstadoFiltro>) {
             <Expresion etiqueta="a =" valor={s.a} variables={[]} onChange={(a: string) => set({ a })} comprobar={() => null} />
           </>
         )}
-        <Segmentado columnas={2} valor={s.dB ? 'dB' : 'lin'} opciones={[{ v: 'lin', t: '|H| lineal' }, { v: 'dB', t: '|H| en dB' }]} onChange={(v) => set({ dB: v === 'dB' })} />
+        <Segmentado valor={s.dB ? 'dB' : 'lin'} opciones={[{ v: 'lin', t: '|H| lineal' }, { v: 'dB', t: '|H| en dB' }]} onChange={(v) => set({ dB: v === 'dB' })} />
       </Grupo>
       <Resultado />
     </>

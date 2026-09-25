@@ -161,7 +161,7 @@ function Panel({ s, set }: PropsPanel<S>) {
 
       <Grupo titulo="Dibujo">
         <Segmentado
-          columnas={3}
+         
           valor={s.color}
           opciones={[
             { v: 'altura' as NombreMapa, t: 'Uniforme' },

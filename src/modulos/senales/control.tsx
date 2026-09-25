@@ -96,7 +96,7 @@ function Panel({ s, set }: PropsPanel<EstadoControl>) {
       </Grupo>
       <Grupo titulo="Vista">
         <Segmentado
-          columnas={2}
+         
           valor={s.vista}
           opciones={[
             { v: 'escalon', t: 'Escalón' },

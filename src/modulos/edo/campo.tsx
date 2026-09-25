@@ -76,7 +76,7 @@ function Panel({ s, set }: PropsPanel<S>) {
 
       <Grupo titulo="Integración">
         <Segmentado
-          columnas={2}
+         
           valor={s.metodo}
           opciones={[
             { v: 'rk4', t: 'RK4' },

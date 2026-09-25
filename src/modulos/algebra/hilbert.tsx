@@ -112,7 +112,7 @@ function Panel({ s, set }: PropsPanel<S>) {
     <>
       <Grupo titulo="Base ortonormal">
         <Segmentado
-          columnas={2}
+         
           valor={s.base}
           opciones={[
             { v: 'fourier', t: 'Fourier' },
@@ -129,7 +129,7 @@ function Panel({ s, set }: PropsPanel<S>) {
 
       <Grupo titulo="Función a aproximar">
         <Segmentado
-          columnas={2}
+         
           valor={s.objetivo}
           opciones={[
             { v: 'escalon', t: 'Escalón' },

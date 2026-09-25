@@ -123,8 +123,8 @@ function Panel({ s, set }: PropsPanel<EstadoCircuito>) {
   return (
     <>
       <Grupo titulo="Circuito">
-        <Segmentado columnas={2} valor={s.tipo} opciones={[{ v: 'serie', t: 'RLC serie' }, { v: 'paralelo', t: 'RLC paralelo' }]} onChange={(tipo) => set({ tipo })} />
-        <Segmentado columnas={2} valor={s.modo} opciones={[{ v: 'transitorio', t: 'Transitorio (continua)' }, { v: 'alterna', t: 'Alterna y resonancia' }]} onChange={(modo) => set({ modo })} />
+        <Segmentado valor={s.tipo} opciones={[{ v: 'serie', t: 'RLC serie' }, { v: 'paralelo', t: 'RLC paralelo' }]} onChange={(tipo) => set({ tipo })} />
+        <Segmentado valor={s.modo} opciones={[{ v: 'transitorio', t: 'Transitorio (continua)' }, { v: 'alterna', t: 'Alterna y resonancia' }]} onChange={(modo) => set({ modo })} />
         <Rango etiqueta="R (Ω)" valor={s.R} min={0.05} max={serie ? 40 : 400} paso={0.05} onChange={(R) => set({ R })} />
         <Rango etiqueta="L (H)" valor={s.L} min={0.01} max={5} paso={0.01} onChange={(L) => set({ L })} />
         <Rango etiqueta="C (F)" valor={s.C} min={0.001} max={2} paso={0.001} formato={(v) => v.toFixed(3)} onChange={(C) => set({ C })} />

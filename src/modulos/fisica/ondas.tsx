@@ -49,7 +49,7 @@ function Panel({ s, set }: PropsPanel<EstadoOndas>) {
   return (
     <>
       <Grupo titulo="Ondas">
-        <Segmentado columnas={3} valor={s.modo} opciones={[{ v: 'polarizacion', t: 'Polarización' }, { v: 'fresnel', t: 'Fresnel' }, { v: 'grupo', t: 'Fase y grupo' }]} onChange={(modo) => set({ modo })} />
+        <Segmentado valor={s.modo} opciones={[{ v: 'polarizacion', t: 'Polarización' }, { v: 'fresnel', t: 'Fresnel' }, { v: 'grupo', t: 'Fase y grupo' }]} onChange={(modo) => set({ modo })} />
       </Grupo>
       {s.modo === 'polarizacion' && (
         <Grupo titulo="E = (a cos(kz − ωt), b cos(kz − ωt + δ))">

@@ -164,7 +164,7 @@ function Panel({ s, set }: PropsPanel<S>) {
       <Grupo titulo="Dibujo">
         <Rango etiqueta="Resolución" valor={s.malla} min={24} max={200} paso={4} formato={(v) => `${v}×${v}`} onChange={(malla) => set({ malla })} />
         <Segmentado
-          columnas={3}
+         
           valor={s.color}
           opciones={[
             { v: 'altura' as NombreMapa, t: 'Uniforme' },

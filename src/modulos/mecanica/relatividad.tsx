@@ -26,7 +26,7 @@ function Panel({ s, set }: PropsPanel<EstadoRelatividad>) {
     <>
       <Grupo titulo="Relatividad especial (c = 1)">
         <Segmentado
-          columnas={2}
+         
           valor={s.modo}
           opciones={[{ v: 'diagrama', t: 'Minkowski' }, { v: 'gemelos', t: 'Gemelos' }, { v: 'contraccion', t: 'Contracción' }, { v: 'velocidades', t: 'Velocidades' }]}
           onChange={(modo) => set({ modo })}

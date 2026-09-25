@@ -104,7 +104,7 @@ function Panel({ s, set }: PropsPanel<EstadoTeoremas>) {
   return (
     <>
       <Grupo titulo="Teorema">
-        <Segmentado columnas={2} valor={s.modo} opciones={[{ v: 'green', t: 'Green' }, { v: 'flujo', t: 'Divergencia (plano)' }, { v: 'stokes', t: 'Stokes' }, { v: 'gauss', t: 'Gauss' }]} onChange={(modo) => set({ modo })} />
+        <Segmentado valor={s.modo} opciones={[{ v: 'green', t: 'Green' }, { v: 'flujo', t: 'Divergencia (plano)' }, { v: 'stokes', t: 'Stokes' }, { v: 'gauss', t: 'Gauss' }]} onChange={(modo) => set({ modo })} />
       </Grupo>
       {plano ? (
         <>
