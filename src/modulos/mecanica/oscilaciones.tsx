@@ -1,3 +1,4 @@
+import { dimOscilaciones } from '../dimensional'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
 import { radios } from '../../nucleo/menu'
 import { Expresion, Grupo, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
@@ -273,6 +274,7 @@ function vistaForzado(g: Pintor2D, s: EstadoOsc) {
 export default definir<EstadoOsc>({
   id: 'oscilaciones',
   area: 'mecanica',
+  dimensiones: dimOscilaciones,
   resumen: 'Oscilaciones acopladas y modos normales, relación de dispersión, oscilador forzado y resonancia',
   corto: 'Oscilaciones',
   titulo: 'Oscilaciones y <i>modos normales</i>',

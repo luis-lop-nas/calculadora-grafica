@@ -1,3 +1,4 @@
+import { dimSolido } from '../dimensional'
 import * as THREE from 'three'
 import { definir, type PropsPanel, type Vista3D } from '../../nucleo/tipos'
 import { accion, capaFija, capaVer, casilla, radios, submenu } from '../../nucleo/menu'
@@ -398,6 +399,7 @@ const VISTAS: Record<Modo, Vista3D<EstadoSolido>> = { tensor: vista3D('tensor'),
 export default definir<EstadoSolido>({
   id: 'solido',
   area: 'mecanica',
+  dimensiones: dimSolido,
   resumen: 'Sólido rígido: tensor de inercia con Steiner, ejes principales, rotación libre (raqueta) y peonza pesada',
   corto: 'Sólido rígido',
   titulo: 'Sólido <i>rígido</i>',

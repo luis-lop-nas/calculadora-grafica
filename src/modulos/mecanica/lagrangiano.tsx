@@ -2,6 +2,7 @@ import { definir, type PropsPanel } from '../../nucleo/tipos'
 import { accion, radios } from '../../nucleo/menu'
 import { Atajos, Boton, Expresion, Grupo, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { graficasTiempo } from '../../render/graficas'
+import { ADIM, DIM, div, ecuacionE, leerDim, type Dim, type Dims, type Dimensional, type Magnitud } from '../../lib/dimensiones'
 import { energiasNumericas } from '../../lib/montaje'
 import { EJEMPLOS_MONTAJE, PanelMontaje, quitarPieza, asasMontaje, colorCuerpo, dibujarMontaje, dibujoDe, generado, menuMontaje, moverMontaje, puntosMontaje, textoDe, y0De, type EstadoMontaje } from './montaje'
 import { tex } from '../../lib/cas/tex'
@@ -16,6 +17,8 @@ import type { Pintor2D } from '../../render/pintor2d'
 type Vista = 'montaje' | 'animacion' | 'tiempo' | 'fases' | 'energias' | 'energia' | 'poincare'
 
 export interface EstadoLagrangiano extends EstadoMontaje {
+  /** Dimensiones corregidas a mano para el análisis dimensional: «c: 1, k: M T^-2». */
+  dims?: string
   /** Construir con piezas o escribir L a mano. */
   modo: 'construir' | 'escribir'
   coords: string
@@ -259,6 +262,7 @@ function PanelTexto({ s, set }: PropsPanel<EstadoLagrangiano>) {
         <Expresion etiqueta="con" valor={s.params} variables={[]} onChange={(params: string) => set({ params })} comprobar={() => null} />
         <Expresion etiqueta="en t = 0" valor={s.ci} variables={[]} onChange={(ci: string) => set({ ci })} comprobar={() => null} />
         <Expresion etiqueta="cuerpos" valor={s.puntos} variables={coords} onChange={(puntos: string) => set({ puntos })} comprobar={() => null} />
+        <Expresion etiqueta="dimensiones" valor={s.dims ?? ''} variables={[]} onChange={(dims: string) => set({ dims })} comprobar={() => null} previa={() => null} />
       </Grupo>
     </>
   )
@@ -460,6 +464,75 @@ function vistaPoincare(g: Pintor2D, c: Calculo) {
   for (const [a, b] of pts) g.punto(a, b, g.color('--accent'), 2)
 }
 
+/* ---------- análisis dimensional ---------- */
+
+const ANGULARES = new Set(['theta', 'phi', 'psi', 'alpha', 'beta', 'gamma', 'chi', 'eta', 'xi'])
+
+/** Dimensión que se supone por el nombre: m… masa, k… rigidez, l… longitud, g gravedad, a… (montaje) ángulo. */
+function dimPorNombre(n: string, montaje: boolean): { dim: Dim; supuesta: boolean } {
+  if (/^m(p)?\d*$|^m[a-z]$|^mc$/.test(n)) return { dim: DIM.masa, supuesta: false }
+  if (/^kr?\d*$/.test(n)) return { dim: DIM.rigidez, supuesta: false }
+  if (/^lr?\d*$|^r\d*$|^d\d*$|^h\d*$/.test(n)) return { dim: DIM.longitud, supuesta: false }
+  if (n === 'g') return { dim: DIM.aceleracion, supuesta: false }
+  if (montaje && /^a[id]?\d+$/.test(n)) return { dim: ADIM, supuesta: false }
+  if (/^i\d*$/.test(n)) return { dim: DIM.inercia, supuesta: false }
+  if (/^(w|omega)\d*$/.test(n)) return { dim: DIM.frecuencia, supuesta: false }
+  if (/^b\d*$/.test(n)) return { dim: DIM.amortiguamiento, supuesta: true }
+  return { dim: ADIM, supuesta: true }
+}
+
+function leerDims(src: string | undefined): Record<string, Dim> {
+  const out: Record<string, Dim> = {}
+  for (const trozo of (src ?? '').split(',')) {
+    const m = trozo.match(/^\s*([A-Za-zα-ω_][\w']*)\s*[:=]\s*(.+)$/)
+    if (!m) continue
+    const d = leerDim(m[2])
+    if (d) out[m[1].toLowerCase()] = d
+  }
+  return out
+}
+
+export function dimensionesDe(s: EstadoLagrangiano): Dimensional | null {
+  const c = calcularModulo(s)
+  if ('error' in c) return null
+  const e = efectivo(s)
+  if ('error' in e) return null
+  const construir = s.modo === 'construir'
+  const params = leerValores(e.params)
+  const manual = leerDims(s.dims)
+  const dims: Dims = {}
+  const magnitudes: Magnitud[] = []
+  const supuestas: string[] = []
+  const nombreTex = (n: string) => (ANGULARES.has(n) ? `\\${n}` : n.replace(/^([a-z]+?)(\d+)$/, '$1_{$2}'))
+  for (const q of c.sis.coords) {
+    const dq = manual[q] ?? (ANGULARES.has(q) ? ADIM : DIM.longitud)
+    dims[q] = dq
+    dims[vel(q)] = div(dq, DIM.tiempo)
+    dims[q + "''"] = div(dq, DIM.tiempo.map((x) => 2 * x) as Dim)
+    magnitudes.push({ simbolo: nombreTex(q), nombre: ANGULARES.has(q) ? 'coordenada (ángulo)' : 'coordenada', dim: dq, valor: undefined })
+  }
+  for (const [p, v] of Object.entries(params)) {
+    const r = manual[p] ? { dim: manual[p], supuesta: false } : dimPorNombre(p, construir)
+    dims[p] = r.dim
+    if (r.supuesta) supuestas.push(p)
+    magnitudes.push({ simbolo: nombreTex(p), nombre: r.supuesta ? 'parámetro (supuesta adimensional)' : 'parámetro', dim: r.dim, valor: String(+v.toPrecision(6)) })
+  }
+  dims.t = DIM.tiempo
+  const ecuaciones = [ecuacionE('Lagrangiano L = T − V (todo energía)', c.sis.L, dims, texM, '')]
+  c.sis.EL.forEach((el, i) => ecuaciones.push(ecuacionE(`Euler–Lagrange para ${c.sis.coords[i]}`, el, dims, texM, ' = 0')))
+  const gen = construir ? generado(s.montaje) : null
+  if (gen && !('error' in gen)) {
+    ecuaciones.unshift(ecuacionE('Energía cinética T', gen.T, dims, texM), ecuacionE('Energía potencial V', gen.V, dims, texM))
+  }
+  return {
+    magnitudes,
+    ecuaciones,
+    nota: supuestas.length
+      ? `Supongo adimensional: ${supuestas.join(', ')}. Se corrige en el campo «dimensiones» del modo Escribir, p. ej. «${supuestas[0]}: L T^-1».`
+      : 'Cada ecuación de Euler–Lagrange tiene la dimensión de energía entre la de su coordenada.',
+  }
+}
+
 function quitarPiezaMod(s: EstadoLagrangiano, id: string): Partial<EstadoLagrangiano> {
   return quitarPieza(s, id)
 }
@@ -571,6 +644,7 @@ export default definir<EstadoLagrangiano>({
     } else out.push(enLineas('E = ', c.sis.H))
     return out
   },
+  dimensiones: dimensionesDe,
   lecturas: (s) => {
     const c = calcularModulo(s)
     if ('error' in c) return [['No se puede', c.error]]

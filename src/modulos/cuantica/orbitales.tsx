@@ -1,3 +1,4 @@
+import { dimOrbitales } from '../dimensional'
 import * as THREE from 'three'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
 import { accion, capaFija, capaVer, casilla, coords, radios } from '../../nucleo/menu'
@@ -203,6 +204,7 @@ const planoCorte = [new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0)]
 export default definir<S>({
   id: 'orbitales',
   area: 'cuantica',
+  dimensiones: dimOrbitales,
   resumen: 'Orbitales y estados ligados 3D',
   corto: 'Orbitales',
   titulo: 'Orbitales y <i>estados ligados</i>',

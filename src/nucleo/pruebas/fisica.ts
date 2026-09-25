@@ -1,3 +1,6 @@
+import { DIM, ecuacion, igual, leerDim, texto, unidadSI } from '../../lib/dimensiones'
+import * as DIMF from '../../modulos/dimensional'
+import { MODULOS } from '../registro'
 import { campo, flujoEsfera, imagenes, lineaDeCampo, potencial, type Carga } from '../../lib/electro'
 import { campoCuadratura, campoPoligonal, campoTramo, circulacion, poligonal, type P3 } from '../../lib/magneto'
 import { campoEspacio, campoPlano, circulacionBorde, circulacionPlana, curvaPlana, estrellada, flujoCerrado, flujoPlano, flujoRotacional, integralDivergencia, integralRegion, parametrizacion } from '../../lib/teoremas'
@@ -368,6 +371,35 @@ export function pruebasFisica() {
         const otra = it.asas(s2).find((q) => q.id === asa.id)!
         cerca(`termodinámica (${est.modo === 'vdw' ? 'vdW' : est.ciclo}): el asa ${asa.id} vuelve a su sitio`, Math.hypot(otra.p[0] - asa.p[0], otra.p[1] - asa.p[1]) / Math.max(1, Math.abs(asa.p[1])), 0, 1e-9)
       }
+    }
+  }
+
+  seccion('Análisis dimensional')
+  {
+    cierto('[F] = M·L·T⁻²', texto(DIM.fuerza) === 'M·L·T⁻²', texto(DIM.fuerza))
+    cierto('la fuerza se reconoce como N', unidadSI(DIM.fuerza) === 'N')
+    cierto('la energía se reconoce como J', unidadSI(DIM.energia) === 'J')
+    cierto('la presión se reconoce como Pa', unidadSI(DIM.presion) === 'Pa')
+    cierto('la tensión se reconoce como V', unidadSI(DIM.potencial) === 'V')
+    cierto('leer «M L^2 T^-2» = energía', igual(leerDim('M L^2 T^-2')!, DIM.energia))
+    cierto('leer «L/T» = velocidad', igual(leerDim('L/T')!, DIM.velocidad))
+    const dims = { m: DIM.masa, v: DIM.velocidad, g: DIM.aceleracion, h: DIM.longitud, E: DIM.energia, t: DIM.tiempo, omega: DIM.frecuencia }
+    cierto('E = ½mv² + mgh es homogénea', !!ecuacion('', 'E = 1/2*m*v^2 + m*g*h', dims).dim)
+    const mal = ecuacion('', 'E = 1/2*m*v^2 + m*g', dims)
+    cierto('E = ½mv² + mg no es homogénea (y se dice)', !mal.dim && /homogénea/.test(mal.error ?? ''), mal.error)
+    const seno = ecuacion('', 'h = sin(t)', dims)
+    cierto('sin(t) con t en segundos: el argumento no es adimensional', !seno.dim && /adimensional/.test(seno.error ?? ''), seno.error)
+    cierto('sin(ωt) sí vale', !!ecuacion('', 'h = h*sin(omega*t)', dims).dim)
+    cierto('una mayúscula no se confunde con la constante e', !!ecuacion('', 'E = m*g*h', dims).dim)
+    for (const [k, f] of Object.entries(DIMF)) {
+      const d = (f as () => { ecuaciones: Array<{ nombre: string; dim: unknown; error?: string }> })()
+      for (const e of d.ecuaciones) cierto(`${k}: «${e.nombre}» es homogénea`, !!e.dim, e.error)
+    }
+    // todos los módulos que declaran dimensiones dan ecuaciones homogéneas con su estado inicial
+    for (const m of MODULOS) {
+      const d = m.dimensiones?.(m.inicial)
+      if (!d) continue
+      for (const e of d.ecuaciones) cierto(`${m.id}: «${e.nombre}» es homogénea`, !!e.dim, e.error)
     }
   }
 }

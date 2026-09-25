@@ -1,3 +1,4 @@
+import { dimOrbitas } from '../dimensional'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
 import { accion, capaFija, capaVer, casilla, radios } from '../../nucleo/menu'
 import { Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
@@ -260,6 +261,7 @@ function vistaHohmann(g: Pintor2D, s: EstadoOrbitas, reloj: number) {
 export default definir<EstadoOrbitas>({
   id: 'orbitas',
   area: 'mecanica',
+  dimensiones: dimOrbitas,
   resumen: 'Órbitas en un campo central: leyes de Kepler, potencial efectivo, precesión y transferencia de Hohmann',
   corto: 'Órbitas',
   titulo: 'Órbitas y <i>Kepler</i>',

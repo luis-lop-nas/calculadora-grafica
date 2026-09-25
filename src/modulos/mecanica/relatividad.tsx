@@ -1,3 +1,4 @@
+import { dimRelatividad } from '../dimensional'
 import { definir, type PropsPanel, type Vista2D } from '../../nucleo/tipos'
 import { accion, capaVer, coords, radios } from '../../nucleo/menu'
 import { Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
@@ -249,6 +250,7 @@ function lecturas(s: EstadoRelatividad): Array<[string, string]> {
 export default definir<EstadoRelatividad>({
   id: 'relatividad',
   area: 'mecanica',
+  dimensiones: dimRelatividad,
   resumen: 'Relatividad especial: diagrama de Minkowski, simultaneidad, dilatación, contracción, gemelos y composición de velocidades',
   corto: 'Relatividad especial',
   titulo: 'Relatividad <i>especial</i>',

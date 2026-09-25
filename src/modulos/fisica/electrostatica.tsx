@@ -1,3 +1,4 @@
+import { dimElectrostatica } from '../dimensional'
 import { divergencia, gradiente, laplaciano, rotacional } from '../../lib/operadores'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
 import { accion, capaFija, capaVer, casilla, coords, radios } from '../../nucleo/menu'
@@ -155,6 +156,7 @@ const cortaConductor = (s: EstadoElectro) =>
 export default definir<EstadoElectro>({
   id: 'electrostatica',
   area: 'fisica',
+  dimensiones: dimElectrostatica,
   resumen: 'Electrostática: cargas arrastrables, líneas de campo, equipotenciales, Gauss y cargas imagen en plano y esfera',
   corto: 'Electrostática',
   titulo: 'Electro<i>stática</i>',

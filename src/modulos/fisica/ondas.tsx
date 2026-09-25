@@ -1,3 +1,4 @@
+import { dimOndas } from '../dimensional'
 import * as THREE from 'three'
 import { definir, type PropsPanel, type Vista } from '../../nucleo/tipos'
 import { accion, casilla, radios } from '../../nucleo/menu'
@@ -323,6 +324,7 @@ function lecturas(s: EstadoOndas): Array<[string, string]> {
 export default definir<EstadoOndas>({
   id: 'ondas',
   area: 'fisica',
+  dimensiones: dimOndas,
   resumen: 'Ondas: polarización lineal, circular y elíptica con Stokes, coeficientes de Fresnel y velocidades de fase y de grupo',
   corto: 'Polarización y Fresnel',
   titulo: 'Polarización y <i>Fresnel</i>',

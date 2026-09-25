@@ -1,3 +1,4 @@
+import { dimGeometrica } from '../dimensional'
 import { definir, type PropsPanel, type Vista } from '../../nucleo/tipos'
 import { accion, capaFija, casilla, radios } from '../../nucleo/menu'
 import { Atajos, Boton, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
@@ -307,6 +308,7 @@ function lecturas(s: EstadoGeometrica): Array<[string, string]> {
 export default definir<EstadoGeometrica>({
   id: 'geometrica',
   area: 'fisica',
+  dimensiones: dimGeometrica,
   resumen: 'Óptica geométrica: sistemas de lentes con matrices ABCD, aberración de un espejo esférico y dispersión en un prisma',
   corto: 'Óptica geométrica',
   titulo: 'Óptica <i>geométrica</i>',

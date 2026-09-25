@@ -1,3 +1,4 @@
+import { dimTermodinamica } from '../dimensional'
 import { definir, type PropsPanel, type Vista } from '../../nucleo/tipos'
 import { casilla, radios } from '../../nucleo/menu'
 import { Atajos, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
@@ -424,6 +425,7 @@ function formula(s: EstadoTermo): string[] {
 export default definir<EstadoTermo>({
   id: 'termodinamica',
   area: 'fisica',
+  dimensiones: dimTermodinamica,
   resumen: 'Termodinámica: ciclos de Carnot, Otto, Diesel, Brayton y Stirling en P–V y T–S, y gas de van der Waals con la construcción de Maxwell',
   corto: 'Termodinámica',
   titulo: 'Termo<i>dinámica</i>',

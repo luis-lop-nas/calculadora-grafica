@@ -7,6 +7,7 @@ import { AREAS_CORTAS, type Capa, type EntradaMenu, type ModuloAny, type Vista }
 import { escritorio, type CapaMenu, type EntradaSerie, type Orden } from './escritorio'
 import { animacion, ContextoVista, guardarPrefs, leerPrefs, ordenVista, type OrdenVista, type PrefsVista } from './vista'
 import { HojaAtajos } from './Atajos'
+import { AnalisisDimensional } from './Dimensional'
 
 /** ¿El foco está en un campo de texto? Ahí ⌘Z y compañía son los del propio campo. */
 const enCampo = () => !!(document.activeElement as HTMLElement | null)?.matches?.('input, textarea, select, [contenteditable="true"]')
@@ -388,6 +389,7 @@ export default function App() {
   const rotulo = moduloP.rotulo?.(s)
   const formula = moduloP.formula?.(s)
   const lecturas = moduloP.lecturas?.(s)
+  const dimensional = moduloP.dimensiones?.(s) ?? null
   const es3D = vistaA.tipo === '3d' || (cmp.activo && vistaB.tipo === '3d')
   const conmutarComparar = () => (cmp.activo ? setCmp((c) => ({ ...c, activo: false, editando: 'A' })) : empezarComparar())
 
@@ -580,7 +582,7 @@ export default function App() {
     )
   }
   const resultado =
-    rotulo || (prefs.formula && formula?.length) || (prefs.lecturas && lecturas?.length) ? (
+    rotulo || (prefs.formula && formula?.length) || (prefs.lecturas && lecturas?.length) || dimensional ? (
       <div className="grupo resultado">
         {rotulo && (
           <div className="titulo">
@@ -589,6 +591,7 @@ export default function App() {
         )}
         {prefs.formula && formula && formula.length > 0 && <Formula tex={formula} />}
         {prefs.lecturas && lecturas && lecturas.length > 0 && <Lecturas filas={lecturas} />}
+        {dimensional && <AnalisisDimensional d={dimensional} />}
       </div>
     ) : null
 

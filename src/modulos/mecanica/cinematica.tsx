@@ -5,6 +5,7 @@ import { Atajos, Boton, Eleccion, Grupo, Interruptor, Muestra, Rango, Resultado,
 import { animacion } from '../../nucleo/vista'
 import type { Pintor2D } from '../../render/pintor2d'
 import { graficasTiempo, type PanelTiempo } from '../../render/graficas'
+import { DIM, ecuacion, mags, type Dimensional } from '../../lib/dimensiones'
 import {
   aceleracionMrua,
   energias,
@@ -1134,6 +1135,53 @@ export function lecturasDe(s: S): Array<[string, string]> {
   return filas
 }
 
+/* ---------------------------------------------------------------- análisis dimensional */
+
+const DIMS = {
+  x: DIM.longitud, y: DIM.longitud, x0: DIM.longitud, y0: DIM.longitud, h: DIM.longitud, s: DIM.longitud, R: DIM.longitud,
+  t: DIM.tiempo, v: DIM.velocidad, v0: DIM.velocidad, v0x: DIM.velocidad, v0y: DIM.velocidad, a: DIM.aceleracion, g: DIM.aceleracion,
+  m: DIM.masa, mu: DIM.adim, theta: DIM.adim, omega: DIM.frecuencia, alpha: DIM.frecuencia.map((x) => 2 * x) as typeof DIM.frecuencia,
+  b: DIM.amortiguamiento, c: DIM.masa.map((x, i) => x - (i === 0 ? 1 : 0)) as typeof DIM.masa, Ec: DIM.energia, Ep: DIM.energia, E: DIM.energia, F: DIM.fuerza,
+}
+
+export function dimensionesDe(s: S): Dimensional {
+  const m = movilSel(s)
+  const n2 = (v: number, u: string, d = 2) => `${num(v, d)} ${u}`
+  const val = <T,>(f: (mv: Movil) => T) => (m ? f(m) : undefined)
+  const ecs = [
+    ecuacion('Posición en el MRUA', 'x = x0 + v0*t + 1/2*a*t^2', DIMS),
+    ecuacion('Velocidad y desplazamiento', 'v^2 = v0^2 + 2*a*s', DIMS),
+    ecuacion('Tiro: altura', 'y = y0 + v0y*t - 1/2*g*t^2', DIMS),
+    ecuacion('Energía cinética y potencial', 'E = 1/2*m*v^2 + m*g*h', DIMS),
+    ecuacion('Rozamiento dinámico', 'F = mu*m*g', DIMS),
+    ecuacion('Plano inclinado', 'a = g*(sin(theta) - mu*cos(theta))', DIMS),
+    ecuacion('MCU: aceleración normal', 'a = omega^2*R', DIMS),
+    ecuacion('MCU: velocidad', 'v = omega*R', DIMS),
+  ]
+  if (s.aire === 'lineal') ecs.push(ecuacion('Velocidad límite (aire lineal)', 'v = m*g/b', DIMS))
+  if (s.aire === 'cuadratico') ecs.push(ecuacion('Velocidad límite (aire cuadrático)', 'v = sqrt(m*g/c)', DIMS))
+  return {
+    magnitudes: mags(
+      ['x,\\ y', 'posición', DIM.longitud],
+      ['t', 'tiempo', DIM.tiempo],
+      ['v_0', 'rapidez inicial', DIM.velocidad, val((q) => n2(Math.abs(q.v0), 'm/s'))],
+      ['a', 'aceleración (MRUA)', DIM.aceleracion, val((q) => (q.movimiento === 'mrua' ? n2(aceleracionMrua(s, q), 'm/s²') : undefined))],
+      ['g', 'gravedad', DIM.aceleracion, n2(s.g, 'm/s²')],
+      ['m', 'masa', DIM.masa, val((q) => n2(q.m, 'kg'))],
+      ['\\mu', 'coeficiente de rozamiento', DIM.adim, num(s.muD)],
+      ['\\omega', 'velocidad angular', DIM.frecuencia, val((q) => (q.movimiento === 'mcu' ? n2(q.w0, 'rad/s') : undefined))],
+      ['\\alpha', 'aceleración angular', DIMS.alpha, val((q) => (q.movimiento === 'mcu' ? n2(q.alfa, 'rad/s²') : undefined))],
+      ['e', 'coeficiente de restitución', DIM.adim, num(s.e)],
+      ...(s.aire === 'lineal' ? [['b', 'rozamiento del aire (lineal)', DIM.amortiguamiento, n2(s.kAire, 'kg/s', 3)] as [string, string, typeof DIM.masa, string]] : []),
+      ...(s.aire === 'cuadratico' ? [['c', 'rozamiento del aire (cuadrático)', DIMS.c, n2(s.kAire, 'kg/m', 3)] as [string, string, typeof DIM.masa, string]] : []),
+      ['E', 'energía', DIM.energia],
+      ['F', 'fuerza', DIM.fuerza],
+    ),
+    ecuaciones: ecs,
+    nota: 'Los ángulos (θ, ωt) son adimensionales: por eso pueden ir dentro de sin y cos.',
+  }
+}
+
 /* ---------------------------------------------------------------- módulo */
 
 const INICIAL: S = {
@@ -1315,6 +1363,7 @@ export default definir<S>({
   },
   formula: formulasDe,
   lecturas: lecturasDe,
+  dimensiones: dimensionesDe,
   capas,
   menu,
   leyenda: (s) =>

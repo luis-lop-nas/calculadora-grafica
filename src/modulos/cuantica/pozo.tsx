@@ -1,3 +1,4 @@
+import { dimPozo } from '../dimensional'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
 import { capaFija, capaVer, casilla, radios } from '../../nucleo/menu'
 import { Grupo, Interruptor, Muestra, Rango, Segmentado } from '../../nucleo/controles'
@@ -252,6 +253,7 @@ function Panel({ s, set }: PropsPanel<EstadoPozo>) {
 export default definir<EstadoPozo>({
   id: 'pozo',
   area: 'cuantica',
+  dimensiones: dimPozo,
   resumen: 'Pozos, barrera y efecto túnel',
   corto: 'Pozos y efecto túnel',
   titulo: 'Pozos y <i>efecto túnel</i>',

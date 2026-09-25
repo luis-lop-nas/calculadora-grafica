@@ -1,3 +1,4 @@
+import { dimPaquete } from '../dimensional'
 import * as THREE from 'three'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
 import { accion, casilla, radios } from '../../nucleo/menu'
@@ -73,6 +74,7 @@ function Panel({ s, set }: PropsPanel<S>) {
 export default definir<S>({
   id: 'paquete',
   area: 'cuantica',
+  dimensiones: dimPaquete,
   resumen: 'Paquete de ondas y dispersión',
   corto: 'Paquete de ondas',
   titulo: 'Paquete gaussiano',

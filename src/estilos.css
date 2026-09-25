@@ -112,6 +112,24 @@ select,input[type=number],input[type=text]{font:inherit;font-size:13px;color:var
 .lecturas dt{color:var(--ink-soft)}
 .lecturas dd{margin:0;font-variant-numeric:tabular-nums;text-align:right}
 
+/* análisis dimensional, plegado bajo las lecturas */
+.dimensional{border-top:.5px solid var(--line);padding-top:10px;font-size:12px}
+.dimensional summary{cursor:pointer;font-weight:600;color:var(--ink);display:flex;gap:10px;align-items:baseline}
+.dimensional summary span{font-weight:500;font-size:11px}
+.dim-ok{color:var(--aux)}
+.dim-mal{color:var(--rosa)}
+.dim-nota{color:var(--ink-soft);margin:8px 0}
+.dim-tabla{width:100%;border-collapse:collapse;margin:8px 0 4px}
+.dim-tabla th{font-weight:600;color:var(--ink-soft);text-align:left;padding:2px 4px;border-bottom:.5px solid var(--line)}
+.dim-tabla td{padding:3px 4px;vertical-align:baseline}
+.dim-tabla td:nth-child(2),.dim-tabla td:nth-child(3),.dim-tabla td:nth-child(4){font-family:var(--mono);white-space:nowrap}
+.dim-tabla .dim-nombre{display:block;font-size:11px}
+.dim-nombre{color:var(--ink-soft)}
+.dim-ecuacion{border-top:.5px dashed var(--line);padding:8px 0 4px;overflow-x:auto}
+.dim-cabeza{display:flex;justify-content:space-between;gap:10px;margin-bottom:4px}
+.dim-cabeza span:first-child{color:var(--ink-soft)}
+.dim-terminos{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--ink-soft);margin-top:4px;font-family:var(--mono);font-size:11px}
+
 /* explicación plegada: un ⓘ en la esquina del grupo */
 .nota{margin:0;color:var(--ink-soft);font-size:12.5px;line-height:1.5}
 .nota summary{list-style:none;margin-left:auto;width:18px;height:18px;border-radius:50%;

@@ -1,3 +1,4 @@
+import { dimCircuito } from '../dimensional'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
 import { accion, radios } from '../../nucleo/menu'
 import { Grupo, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
@@ -231,6 +232,7 @@ function vistaAlterna(g: Pintor2D, s: EstadoCircuito, reloj: number) {
 export default definir<EstadoCircuito>({
   id: 'circuito',
   area: 'senales',
+  dimensiones: dimCircuito,
   resumen: 'Circuitos RLC serie y paralelo: transitorio, fasores, impedancia y resonancia',
   corto: 'Circuitos RLC',
   titulo: 'Circuitos <i>RLC</i>',

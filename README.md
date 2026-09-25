@@ -207,6 +207,17 @@ la figura ya colocada. «Recolocar la figura» la devuelve al origen.
 - Paquete de ondas y dispersión — ψ compleja como hélice coloreada por la fase, y su ensanchamiento.
 - Pozos, barrera y efecto túnel — pozo infinito, finito (ecuación trascendente resuelta numéricamente), armónico y T(E) de la barrera.
 
+## Análisis dimensional
+
+Los módulos de física (Escenarios de cinemática, Tu lagrangiano, Órbitas, Oscilaciones, Sólido rígido, Relatividad, Electrostática, Magnetostática, Ondas, Difracción, Óptica geométrica, Termodinámica, Pozo, Paquete de ondas, Orbitales y Circuitos RLC) tienen, bajo las lecturas, un bloque plegable **Análisis dimensional**. Contiene:
+
+- una tabla de sus magnitudes con la dimensión (M·L·T⁻²…), la unidad SI (reconoce N, J, W, Pa, V, Ω, F, H, T…) y el valor actual cuando lo hay;
+- las ecuaciones del módulo comprobadas término a término: cada sumando con su dimensión y si la igualdad es homogénea. Los argumentos de sin, cos, exp y log tienen que ser adimensionales.
+
+En Tu lagrangiano se comprueban T, V, L y cada ecuación de Euler–Lagrange. En el modo Construir las dimensiones salen de las piezas. En el modo Escribir se deducen por el nombre (m… masa, k… rigidez, l… longitud, g gravedad) y se corrigen en el campo «dimensiones», por ejemplo `c: L T^-1`.
+
+El motor está en `src/lib/dimensiones.ts` y un módulo lo usa declarando `dimensiones(s)`.
+
 ## Cómo añadir un módulo
 
 Un módulo es un fichero que exporta `definir<S>({...})`:

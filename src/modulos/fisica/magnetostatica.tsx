@@ -1,3 +1,4 @@
+import { dimMagnetostatica } from '../dimensional'
 import { divergencia, rotacional } from '../../lib/operadores'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
 import { accion, capaFija, capaVer, casilla, coords } from '../../nucleo/menu'
@@ -230,6 +231,7 @@ function lecturas(s: EstadoMagneto): Array<[string, string]> {
 export default definir<EstadoMagneto>({
   id: 'magnetostatica',
   area: 'fisica',
+  dimensiones: dimMagnetostatica,
   resumen: 'Magnetostática: Biot–Savart sobre curvas escritas (espira, Helmholtz, solenoide, hilo), líneas de B y Ampère',
   corto: 'Magnetostática',
   titulo: 'Magneto<i>stática</i>',

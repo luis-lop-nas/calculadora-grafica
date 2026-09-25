@@ -1,3 +1,4 @@
+import { dimDifraccion } from '../dimensional'
 import { definir, type PropsPanel, type Vista } from '../../nucleo/tipos'
 import { casilla, radios } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
@@ -297,6 +298,7 @@ function lecturas(s: EstadoDifraccion): Array<[string, string]> {
 export default definir<EstadoDifraccion>({
   id: 'difraccion',
   area: 'fisica',
+  dimensiones: dimDifraccion,
   resumen: 'Óptica ondulatoria: rendijas y redes, difracción de una abertura escrita por FFT 2D, películas delgadas y Michelson',
   corto: 'Óptica ondulatoria',
   titulo: 'Óptica <i>ondulatoria</i>',

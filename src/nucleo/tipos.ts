@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Escena3D } from '../render/escena3d'
 import type { Pintor2D } from '../render/pintor2d'
+import type { Dimensional } from '../lib/dimensiones'
 
 export type Area = 'funciones' | 'geometria' | 'cuantica' | 'edp' | 'edo' | 'campos' | 'algebra'
   | 'senales' | 'mecanica' | 'fisica' | 'estadistica' | 'numerico'
@@ -195,6 +196,8 @@ export interface Modulo<S> {
   /** Encabezado sobre las fórmulas: ['3d<sub>z²</sub>', 'orbital real'] */
   rotulo?: (s: S) => { nombre: string; apunte?: string }
   lecturas?: (s: S) => [string, string][]
+  /** Magnitudes con su dimensión y las ecuaciones del módulo comprobadas término a término. */
+  dimensiones?: (s: S) => Dimensional | null
   /** Refresca el panel ~10 veces por segundo (lecturas que dependen del tiempo). */
   lecturasVivas?: boolean
   leyenda?: (s: S) => ReactNode
