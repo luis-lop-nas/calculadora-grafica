@@ -37,7 +37,7 @@
   "main": "electron/main.cjs",
   "build": {
     "appId": "es.luichi.calculadora",
-    "productName": "Calculadora gráfica",
+    "productName": "Calculadora",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -56,6 +56,9 @@
         "dir"
       ],
       "identity": null,
+      "extendInfo": {
+        "CFBundleDisplayName": "Calculadora gráfica"
+      },
       "icon": "build/icon.png"
     },
     "fileAssociations": [

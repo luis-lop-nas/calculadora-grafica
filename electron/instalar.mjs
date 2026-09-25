@@ -1,7 +1,9 @@
 /**
  * Instala la app empaquetada en /Applications (o en ~/Applications si no hay permiso):
  *   npm run app:instalar
- * Antes, `electron-builder --mac dir` la deja en release/mac…/Calculadora gráfica.app.
+ * Antes, `electron-builder --mac dir` la deja en release/mac…/Calculadora.app.
+ * El paquete va sin tilde: con «gráfica» en el nombre, los procesos auxiliares de Electron no
+ * arrancan y la app se cierra al abrirla. El nombre visible lo pone CFBundleDisplayName.
  * Se firma «ad hoc» (sin cuenta de desarrollador): en un Mac con Apple Silicon una app sin
  * ninguna firma no arranca, y como no viene de internet, Gatekeeper no la bloquea.
  */
@@ -10,7 +12,8 @@ import { existsSync, readdirSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const NOMBRE = 'Calculadora gráfica.app'
+const NOMBRE = 'Calculadora.app'
+const ANTIGUA = 'Calculadora gráfica.app'
 if (process.platform !== 'darwin') {
   console.error('La instalación solo tiene sentido en un Mac.')
   process.exit(1)
@@ -28,7 +31,7 @@ const origen = path.join('release', preferida, app(path.join('release', preferid
 
 // si la app está abierta, se cierra para poder sustituirla
 try {
-  execFileSync('osascript', ['-e', 'tell application "Calculadora gráfica" to quit'], { stdio: 'ignore' })
+  execFileSync('osascript', ['-e', 'if application id "es.luichi.calculadora" is running then tell application id "es.luichi.calculadora" to quit'], { stdio: 'ignore' })
 } catch {}
 
 let destinoDir = '/Applications'
@@ -39,6 +42,8 @@ try {
   execFileSync('mkdir', ['-p', destinoDir])
 }
 const destino = path.join(destinoDir, NOMBRE)
+const antigua = readdirSync(destinoDir).find((f) => f.normalize('NFC') === ANTIGUA.normalize('NFC'))
+if (antigua) rmSync(path.join(destinoDir, antigua), { recursive: true, force: true })
 if (existsSync(destino)) rmSync(destino, { recursive: true, force: true })
 execFileSync('ditto', [origen, destino], { stdio: 'inherit' })
 execFileSync('codesign', ['--force', '--deep', '--sign', '-', destino], { stdio: 'inherit' })

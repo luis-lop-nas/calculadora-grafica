@@ -23,7 +23,7 @@ reabre un `.calc`, exporta PNG y CSV, y prueba una casilla de Vista y deshacer/r
 La misma aplicación, también como app nativa (Electron) con barra de menús de macOS. La web no cambia.
 
 ```bash
-npm run app:instalar    # empaqueta «Calculadora gráfica.app», la instala en Aplicaciones y la abre
+npm run app:instalar    # empaqueta «Calculadora.app», la instala en Aplicaciones y la abre
 npm run app:dev         # en caliente: Vite + ventana de la app
 npm run app             # compila dist/ y abre la app sin empaquetar (en la barra sale «Electron»)
 ```
