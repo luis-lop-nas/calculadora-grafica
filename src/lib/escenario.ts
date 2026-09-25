@@ -8,6 +8,9 @@
  */
 
 export type TipoPieza = 'edificio' | 'muro' | 'rampa' | 'plataforma' | 'arbol' | 'farola' | 'suelo'
+  /** Sin contorno sólido: la diana (círculo de centro (x + ancho/2, alto)) y la regla (de x a x + ancho, a la altura alto). */
+  | 'diana'
+  | 'regla'
 
 export interface Pieza {
   id: string
@@ -58,6 +61,8 @@ export interface Movil {
   fase: number
   /** Restitución propia (goma, madera…); si falta, la del mundo. */
   e?: number
+  /** Se dibuja saliendo de un cañón (solo el dibujo: el tiro es el mismo). */
+  canon?: boolean
 }
 
 export type Aire = 'no' | 'lineal' | 'cuadratico'
@@ -126,6 +131,8 @@ export interface Simulacion {
   /** Hasta dónde tiene sentido reproducir. */
   tFin: number
   encuentros: Suceso[]
+  /** Primera vez que cada móvil pasa por cada diana. */
+  aciertos: Array<Suceso & { diana: string; movil: string }>
 }
 
 /** Número con coma decimal para los textos. */
@@ -801,10 +808,31 @@ export function simular(esc: Escena): Simulacion {
         break
       }
     }
+  // dianas: el primer instante en que el cuerpo toca el círculo
+  const aciertos: Simulacion['aciertos'] = []
+  for (const d of esc.piezas.filter((p) => p.tipo === 'diana')) {
+    const cx = d.x + d.ancho / 2
+    const R = d.ancho / 2
+    esc.moviles.forEach((mv, i) => {
+      const ms = recorridos[i].muestras
+      const hueco = (k: number) => Math.hypot(ms[k].x - cx, ms[k].y - d.alto) - R - mv.r
+      for (let k = 0; k < ms.length; k++) {
+        if (hueco(k) > 0) continue
+        let t = ms[k].t
+        if (k > 0) {
+          const h0 = hueco(k - 1)
+          t = ms[k - 1].t + (h0 / (h0 - hueco(k))) * (ms[k].t - ms[k - 1].t)
+        }
+        const e = estadoEnT(recorridos[i], t)
+        aciertos.push({ t, x: e.x, y: e.y, tipo: 'encuentro', texto: `${mv.nombre} da en la diana`, v: Math.hypot(e.vx, e.vy), diana: d.id, movil: mv.id })
+        break
+      }
+    })
+  }
   // se reproduce hasta que todo esté quieto (con un respiro), o hasta tMax
   const quietos = recorridos.map((r) => r.quieto)
   const tFin = recorridos.length && quietos.every((q) => q !== null) ? Math.min(esc.tMax, Math.max(...(quietos as number[])) + 0.5) : esc.tMax
-  return { tramos, recorridos, tFin, encuentros }
+  return { tramos, recorridos, tFin, encuentros, aciertos }
 }
 
 /** Energías de una muestra: cinética, potencial gravitatoria (cero en el suelo) y total. */

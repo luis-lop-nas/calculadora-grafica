@@ -421,6 +421,19 @@ export function pruebasMecanica() {
       const imp = primero(S, 'impacto')
       cierto('pie de un edificio: choca con la pared, no con la esquina', !!imp && imp.texto.includes('pared'), imp?.texto)
     }
+    // diana en el vértice del tiro: la bala da en ella, y a 1,5 m más arriba no
+    {
+      const vx = 15 * Math.SQRT1_2
+      const diana = (dy: number): Pieza => ({ id: 'd', tipo: 'diana', x: (vx * vx) / 9.8 - 0.6, ancho: 1.2, alto: 0.2 + (vx * vx) / (2 * 9.8) + dy, muE: 0, muD: 0 })
+      S = simular(esc([diana(0)], [mv({ id: 'b', r: 0.2, x0: 0, y0: 0.2, v0: 15, ang: 45 })], { tMax: 3 }))
+      cierto('diana en el vértice: acierta', S.aciertos.length === 1)
+      cierto('diana en el vértice: antes de t = v₀ sin θ / g', S.aciertos[0].t < vx / 9.8 && S.aciertos[0].t > vx / 9.8 - 0.2, String(S.aciertos[0]?.t))
+      S = simular(esc([diana(1.5)], [mv({ id: 'b', r: 0.2, x0: 0, y0: 0.2, v0: 15, ang: 45 })], { tMax: 3 }))
+      cierto('diana 1,5 m por encima del vértice: falla', S.aciertos.length === 0)
+      // la diana y la regla no son sólidas: no cambian el vuelo
+      const libre = simular(esc([], [mv({ id: 'b', r: 0.2, x0: 0, y0: 0.2, v0: 15, ang: 45 })], { tMax: 3 }))
+      cerca('diana: no desvía la bala', S.recorridos[0].muestras.at(-1)!.x, libre.recorridos[0].muestras.at(-1)!.x, 1e-12)
+    }
     // solidoEn / apoyarEn: nada se coloca dentro de un edificio
     {
       const ed: Pieza = { id: 'e', tipo: 'edificio', x: 0, ancho: 8, alto: 20, muE: 0.5, muD: 0.4 }

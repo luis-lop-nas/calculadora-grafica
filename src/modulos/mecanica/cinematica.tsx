@@ -64,6 +64,8 @@ const NOMBRE_PIEZA: Record<TipoPieza, string> = {
   arbol: 'Árbol',
   farola: 'Farola',
   suelo: 'Suelo',
+  diana: 'Diana',
+  regla: 'Regla',
 }
 
 const NOMBRE_MOVIL: Record<TipoMovil, string> = {
@@ -106,7 +108,7 @@ const COLOR_MATERIAL: Record<string, string> = {
 }
 
 const colorPieza = (p: Pieza) =>
-  p.tipo === 'suelo' ? COLOR_MATERIAL[p.material ?? ''] ?? '--ink-soft' : p.tipo === 'arbol' ? '--aux' : p.tipo === 'farola' ? '--ocre' : p.tipo === 'rampa' ? '--ocre' : '--ink-soft'
+  p.tipo === 'diana' ? '--rosa' : p.tipo === 'regla' ? '--aux' : p.tipo === 'suelo' ? COLOR_MATERIAL[p.material ?? ''] ?? '--ink-soft' : p.tipo === 'arbol' ? '--aux' : p.tipo === 'farola' ? '--ocre' : p.tipo === 'rampa' ? '--ocre' : '--ink-soft'
 
 /** Una pieza nueva con valores típicos, colocada a la derecha de lo que ya hay. */
 export function piezaNueva(tipo: TipoPieza, s: S, material?: string): Pieza {
@@ -127,6 +129,10 @@ export function piezaNueva(tipo: TipoPieza, s: S, material?: string): Pieza {
       return { ...base, ancho: 3, alto: 6, solido: false }
     case 'farola':
       return { ...base, ancho: 1, alto: 5, solido: false }
+    case 'diana':
+      return { ...base, ancho: 1.2, alto: 3 }
+    case 'regla':
+      return { ...base, ancho: 10, alto: 0.6 }
     case 'suelo': {
       const m = MATERIALES.find((q) => q.t === material) ?? MATERIALES[4]
       return { ...base, ancho: 10, alto: 0, muE: m.muE, muD: m.muD, material: m.t }
@@ -304,6 +310,20 @@ export const EJEMPLOS: Array<{ t: string; e: Partial<S> }> = [
     },
   },
   {
+    t: 'Cañón y diana (en la altura máxima)',
+    e: {
+      ...MUNDO,
+      e: 0.3,
+      tMax: 4,
+      piezas: [
+        // vértice de la parábola: x = v₀² sin 2θ / (2g), y = y₀ + v₀² sin²θ / (2g)
+        P({ id: 'p1', tipo: 'diana', x: 225 / (2 * 9.8) - 0.6, ancho: 1.2, alto: 0.2 + 225 / (4 * 9.8) }),
+        P({ id: 'p2', tipo: 'regla', x: 0, ancho: 225 / 9.8, alto: -0.9 }),
+      ],
+      moviles: [M({ id: 'm1', tipo: 'pelota', nombre: 'Bala', canon: true, m: 1, r: 0.2, x0: 0, y0: 0.2, v0: 15, ang: 45 })],
+    },
+  },
+  {
     t: 'Hielo y asfalto: frenada de un bloque',
     e: {
       ...MUNDO,
@@ -415,6 +435,14 @@ export const CATALOGO: Categoria[] = [
     ],
   },
   {
+    id: 'medir',
+    nombre: 'Medir',
+    objetos: [
+      { id: 'p:diana', nombre: 'Diana', icono: circ(16, 16, 10) + circ(16, 16, 5) + circ(16, 16, 1), color: '--rosa' },
+      { id: 'p:regla', nombre: 'Regla', icono: 'M4 16h24M4 12v8M28 12v8M10 16v-3M16 16v-4M22 16v-3', color: '--aux' },
+    ],
+  },
+  {
     id: 'moviles',
     nombre: 'Móviles',
     objetos: [
@@ -423,6 +451,7 @@ export const CATALOGO: Categoria[] = [
       { id: 'm:bloque', nombre: 'Bloque', icono: caja(9, 14, 14, 14) + 'M4 28h24', color: '--morado' },
       { id: 'm:coche', nombre: 'Coche MRUA', icono: caja(4, 13, 24, 9) + circ(10, 24, 3) + circ(22, 24, 3), color: '--pos' },
       { id: 'm:coche:mru', nombre: 'Coche MRU', icono: caja(4, 13, 24, 9) + circ(10, 24, 3) + circ(22, 24, 3) + 'M8 8h16', color: '--pos' },
+      { id: 'm:canon', nombre: 'Cañón', icono: 'M6 26l6-6' + circ(9, 23, 3) + 'M12 20l10-10' + circ(24, 8, 2.5), color: '--accent' },
       { id: 'm:disco', nombre: 'Giro MCU', icono: circ(16, 16, 10) + 'M16 16L26 16' + circ(26, 16, 2), color: '--rosa' },
     ],
   },
@@ -446,9 +475,13 @@ export function objetoNuevo(s: S, pincel: string, x: number, y: number): Pieza |
     if (tipo === 'rampa' && variante === 'i') p.derecha = false
     // la plataforma, a la altura del clic
     if (tipo === 'plataforma') p.alto = Math.max(1, +redondea(y, k).toFixed(2))
+    // la diana y la regla, a la altura del clic
+    if (tipo === 'diana' || tipo === 'regla') p.alto = Math.max(0, +redondea(y, k).toFixed(2))
     return p
   }
-  const m = movilNuevo(tipo as TipoMovil, s, variante as Movimiento | undefined)
+  const canon = tipo === 'canon'
+  const m = movilNuevo(canon ? 'pelota' : (tipo as TipoMovil), s, variante as Movimiento | undefined)
+  if (canon) Object.assign(m, { nombre: `Bala${s.moviles.some((q) => q.canon) ? ' ' + (s.moviles.filter((q) => q.canon).length + 1) : ''}`, canon: true, r: 0.2, m: 1 })
   if (m.movimiento === 'mcu') {
     m.x0 = +redondea(x, k).toFixed(2)
     m.y0 = +Math.max(m.R, redondea(y, k)).toFixed(2)
@@ -459,6 +492,7 @@ export function objetoNuevo(s: S, pincel: string, x: number, y: number): Pieza |
     // cerca de una superficie (o dentro de algo sólido), apoyado en ella; si no, donde se ha hecho clic
     m.y0 = +(y - apoyo < 0.8 ? apoyo : redondea(y, k)).toFixed(2)
     if (m.tipo !== 'coche') m.v0 = 0
+    if (canon) Object.assign(m, { v0: 15, ang: 45 })
   }
   return m
 }
@@ -484,6 +518,29 @@ export function camposDe(s: S, set: (p: Partial<S>) => void): Seleccion | null {
   const dup = () => s.sel && set(duplicar(s, s.sel))
   if (p) {
     const cambia = (parche: Partial<Pieza>) => set({ ...moverPieza(s, p.id, parche), ...reiniciar() })
+    if (p.tipo === 'diana' || p.tipo === 'regla') {
+      const diana = p.tipo === 'diana'
+      return {
+        nombre: NOMBRE_PIEZA[p.tipo],
+        color: colorPieza(p),
+        campos: diana
+          ? [
+              { etiqueta: 'Centro x', valor: p.x + p.ancho / 2, paso: 0.5, unidad: 'm', onChange: (cx) => cambia({ x: +(cx - p.ancho / 2).toFixed(3) }) },
+              { etiqueta: 'Centro y', valor: p.alto, paso: 0.5, min: 0, unidad: 'm', onChange: (alto) => cambia({ alto }) },
+              { etiqueta: 'Diámetro', valor: p.ancho, paso: 0.1, min: 0.1, unidad: 'm', onChange: (ancho) => cambia({ ancho, x: +(p.x + p.ancho / 2 - ancho / 2).toFixed(3) }) },
+            ]
+          : [
+              { etiqueta: 'Desde x', valor: p.x, paso: 0.5, unidad: 'm', onChange: (x) => cambia({ x }) },
+              { etiqueta: 'Hasta x', valor: p.x + p.ancho, paso: 0.5, unidad: 'm', onChange: (x1) => cambia({ ancho: Math.max(0.1, +(x1 - p.x).toFixed(3)) }) },
+              { etiqueta: 'Altura', valor: p.alto, paso: 0.5, min: 0, unidad: 'm', onChange: (alto) => cambia({ alto }) },
+            ],
+        paso: pasoRejilla(s.ed),
+        mover: (dx, dy) => cambia({ x: +(p.x + dx).toFixed(2), alto: Math.max(0, +(p.alto + dy).toFixed(2)) }),
+        duplicar: dup,
+        quitar,
+        soltar,
+      }
+    }
     const campos: CampoEditor[] = [{ etiqueta: 'x (borde izq.)', valor: p.x, paso: 0.5, unidad: 'm', onChange: (x) => cambia({ x }) }]
     if (p.tipo !== 'suelo') campos.push({ etiqueta: p.tipo === 'plataforma' ? 'Altura de la losa' : 'Altura', valor: p.alto, paso: 0.5, min: 0.2, unidad: 'm', onChange: (alto) => cambia({ alto }) })
     campos.push({ etiqueta: p.tipo === 'arbol' ? 'Copa' : 'Ancho', valor: p.ancho, paso: p.tipo === 'muro' ? 0.1 : 0.5, min: p.tipo === 'muro' ? 0.1 : 0.5, unidad: 'm', onChange: (ancho) => cambia({ ancho }) })
@@ -599,7 +656,8 @@ let fantasma: { x: number; y: number } | null = null
 function cursor(p: { x: number; y: number } | null, s: S): boolean {
   const antes = fantasma
   fantasma = p
-  return s.ed.modo === 'construir' && !!s.ed.pincel && (!!antes || !!p)
+  // vista previa del pincel o lectura de la trayectoria: las dos se repintan al mover el ratón
+  return (!!antes || !!p) && (s.moviles.length > 0 || (s.ed.modo === 'construir' && !!s.ed.pincel))
 }
 
 /** El objeto del pincel, translúcido, donde caería con un clic. */
@@ -617,6 +675,24 @@ function dibujarFantasma(g: Pintor2D, s: S) {
     dibujarMovil(g, m, x, y, 1, 0, false)
   }
   g.ctx.restore()
+}
+
+/** Al pasar el ratón cerca de una trayectoria: t, x, y y |v| del punto más cercano (como el «rastro» de PhET). */
+function dibujarLectura(g: Pintor2D, s: S) {
+  if (!fantasma || (s.ed.modo === 'construir' && s.ed.pincel)) return
+  const sim = calcular(s)
+  let mejor: { d: number; q: (typeof sim.recorridos)[number]['muestras'][number]; c: string } | null = null
+  const visibles = s.moviles.filter((m) => !s.ocultos.includes(m.id))
+  visibles.forEach((m, i) => {
+    for (const q of sim.recorridos[i]?.muestras ?? []) {
+      const d = Math.hypot(g.X(q.x) - g.X(fantasma!.x), g.Y(q.y) - g.Y(fantasma!.y))
+      if (d < 10 && (!mejor || d < mejor.d)) mejor = { d, q, c: COLOR_MOVIL[m.tipo] }
+    }
+  })
+  if (!mejor) return
+  const { q, c } = mejor as { q: (typeof sim.recorridos)[number]['muestras'][number]; c: string }
+  g.punto(q.x, q.y, g.color(c), 5)
+  g.texto(`t = ${num(q.t)} s · (${num(q.x)}; ${num(q.y)}) m · |v| = ${num(Math.hypot(q.vx, q.vy))} m/s`, q.x, q.y, g.color('--ink'), { dx: 10, dy: -12 })
 }
 
 /** Clic en el lienzo según el modo del editor. */
@@ -856,6 +932,57 @@ function dibujarPieza(g: Pintor2D, p: Pieza, s: S, sel: boolean) {
       g.curva(circulo(cx + 0.8, h - 0.25, 0.25, 14), c, 1.5)
       break
     }
+    case 'diana': {
+      const cx = (x0 + x1) / 2
+      const R = p.ancho / 2
+      for (const k of [1, 0.6, 0.2]) g.curva(circulo(cx, h, R * k, 32), c, k === 1 ? grosor : 1.2)
+      g.curva(
+        [
+          [cx, 0],
+          [cx, h - R],
+        ],
+        tinta,
+        1,
+        true,
+      )
+      if (s.verCotas) g.texto(`(${num(cx, 1)}; ${num(h, 1)}) m`, cx + R, h, tinta, { dx: 6 })
+      if (sel) g.curva(rect(cx - R - 0.3, h - R - 0.3, cx + R + 0.3, h + R + 0.3), g.color('--accent'), 1, true)
+      return
+    }
+    case 'regla': {
+      // cota horizontal con su longitud: Δx de x a x + ancho
+      const d = 6 / g.escalaY
+      g.curva(
+        [
+          [x0, h],
+          [x1, h],
+        ],
+        c,
+        grosor,
+      )
+      for (const xx of [x0, x1])
+        g.curva(
+          [
+            [xx, h - 2 * d],
+            [xx, h + 2 * d],
+          ],
+          c,
+          grosor,
+        )
+      const paso = p.ancho > 40 ? 10 : p.ancho > 8 ? 1 : 0.5
+      for (let xx = x0 + paso; xx < x1 - 1e-9; xx += paso)
+        g.curva(
+          [
+            [xx, h],
+            [xx, h + d],
+          ],
+          c,
+          1,
+        )
+      g.texto(`Δx = ${num(p.ancho, 2)} m`, (x0 + x1) / 2, h, c, { dy: -12, alinea: 'center' })
+      if (sel) g.curva(rect(x0 - 0.3, h - 0.5, x1 + 0.3, h + 0.5), g.color('--accent'), 1, true)
+      return
+    }
     case 'suelo':
       g.curva(
         [
@@ -921,6 +1048,32 @@ function dibujarMovil(g: Pintor2D, m: Movil, x: number, y: number, vx: number, v
   if (g.mostrarNombres) g.texto(m.nombre, x, y + r, g.color('--ink-soft'), { dy: -10, alinea: 'center' })
 }
 
+/** Cañón de trazo simple en la posición de salida: una rueda y el tubo en la dirección de v₀. */
+function dibujarCanon(g: Pintor2D, m: Movil) {
+  const tinta = g.color('--ink-soft')
+  const a = (m.ang * Math.PI) / 180
+  const L = Math.max(1.2, 6 * m.r)
+  const [ux, uy] = [Math.cos(a), Math.sin(a)]
+  const [nx, ny] = [-uy, ux]
+  const w = Math.max(m.r * 1.3, 0.25)
+  // el eje (la rueda) en el punto de salida y el tubo hacia delante: nunca se mete bajo el suelo
+  const boca: [number, number] = [m.x0 + 0.75 * L * ux, m.y0 + 0.75 * L * uy]
+  const culata: [number, number] = [m.x0 - 0.25 * L * ux, m.y0 - 0.25 * L * uy]
+  g.curva(
+    [
+      [culata[0] + w * nx, culata[1] + w * ny],
+      [boca[0] + w * nx, boca[1] + w * ny],
+      [boca[0] - w * nx, boca[1] - w * ny],
+      [culata[0] - w * nx, culata[1] - w * ny],
+      [culata[0] + w * nx, culata[1] + w * ny],
+    ],
+    tinta,
+    1.8,
+  )
+  g.curva(circulo(m.x0, m.y0, Math.max(0.1, Math.min(w * 1.4, m.y0)), 20), tinta, 1.8)
+  g.texto(`θ = ${num(m.ang, 0)}°`, culata[0], culata[1], tinta, { dx: -8, dy: 14, alinea: 'right' })
+}
+
 /** Ventana que abarca el escenario y las trayectorias, con margen. */
 function encuadre(s: S): { x: [number, number]; y: [number, number] } {
   const sim = calcular(s)
@@ -978,8 +1131,9 @@ function vistaEscena(g: Pintor2D, s: S) {
   )
   const visibles = s.piezas.filter((p) => !s.ocultos.includes(p.id))
   // primero el decorado (detrás), luego lo sólido
-  for (const p of visibles.filter((p) => p.tipo === 'arbol' || p.tipo === 'farola' || p.tipo === 'suelo')) dibujarPieza(g, p, s, p.id === s.sel)
-  for (const p of visibles.filter((p) => !(p.tipo === 'arbol' || p.tipo === 'farola' || p.tipo === 'suelo'))) dibujarPieza(g, p, s, p.id === s.sel)
+  const detras = (p: Pieza) => p.tipo === 'arbol' || p.tipo === 'farola' || p.tipo === 'suelo' || p.tipo === 'diana'
+  for (const p of visibles.filter(detras)) dibujarPieza(g, p, s, p.id === s.sel)
+  for (const p of visibles.filter((p) => !detras(p))) dibujarPieza(g, p, s, p.id === s.sel)
 
   const moviles = s.moviles.filter((m) => !s.ocultos.includes(m.id))
   moviles.forEach((m, i) => {
@@ -997,6 +1151,7 @@ function vistaEscena(g: Pintor2D, s: S) {
         1,
         true,
       )
+    if (m.canon && m.movimiento !== 'mcu') dibujarCanon(g, m)
     // estela: lo ya recorrido
     const pasado = rec.muestras.filter((q) => q.t <= t).map((q) => [q.x, q.y] as [number, number])
     g.curva(pasado, c, 2)
@@ -1048,7 +1203,13 @@ function vistaEscena(g: Pintor2D, s: S) {
       g.punto(e.x, e.y, g.color('--rosa'), 5)
       if (e.t <= t) g.texto(`${e.texto} · t = ${num(e.t)} s`, e.x, e.y, g.color('--rosa'), { dy: -24, alinea: 'center' })
     }
+  if (s.verSucesos)
+    for (const e of sim.aciertos) {
+      g.punto(e.x, e.y, g.color('--rosa'), 5)
+      if (e.t <= t) g.texto(`${e.texto} · t = ${num(e.t)} s`, e.x, e.y, g.color('--rosa'), { dy: -24, alinea: 'center' })
+    }
   dibujarFantasma(g, s)
+  dibujarLectura(g, s)
   // rótulo del tiempo, fijo arriba a la izquierda
   const tx = x[0] + 0.02 * (x[1] - x[0])
   const ty = y[1] - 0.04 * (y[1] - y[0])
@@ -1315,6 +1476,9 @@ export function lecturasDe(s: S): Array<[string, string]> {
     if (par) filas.push(['Se para', `t = ${num(par.t)} s en x = ${num(par.x)} m`])
   }
   for (const q of sim.encuentros) filas.push(['Encuentro', `${q.texto}: t = ${num(q.t)} s, x = ${num(q.x)} m`])
+  for (const q of sim.aciertos) filas.push(['Diana', `${q.texto}: t = ${num(q.t)} s a ${num(q.v ?? 0)} m/s`])
+  const dianas = s.piezas.filter((p) => p.tipo === 'diana' && !s.ocultos.includes(p.id))
+  if (dianas.length && !sim.aciertos.some((a) => a.movil === m.id)) filas.push(['Diana', `${m.nombre} no da en ninguna`])
   return filas
 }
 
@@ -1466,8 +1630,8 @@ function objetoEn(s: S, x: number, y: number): string | null {
   }
   for (const p of [...s.piezas].reverse()) {
     if (s.ocultos.includes(p.id)) continue
-    const y0 = p.tipo === 'suelo' ? -0.4 : p.tipo === 'plataforma' ? p.alto - 0.5 : 0
-    const y1 = p.tipo === 'suelo' ? 0.1 : p.alto
+    const y0 = p.tipo === 'suelo' ? -0.4 : p.tipo === 'plataforma' ? p.alto - 0.5 : p.tipo === 'diana' ? p.alto - p.ancho / 2 : p.tipo === 'regla' ? p.alto - 0.4 : 0
+    const y1 = p.tipo === 'suelo' ? 0.1 : p.tipo === 'diana' ? p.alto + p.ancho / 2 : p.tipo === 'regla' ? p.alto + 0.2 : p.alto
     if (x >= p.x - 0.2 && x <= p.x + p.ancho + 0.2 && y >= y0 && y <= y1 + 0.2) return p.id
   }
   return null
