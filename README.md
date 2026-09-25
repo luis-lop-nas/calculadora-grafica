@@ -99,6 +99,33 @@ vuelve a igualarlos) o cualquier otro módulo, elegido en la barra. Encima del p
 elige qué lado editas. Algunos módulos traen comparaciones hechas: **dominio ↔ imagen** en Variable
 compleja y en Aplicaciones lineales, y **otra métrica** en Espacios métricos.
 
+## Editor de escenarios
+
+Escenarios de cinemática y Tu lagrangiano (vista Montaje) se montan con una barra al pie del lienzo,
+al estilo del editor de niveles de Geometry Dash:
+
+- **Construir** (tecla 1): pestañas de categorías y una rejilla de objetos dibujados con trazo simple.
+  Se elige uno y cada clic en el lienzo lo coloca (sigue elegido para poner más; Esc lo suelta). Bajo
+  el cursor se ve translúcido dónde caería.
+  - Cinemática: Terreno (edificio, muro, rampas, plataforma), Suelos (asfalto, hierba, arena,
+    madera, hielo), Decorado (árbol, farola), Medir (diana, regla) y Móviles (pelota, piedra,
+    bloque, coches MRU/MRUA, cañón, giro MCU). Un móvil soltado dentro de algo sólido sube encima.
+  - Montaje: Cuerpos (péndulo, carro, plano inclinado, rueda, masa libre), Muelles y Apoyos y
+    poleas. Péndulos y muelles cuelgan de lo más cercano, con la longitud y el ángulo del clic.
+- **Editar** (tecla 2): clic en un objeto y sus valores salen en la barra (−/+ o escribiéndolos);
+  flechas para moverlo (Mayús: ×10), ⌘D duplicar, voltear en espejo, Supr quitar.
+- **Borrar** (tecla 3): clic en un objeto, o arrastrar por encima de varios. ⌘Z los devuelve.
+- La **rejilla** (libre, 0,1, 0,5 o 1 m) vale para colocar y para las flechas; ▾ recoge la barra.
+
+En cinemática, además: la diana cuenta quién la toca y cuándo, la regla mide Δx, cada móvil libre
+puede tener su propio rebote e, y al pasar el ratón por una trayectoria se leen t, (x, y) y |v|.
+Las fórmulas dependen del escenario: deslizamiento si el móvil empieza apoyado, y «primer choque»
+sacado de la simulación si hay un obstáculo antes del suelo.
+
+Un módulo 2D usa la barra declarando en su vista `barra` (el componente `BarraEditor` de
+`src/nucleo/editor.tsx`, con su catálogo y los campos del seleccionado), `alPulsar` según el modo,
+`barrer` (borrar de un trazo) y `cursor` (vista previa).
+
 ## Mover con el ratón
 
 Casi todos los lienzos tienen **asas**: puntos que se arrastran y cambian el problema. Doble clic en
@@ -186,7 +213,7 @@ la figura ya colocada. «Recolocar la figura» la devuelve al origen.
 - Filtros digitales — media móvil, IIR, resonador, peine, Butterworth (bilineal) o coeficientes propios: plano z, |H(e^{iω})| y h[n].
 
 **Mecánica clásica y relatividad**
-- Escenarios de cinemática — se parte de un plano vacío y se monta el problema con piezas (edificios, muros, rampas, plataformas, árboles, farolas, tramos de suelo de hielo, asfalto, hierba…) y móviles (pelota, piedra, coche, bloque, disco) con movimiento libre (gravedad, rozamiento del aire lineal o cuadrático, rebotes con restitución e, deslizamiento con μ estático y dinámico), MRU, MRUA (con frenada y parada) o MCU/MCUA. Alturas, posiciones y la flecha de v₀ se arrastran. Vistas: escena animada con vectores v y a, trayectoria y sucesos (altura máxima, choques, paradas, encuentros); gráficas x(t), y(t), |v|, |a|, distancia y energías; tabla de valores con la fila del instante actual. Doce ejemplos.
+- Escenarios de cinemática — se parte de un plano vacío y se monta el problema con piezas (edificios, muros, rampas, plataformas, árboles, farolas, tramos de suelo de hielo, asfalto, hierba…) y móviles (pelota, piedra, coche, bloque, disco) con movimiento libre (gravedad, rozamiento del aire lineal o cuadrático, rebotes con restitución e, deslizamiento con μ estático y dinámico), MRU, MRUA (con frenada y parada) o MCU/MCUA. Alturas, posiciones y la flecha de v₀ se arrastran. Vistas: escena animada con vectores v y a, trayectoria y sucesos (altura máxima, choques, paradas, encuentros); gráficas x(t), y(t), |v|, |a|, distancia y energías; tabla de valores con la fila del instante actual. Trece ejemplos (uno, cañón y diana en el vértice de la parábola). Se monta con la barra del editor (ver más abajo).
 - Tu lagrangiano — se monta con piezas o se escribe a mano. Construir: soportes, péndulos (varillas), carros en raíles rectos o inclinados, ruedas que ruedan sin deslizar (disco, aro, bola), masas colgadas de muelles o péndulos elásticos, poleas con cuerda (Atwood, masa en la mesa, plano inclinado; la polea puede tener masa), masas libres y muelles entre cuerpos; el módulo elige las coordenadas, escribe T, V y L = T − V (con cos²+sin² = 1 y cos u cos v + sin u sin v = cos(u − v) ya aplicados) y la simulación se para si se acaba la cuerda. Masas, longitudes, k, posición y velocidad iniciales se tocan en el panel o arrastrando; un deslizador fija la energía total. Escribir: L(q, q̇) con `q'` para las velocidades. Ecuaciones de Euler–Lagrange y de Hamilton, animación, energías T, V, E (y la cinética de cada cuerpo), fases y sección de Poincaré. Doce montajes y siete sistemas escritos de ejemplo.
 - Órbitas — potencial −μ/r (+ ε/r³ para la precesión), elementos orbitales, áreas iguales y transferencia de Hohmann.
 - Oscilaciones — cadena de N masas o M y K escritas: modos normales (problema generalizado), superposición y dispersión; oscilador forzado amortiguado con amplitud, fase y transitorio exacto.
@@ -247,6 +274,9 @@ para que el lienzo se remonte al cambiar.
 
 Después basta añadirlo a `src/nucleo/registro.ts`; el orden de esa lista es el orden del menú.
 
+`ejemplos: [{ t, e }]` pone el desplegable «Ejemplos…» arriba del panel (marcando el que está puesto)
+y los añade a Módulo ▸ Ejemplos; lo tienen los 45 módulos, por aquí o con su propio desplegable.
+
 Para los controles del panel están `Segmentado`, `Rango`, `Interruptor`, `Boton`, `Numero`,
 `Matriz` (con `filas` para vectores con nombre y color), `Expresion` y `Atajos`, todos en
 `src/nucleo/controles.tsx`.
@@ -264,7 +294,7 @@ dependen del tiempo.
 - `src/lib/control.ts` — respuesta temporal, Bode, márgenes, Nyquist, lugar de las raíces y Routh.
 - `src/lib/cas/laplace.ts` — Laplace directa, inversa y EDO lineales, con su comprobación numérica.
 - `src/lib/cas/compilar.ts` — pasa una expresión del CAS a un cierre numérico rápido.
-- `src/lib/escenario.ts` — escenarios de cinemática: contorno sólido de las piezas, vuelo con RK4 y choques por bisección, deslizamiento con rozamiento y paso por juntas, MRU/MRUA/MCU exactos y encuentros.
+- `src/lib/escenario.ts` — escenarios de cinemática: contorno sólido de las piezas, vuelo con RK4 y choques por bisección con caras y esquinas salientes, deslizamiento con rozamiento y paso por juntas, MRU/MRUA/MCU exactos, encuentros y dianas.
 - `src/render/graficas.ts` — cuadrícula de gráficas frente al tiempo con cursor y valores en el instante actual.
 - `src/lib/montaje.ts` — de un montaje de piezas a las posiciones en coordenadas generalizadas y a T, V y L con el CAS; `aTexto` escribe una expresión del CAS como texto que se vuelve a leer.
 - `src/lib/operadores.ts` — gradiente, divergencia, rotacional, laplaciano y derivada direccional, numéricos y (para un campo escalar escrito) simbólicos.
