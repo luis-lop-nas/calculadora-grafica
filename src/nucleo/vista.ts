@@ -91,6 +91,12 @@ export function alOrdenVista(fn: (o: OrdenVista) => void): () => void {
  */
 export const animacion = { pausado: false, velocidad: 1, pasos: 0, reinicios: 0 }
 
+/**
+ * Barra espaciadora mantenida: mientras `pulsado`, arrastrar en cualquier lienzo desplaza la vista.
+ * Los lienzos marcan `usado` al arrastrar; si al soltar no se usó, el toque reproduce o para.
+ */
+export const espacio = { pulsado: false, usado: false }
+
 /** Paso de un fotograma, en segundos de animación. */
 export const PASO_ANIMACION = 1 / 30
 

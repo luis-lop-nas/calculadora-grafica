@@ -87,6 +87,16 @@ export class Escena3D {
     this.orb.r = Math.min(40 * this.escala, Math.max(0.8 * this.escala, this.orb.r * factor))
   }
 
+  /** Desplaza el objetivo en el plano de la pantalla: lo que está bajo el ratón lo sigue. */
+  desplazar(dxPx: number, dyPx: number) {
+    const alto = this.renderer.domElement.clientHeight || 1
+    const porPx = (2 * this.orb.r * Math.tan((20 * Math.PI) / 180)) / alto
+    this.camera.updateMatrixWorld()
+    const derecha = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0)
+    const arriba = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1)
+    this.objetivo.addScaledVector(derecha, -dxPx * porPx).addScaledVector(arriba, dyPx * porPx)
+  }
+
   colocarCamara() {
     const { theta, phi } = this.orb
     const fov = this.ortografica ? 2 : 40

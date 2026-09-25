@@ -5,7 +5,7 @@ import { Lienzo2D, Lienzo3D, type Enlace } from './lienzos'
 import { Formula, Lecturas, RanuraResultado } from './controles'
 import { AREAS_CORTAS, type Capa, type EntradaMenu, type ModuloAny, type Vista } from './tipos'
 import { escritorio, type CapaMenu, type EntradaSerie, type Orden } from './escritorio'
-import { animacion, ContextoVista, guardarPrefs, leerPrefs, ordenVista, type OrdenVista, type PrefsVista } from './vista'
+import { animacion, ContextoVista, espacio, guardarPrefs, leerPrefs, ordenVista, type OrdenVista, type PrefsVista } from './vista'
 import { HojaAtajos } from './Atajos'
 
 /** ¿El foco está en un campo de texto? Ahí ⌘Z y compañía son los del propio campo. */
@@ -370,16 +370,42 @@ export default function App() {
     return () => document.removeEventListener('keydown', atajo)
   }, [])
 
+  // Espacio: un toque reproduce o para la animación; mantenido, arrastrar desplaza la vista
+  // (los lienzos leen `espacio`); ⇧Espacio, autogiro.
+  const animadoRef = useRef(false)
   useEffect(() => {
-    const atajo = (e: KeyboardEvent) => {
+    const soltar = () => {
+      espacio.pulsado = false
+      document.body.classList.remove('espacio')
+    }
+    const abajo = (e: KeyboardEvent) => {
       if (e.code !== 'Space') return
       const elemento = e.target as HTMLElement | null
       if (elemento?.matches('input, textarea, select, button, [contenteditable="true"]')) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
       e.preventDefault()
-      setGiro((v) => !v)
+      if (e.repeat) return
+      if (e.shiftKey) {
+        setGiro((v) => !v)
+        return
+      }
+      espacio.pulsado = true
+      espacio.usado = false
+      document.body.classList.add('espacio')
     }
-    document.addEventListener('keydown', atajo)
-    return () => document.removeEventListener('keydown', atajo)
+    const arriba = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || !espacio.pulsado) return
+      soltar()
+      if (!espacio.usado && animadoRef.current) setAnim((a) => ({ ...a, pausado: !a.pausado }))
+    }
+    document.addEventListener('keydown', abajo)
+    document.addEventListener('keyup', arriba)
+    window.addEventListener('blur', soltar)
+    return () => {
+      document.removeEventListener('keydown', abajo)
+      document.removeEventListener('keyup', arriba)
+      window.removeEventListener('blur', soltar)
+    }
   }, [])
 
   const vistaDe = (m: ModuloAny, st: any): Vista<any> => (typeof m.vista === 'function' ? m.vista(st) : m.vista)
@@ -512,6 +538,7 @@ export default function App() {
   const hayFormula = !!formula?.length
   const vistaP = editandoB ? vistaB : vistaA
   const animado = (vistaP.tipo === '3d' ? !!vistaP.animar : vistaP.tipo === '2d' ? !!vistaP.animada?.(s) : false) || (!!s && 'jugando' in s)
+  animadoRef.current = animado
   const transformable = vistaP.tipo !== 'html' && !!vistaP.interaccion?.objeto
   // capas y entradas propias del módulo que se edita; se mandan como texto para no reconstruir el menú sin motivo
   const capasMenu = JSON.stringify(serieCapas(moduloP.capas?.(s) ?? []))

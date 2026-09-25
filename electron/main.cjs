@@ -280,7 +280,7 @@ function piezasMenu(win) {
     ],
   }
   const reproducir = {
-    label: 'Reproducir',
+    label: 'Reproducir (espacio)',
     type: 'checkbox',
     checked: !e.pausado,
     accelerator: 'Alt+CmdOrCtrl+P',
@@ -455,8 +455,8 @@ function construirMenu() {
             { label: 'Copiar A en B', enabled: hay && e.comparar && e.mismoModulo, click: alFoco('cmp', 'copiarAenB') },
           ],
         },
-        // sin atajo en el menú: la barra espaciadora ya lo hace y robarla rompería los campos de texto
-        { label: 'Autogiro (espacio)', type: 'checkbox', checked: !!e.giro, enabled: hay && e.es3D, click: alFoco('giro') },
+        // sin atajo en el menú: ⇧Espacio lo hace la página y robarlo rompería los campos de texto
+        { label: 'Autogiro (⇧ espacio)', type: 'checkbox', checked: !!e.giro, enabled: hay && e.es3D, click: alFoco('giro') },
         { type: 'separator' },
         casilla('Modo presentación', 'presentacion', { accelerator: 'CmdOrCtrl+\\' }),
         {

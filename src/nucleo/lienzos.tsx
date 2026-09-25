@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react'
 import { Escena3D } from '../render/escena3d'
-import { ContextoVista, alOrdenVista, relojLienzo, type PrefsVista } from './vista'
+import { ContextoVista, alOrdenVista, espacio, relojLienzo, type PrefsVista } from './vista'
 import { escritorio } from './escritorio'
 import { Pintor2D } from '../render/pintor2d'
 import { alCambiarTema } from '../render/tema'
@@ -54,7 +54,9 @@ function ponerPrefs3D(e: Escena3D, p: PrefsVista) {
 
 const ATAJOS_3D = [
   'X / Y / Z: mirar desde ese eje · 0: vista de partida',
+  'Espacio + arrastrar: desplazar la vista',
   'Arrastrar un punto: moverlo · ⌥: en vertical · Mayús: por un eje y a pasos de 0,5',
+  'Clic en un punto: seleccionarlo · Supr: borrarlo',
   'Clic en una figura movible: seleccionarla · Esc: soltarla',
   '⌘ (Ctrl) + arrastrar: mover la figura · Mayús: por un eje y a pasos de 0,5',
   'R (o ⌘R): girarla con el ratón · X / Y / Z: eje de giro · Mayús: a pasos de 15° · clic o Intro: vale · Esc: deshacer',
@@ -149,7 +151,11 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     // Asas: la lista vigente, la que está bajo el ratón y la que se arrastra.
     let asas: Asa[] = []
     let encima: string | null = null
+    // la última asa agarrada: sigue marcada y Supr la borra aunque el ratón ya no esté encima
+    let elegida: string | null = null
     let mano: { id: string; desfase: number[]; p0: number[] } | null = null
+    // espacio + arrastrar: desplazar la cámara en vez de girarla
+    let desplazando = false
     // objeto entero: seleccionado, moviéndose (⌘ + arrastrar) o girando (R)
     let seleccionado = false
     let movObj: { s0: any; c0: number[]; desfase: number[]; eje: number | null } | null = null
@@ -164,7 +170,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
       pedir = true
       e.ponerAsas(
         asas.map((a) => ({ id: a.id, p: a.p, color: new THREE.Color(colorDeAsa(a.color)) })),
-        mano?.id ?? encima,
+        mano?.id ?? encima ?? elegida,
       )
     }
     const aplicar = (parche: any) => {
@@ -260,6 +266,12 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
       }
       canvas.setPointerCapture(ev.pointerId)
       punteros.set(ev.pointerId, { x: ev.clientX, y: ev.clientY })
+      if (punteros.size === 1 && espacio.pulsado) {
+        espacio.usado = true
+        desplazando = true
+        canvas.style.cursor = 'grabbing'
+        return
+      }
       const inter = estado.current.vista.interaccion
       if (punteros.size === 1 && inter) {
         const { x, y } = local(ev)
@@ -270,6 +282,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
           // se guarda el desfase para que el punto no salte al agarrarlo por el borde
           const bajo = asa.sobre === 'superficie' ? null : e.puntoEnPlano(x, y, asa.p, ev.altKey)
           mano = { id: asa.id, desfase: bajo ? asa.p.map((c, i) => c - bajo[i]) : [0, 0, 0], p0: asa.p.slice() }
+          elegida = asa.id
           repintarAsas()
           cursor()
           return
@@ -348,7 +361,8 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
         }
         return
       }
-      if (punteros.size === 1) {
+      if (punteros.size === 1 && desplazando) e.desplazar(ev.clientX - p.x, ev.clientY - p.y)
+      else if (punteros.size === 1) {
         e.orb.theta += (ev.clientX - p.x) * 0.008
         e.orb.phi = Math.min(3.05, Math.max(0.09, e.orb.phi - (ev.clientY - p.y) * 0.008))
       }
@@ -364,6 +378,10 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
     const arriba = (ev: PointerEvent) => {
       punteros.delete(ev.pointerId)
       pellizco = 0
+      if (desplazando) {
+        desplazando = false
+        cursor()
+      }
       if (movObj) {
         movObj = null
         cursor()
@@ -371,9 +389,14 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
       }
       // un clic (sin arrastrar) fuera del objeto lo deselecciona
       const { x, y } = local(ev)
-      if (bajoEn && Math.hypot(x - bajoEn.x, y - bajoEn.y) < 4 && seleccionado && !mano && !sobreObjeto(x, y)) {
+      const clic = !!bajoEn && Math.hypot(x - bajoEn.x, y - bajoEn.y) < 4
+      if (clic && seleccionado && !mano && !sobreObjeto(x, y)) {
         seleccionado = false
         guias()
+      }
+      if (clic && !mano && elegida) {
+        elegida = null
+        repintarAsas()
       }
       bajoEn = null
       if (mano) {
@@ -438,6 +461,10 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
         guias()
         return
       }
+      if (k === 'escape' && elegida) {
+        elegida = null
+        repintarAsas()
+      }
       if (k === 'escape' && seleccionado) {
         seleccionado = false
         guias()
@@ -449,11 +476,12 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
         alinearRef.current(k === '0' ? '3d' : k)
         return
       }
-      if (!encima || !inter?.quitar) return
+      const blanco = elegida ?? encima
+      if (!blanco || !inter?.quitar) return
       if (ev.key !== 'Delete' && ev.key !== 'Backspace') return
       ev.preventDefault()
-      aplicar(inter.quitar(encima, estado.current.s))
-      encima = null
+      aplicar(inter.quitar(blanco, estado.current.s))
+      encima = elegida = null
       cursor()
     }
     const fuera = () => {
@@ -502,6 +530,7 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
           v.construir(e, st)
           asas = v.interaccion?.asas(st) ?? []
           if (encima && !asas.some((a) => a.id === encima)) encima = null
+          if (elegida && !asas.some((a) => a.id === elegida)) elegida = null
           repintarAsas()
           guias()
           construyendo.current = false
@@ -683,9 +712,11 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
     ro.observe(canvas.parentElement!)
     medir()
 
-    let arrastre: { x: number; y: number; movido: boolean } | null = null
+    let arrastre: { x: number; y: number; movido: boolean; espacio?: boolean } | null = null
     let asas: Asa[] = []
     let encima: string | null = null
+    // la última asa agarrada: sigue marcada y Supr la borra aunque el ratón ya no esté encima
+    let elegida: string | null = null
     let mano: { id: string; dx: number; dy: number } | null = null
     const local = (ev: { clientX: number; clientY: number }) => {
       const r = canvas.getBoundingClientRect()
@@ -712,12 +743,19 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
 
     const abajo = (ev: PointerEvent) => {
       canvas.setPointerCapture(ev.pointerId)
+      if (espacio.pulsado) {
+        espacio.usado = true
+        arrastre = { x: ev.clientX, y: ev.clientY, movido: true, espacio: true }
+        canvas.style.cursor = 'grabbing'
+        return
+      }
       const { x, y } = local(ev)
       const id = estado.current.vista.interaccion ? asaEn(x, y) : null
       const asa = id ? asas.find((q) => q.id === id) : null
       if (asa) {
         const m = g.aMundo(x, y)
         mano = { id: asa.id, dx: asa.p[0] - m.x, dy: asa.p[1] - m.y }
+        elegida = asa.id
         sucio.current = true
         cursor()
         return
@@ -768,6 +806,11 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
         cursor()
         return
       }
+      if (arrastre?.espacio) cursor()
+      if (arrastre && !arrastre.movido && elegida) {
+        elegida = null
+        sucio.current = true
+      }
       const alPulsar = estado.current.vista.alPulsar
       if (arrastre && !arrastre.movido && alPulsar) {
         const { x, y } = local(ev)
@@ -790,11 +833,18 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
     }
     const tecla = (ev: KeyboardEvent) => {
       const inter = estado.current.vista.interaccion
-      if (!encima || !inter?.quitar || escribiendo(ev)) return
+      if (escribiendo(ev)) return
+      if (ev.key === 'Escape' && elegida) {
+        elegida = null
+        sucio.current = true
+        return
+      }
+      const blanco = elegida ?? encima
+      if (!blanco || !inter?.quitar) return
       if (ev.key !== 'Delete' && ev.key !== 'Backspace') return
       ev.preventDefault()
-      aplicar(inter.quitar(encima, estado.current.s))
-      encima = null
+      aplicar(inter.quitar(blanco, estado.current.s))
+      encima = elegida = null
       cursor()
     }
     const fuera = () => {
@@ -874,7 +924,8 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
         v.dibujar(g, st, tAnim)
         asas = v.interaccion?.asas(st) ?? []
         if (encima && !asas.some((a) => a.id === encima)) encima = null
-        pintarAsas2d(g, asas, mano?.id ?? encima)
+        if (elegida && !asas.some((a) => a.id === elegida)) elegida = null
+        pintarAsas2d(g, asas, mano?.id ?? encima ?? elegida)
       }
       requestAnimationFrame(bucle)
     }

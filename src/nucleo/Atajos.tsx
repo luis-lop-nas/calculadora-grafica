@@ -23,7 +23,9 @@ const GRUPOS: Array<[string, Array<[string, string]>]> = [
       ['⌘+ · ⌘−', 'Acercar · Alejar el lienzo'],
       ['⇧⌘O', 'Perspectiva / ortográfica'],
       ["⇧⌘'", 'Ajustar a la rejilla'],
-      ['Espacio', 'Autogiro'],
+      ['Espacio', 'Reproducir · parar la animación'],
+      ['Espacio + arrastrar', 'Desplazar la vista (2D y 3D)'],
+      ['⇧ Espacio', 'Autogiro'],
     ],
   ],
   [
@@ -34,7 +36,8 @@ const GRUPOS: Array<[string, Array<[string, string]>]> = [
       ['⌥ + arrastrar', 'Mover un punto en vertical'],
       ['Mayús + arrastrar', 'Por un eje y a pasos de la rejilla'],
       ['Doble clic', 'Punto nuevo · sobre un punto, quitarlo'],
-      ['Supr', 'Quitar el punto señalado'],
+      ['Clic en un punto', 'Seleccionarlo · Esc: soltarlo'],
+      ['Supr · ⌫', 'Borrar el punto seleccionado'],
     ],
   ],
   [
