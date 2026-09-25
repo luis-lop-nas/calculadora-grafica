@@ -218,6 +218,37 @@ export function superficieBajo(tramos: Tramo[], x: number, y = Infinity): number
   return mejor
 }
 
+/** ¿Cae el punto (x, y) dentro de algo sólido? (para no dejar un móvil metido en un edificio) */
+export function solidoEn(esc: Pick<Escena, 'piezas'>, x: number, y: number): boolean {
+  if (y < 0) return true
+  for (const p of esc.piezas) {
+    const x0 = p.x
+    const x1 = p.x + p.ancho
+    const h = Math.max(0.05, p.alto)
+    if (p.tipo === 'edificio' || p.tipo === 'muro') {
+      if (x > x0 && x < x1 && y < h) return true
+    } else if (p.tipo === 'plataforma') {
+      if (x > x0 && x < x1 && y > h - ALTO_LOSA && y < h) return true
+    } else if (p.tipo === 'rampa') {
+      if (x > x0 && x < x1) {
+        const k = (x - x0) / p.ancho
+        if (y < h * (p.derecha !== false ? k : 1 - k)) return true
+      }
+    } else if ((p.tipo === 'arbol' || p.tipo === 'farola') && p.solido) {
+      const [a, b] = huella(p)!
+      if (x > a && x < b && y < h) return true
+    }
+  }
+  return false
+}
+
+/** Altura a la que se apoya un cuerpo de radio r soltado en (x, y): encima de lo que tenga debajo, o de lo que lo contiene. */
+export function apoyarEn(esc: Escena, x: number, y: number, r: number): number {
+  const tramos = tramosDe(esc)
+  if (solidoEn(esc, x, y)) return superficieBajo(tramos, x) + r
+  return superficieBajo(tramos, x, y) + r
+}
+
 /* ---------------------------------------------------------------- movimiento libre */
 
 type Estado4 = [number, number, number, number]
@@ -276,6 +307,54 @@ function choque(tramos: Tramo[], r: number, y0: Estado4, y1: Estado4, excluir: n
   return mejor
 }
 
+/** Esquina del contorno: un extremo de tramo con el rozamiento del tramo al que pertenece. */
+interface Vertice {
+  p: [number, number]
+  muD: number
+  /** Tramos que acaban o empiezan en ella. */
+  tramos: number[]
+}
+
+/** Esquinas salientes (convexas) del contorno: las que un cuerpo puede tocar sin tocar antes una cara. */
+function verticesDe(tramos: Tramo[]): Vertice[] {
+  const out: Vertice[] = []
+  for (let i = 0; i < tramos.length; i++)
+    for (const P of [tramos[i].a, tramos[i].b]) {
+      const v = out.find((q) => Math.hypot(q.p[0] - P[0], q.p[1] - P[1]) < 1e-6)
+      if (v) {
+        if (!v.tramos.includes(i)) v.tramos.push(i)
+      } else out.push({ p: P, muD: tramos[i].muD, tramos: [i] })
+    }
+  // una esquina es saliente si el sólido queda a menos de media vuelta: la salida del
+  // tramo que llega gira a la derecha (hacia el sólido) para seguir por el que sale
+  return out.filter((v) => {
+    const entra = v.tramos.find((i) => Math.hypot(tramos[i].b[0] - v.p[0], tramos[i].b[1] - v.p[1]) < 1e-6)
+    const sale = v.tramos.find((i) => Math.hypot(tramos[i].a[0] - v.p[0], tramos[i].a[1] - v.p[1]) < 1e-6)
+    if (entra === undefined || sale === undefined) return true
+    const t1 = tramos[entra].t
+    const t2 = tramos[sale].t
+    return t1[0] * t2[1] - t1[1] * t2[0] < -1e-9
+  })
+}
+
+/** Primera esquina con la que choca al ir de y0 a y1, si alguna. */
+function choqueEsquina(vertices: Vertice[], r: number, y0: Estado4, y1: Estado4, excluir: number): number {
+  let mejor = -1
+  let dMejor = Infinity
+  for (let i = 0; i < vertices.length; i++) {
+    const v = vertices[i]
+    if (excluir >= 0 && v.tramos.includes(excluir)) continue
+    const d0 = Math.hypot(y0[0] - v.p[0], y0[1] - v.p[1]) - r
+    const d1 = Math.hypot(y1[0] - v.p[0], y1[1] - v.p[1]) - r
+    if (!(d0 >= -1e-9 && d1 < 0)) continue
+    if (d0 < dMejor) {
+      dMejor = d0
+      mejor = i
+    }
+  }
+  return mejor
+}
+
 /** Tramos que empiezan o acaban justo donde acaba otro, para seguir rodando por uno de ellos. */
 function vecinos(tramos: Tramo[], i: number, alFinal: boolean): Array<{ j: number; desdeA: boolean }> {
   const s = tramos[i]
@@ -312,7 +391,9 @@ function simularLibre(esc: Escena, mv: Movil, tramos: Tramo[]): Recorrido {
   const sucesos: Suceso[] = []
   let recorrido = 0
   let quieto: number | null = null
+  let paraEn: number | null = null
   const f = (z: Estado4) => derivAire(esc, m, z)
+  const vertices = verticesDe(tramos)
 
   // ¿empieza apoyado? (sobre algo y sin velocidad hacia fuera)
   for (let i = 0; i < tramos.length; i++) {
@@ -380,16 +461,19 @@ function simularLibre(esc: Escena, mv: Movil, tramos: Tramo[]): Recorrido {
       if (a0 === null) {
         // sujeto por el rozamiento estático
         if (quieto === null) {
-          quieto = t
+          // el instante exacto si el rozamiento lo paró dentro del paso anterior
+          quieto = paraEn ?? t
           const [px, py] = posApoyo()
-          if (t > 0) sucesos.push({ t, x: px, y: py, tipo: 'parada', texto: 'se para' })
+          if (quieto > 0) sucesos.push({ t: quieto, x: px, y: py, tipo: 'parada', texto: 'se para' })
         }
         w = 0
         acel = [0, 0]
       } else {
         quieto = null
+        paraEn = null
         // RK4 en 1D con el sentido del rozamiento fijado al del principio del paso
-        const sg = Math.abs(w) < V_QUIETO ? -Math.sign(a0) : Math.sign(w)
+        // sentido del movimiento: el de la velocidad o, si arranca desde parado, el de la aceleración neta
+        const sg = Math.abs(w) < V_QUIETO ? Math.sign(a0) : Math.sign(w)
         const N = esc.g * s.n[1]
         const g1 = (z: number) => {
           const [axA, ayA] = aceleracionAire(esc, m, z * s.t[0], z * s.t[1])
@@ -404,6 +488,7 @@ function simularLibre(esc: Escena, mv: Movil, tramos: Tramo[]): Recorrido {
           const tPara = Math.abs(w / k1w)
           du = 0.5 * w * tPara
           wn = 0
+          paraEn = t + tPara
         } else {
           const k2u = w + (h / 2) * k1w
           const k2w = g1(w + (h / 2) * k1w)
@@ -470,49 +555,79 @@ function simularLibre(esc: Escena, mv: Movil, tramos: Tramo[]): Recorrido {
         const hh = hueco(tramos[ignora], y1[0], y1[1], r)
         if (hh.d > 1e-3 || hh.u < -r || hh.u > tramos[ignora].L + r) ignora = -1
       }
-      const i = choque(tramos, r, y, y1, ignora)
-      let hUsado = h
-      if (i >= 0) {
-        // bisección del instante del choque
-        const s = tramos[i]
+      const iCara = choque(tramos, r, y, y1, ignora)
+      const iEsq = choqueEsquina(vertices, r, y, y1, ignora)
+      // instante del choque por bisección, con la distancia (con signo) a lo que se toca
+      const instante = (hueco: (z: Estado4) => number) => {
         let lo = 0
         let hi = h
         for (let k = 0; k < 40; k++) {
           const mid = (lo + hi) / 2
-          const ym = rk4(f, y, mid)
-          if (hueco(s, ym[0], ym[1], r).d >= 0) lo = mid
+          if (hueco(rk4(f, y, mid)) >= 0) lo = mid
           else hi = mid
         }
+        return lo
+      }
+      const gapCara = iCara >= 0 ? (z: Estado4) => hueco(tramos[iCara], z[0], z[1], r).d : null
+      const gapEsq = iEsq >= 0 ? (z: Estado4) => Math.hypot(z[0] - vertices[iEsq].p[0], z[1] - vertices[iEsq].p[1]) - r : null
+      const tCara = gapCara ? instante(gapCara) : Infinity
+      const tEsq = gapEsq ? instante(gapEsq) : Infinity
+      // la cara gana los empates: una esquina entre dos caras llanas no desvía nada
+      const i = tCara <= tEsq ? iCara : -1
+      const esquina = i < 0 && iEsq >= 0 ? vertices[iEsq] : null
+      let hUsado = h
+      if (i >= 0 || esquina) {
+        const lo = i >= 0 ? tCara : tEsq
         hUsado = lo
         y1 = rk4(f, y, lo)
-        const vn = y1[2] * s.n[0] + y1[3] * s.n[1]
-        const vt = y1[2] * s.t[0] + y1[3] * s.t[1]
+        let n: [number, number]
+        let tg: [number, number]
+        let mu: number
+        if (i >= 0) {
+          n = tramos[i].n
+          tg = tramos[i].t
+          mu = tramos[i].muD
+        } else {
+          const dx = y1[0] - esquina!.p[0]
+          const dy = y1[1] - esquina!.p[1]
+          const L = Math.hypot(dx, dy) || 1
+          n = [dx / L, dy / L]
+          tg = [-n[1], n[0]]
+          mu = esquina!.muD
+        }
+        const vn = y1[2] * n[0] + y1[3] * n[1]
+        const vt = y1[2] * tg[0] + y1[3] * tg[1]
         const rapidez = Math.hypot(y1[2], y1[3])
         const vn2 = -esc.e * vn
         // rozamiento durante el choque: impulso tangencial limitado por μ·(1+e)|vn|
-        const frena = Math.min(Math.abs(vt), s.muD * (1 + esc.e) * Math.abs(vn))
+        const frena = Math.min(Math.abs(vt), mu * (1 + esc.e) * Math.abs(vn))
         const vt2 = vt - Math.sign(vt) * frena
-        sucesos.push({ t: t + lo, x: y1[0], y: y1[1], tipo: 'impacto', texto: `choca a ${coma(rapidez, 2)} m/s`, v: rapidez })
-        if (vn2 < V_PEGA && s.n[1] > 0.2) {
+        // los roces de rodar por una esquina no son choques que valga la pena contar
+        if (i >= 0 || Math.abs(vn) > 0.3)
+          sucesos.push({ t: t + lo, x: y1[0], y: y1[1], tipo: 'impacto', texto: `choca${esquina ? ' con una esquina' : ''} a ${coma(rapidez, 2)} m/s`, v: rapidez })
+        if (i >= 0 && vn2 < V_PEGA && tramos[i].n[1] > 0.2) {
+          const s = tramos[i]
           apoyo = i
           const hh = hueco(s, y1[0], y1[1], r)
           u = Math.max(0, Math.min(s.L, hh.u))
           w = vt2
           sucesos.push({ t: t + lo, x: y1[0], y: y1[1], tipo: 'apoyo', texto: 'queda apoyado y desliza' })
         } else {
-          y1 = [y1[0] + 1e-9 * s.n[0], y1[1] + 1e-9 * s.n[1], vt2 * s.t[0] + vn2 * s.n[0], vt2 * s.t[1] + vn2 * s.n[1]]
+          // tras una esquina nunca se sale con velocidad hacia ella (e = 0 la deja rozando)
+          const vs = Math.max(vn2, esquina ? 1e-6 : 0)
+          y1 = [y1[0] + 1e-9 * n[0], y1[1] + 1e-9 * n[1], vt2 * tg[0] + vs * n[0], vt2 * tg[1] + vs * n[1]]
         }
       }
       recorrido += Math.hypot(y1[0] - y[0], y1[1] - y[1])
       if (apoyo < 0) {
         const d = f(y1)
         acel = [d[2], d[3]]
-        if (vyPrevia > 0 && y1[3] <= 0 && i < 0) sucesos.push({ t: t + hUsado, x: y1[0], y: y1[1], tipo: 'altura-max', texto: `altura máxima ${coma(y1[1], 2)} m` })
+        if (vyPrevia > 0 && y1[3] <= 0 && i < 0 && !esquina) sucesos.push({ t: t + hUsado, x: y1[0], y: y1[1], tipo: 'altura-max', texto: `altura máxima ${coma(y1[1], 2)} m` })
         vyPrevia = y1[3]
       }
       y = y1
       // el trozo que queda del paso tras el choque se come en el siguiente
-      if (i >= 0) {
+      if (i >= 0 || esquina) {
         t += hUsado
         choques++
         continue

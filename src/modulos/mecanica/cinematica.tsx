@@ -1,16 +1,19 @@
 import { useEffect, useRef } from 'react'
 import { definir, type Asa, type Capa, type EntradaMenu, type PropsPanel } from '../../nucleo/tipos'
 import { accion, casilla, radios, submenu } from '../../nucleo/menu'
-import { Atajos, Boton, Eleccion, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
+import { Atajos, Boton, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
 import { animacion } from '../../nucleo/vista'
+import { BarraEditor, EDITOR_INICIAL, caja, circ, type CampoEditor, type Categoria, type EstadoEditor, type Seleccion } from '../../nucleo/editor'
 import type { Pintor2D } from '../../render/pintor2d'
 import { graficasTiempo, type PanelTiempo } from '../../render/graficas'
 import { DIM, ecuacion, mags, type Dimensional } from '../../lib/dimensiones'
 import {
   aceleracionMrua,
+  apoyarEn,
   energias,
   estadoEnT,
   simular,
+  solidoEn,
   superficieBajo,
   tramosDe,
   type Aire,
@@ -42,6 +45,10 @@ export interface EstadoCinematica extends Escena {
   sig: number
   /** Objetos apagados: ni se dibujan ni cuentan en la simulación. */
   ocultos: string[]
+  /** Barra del editor: modo, objeto elegido para colocar y pestaña. */
+  ed: EstadoEditor
+  /** Sube al poner un ejemplo o vaciar: el lienzo vuelve a encuadrar. */
+  marco: number
 }
 
 type S = EstadoCinematica
@@ -375,7 +382,216 @@ const anadirMovil = (s: S, tipo: TipoMovil, mov?: Movimiento): Partial<S> => {
   const m = movilNuevo(tipo, s, mov)
   return { moviles: [...s.moviles, m], sig: s.sig + 1, sel: m.id, ...reiniciar() }
 }
-const ponerEjemplo = (s: S, e: Partial<S>): Partial<S> => ({ ...e, sel: e.moviles?.[0]?.id ?? null, ocultos: [], sig: s.sig + 10, jugando: true, ...reiniciar() })
+const ponerEjemplo = (s: S, e: Partial<S>): Partial<S> => ({ ...e, sel: e.moviles?.[0]?.id ?? null, ocultos: [], sig: s.sig + 10, jugando: true, marco: s.marco + 1, ...reiniciar() })
+const vaciar = (s: S): Partial<S> => ({ piezas: [], moviles: [], sel: null, ocultos: [], marco: s.marco + 1, ...reiniciar() })
+
+/* ---------------------------------------------------------------- editor (barra al pie del lienzo) */
+
+/** Catálogo de la barra: el id dice qué se crea (`p:tipo[:variante]` pieza, `m:tipo[:movimiento]` móvil). */
+export const CATALOGO: Categoria[] = [
+  {
+    id: 'terreno',
+    nombre: 'Terreno',
+    objetos: [
+      { id: 'p:edificio', nombre: 'Edificio', icono: caja(8, 6, 16, 22) + 'M4 28h24' },
+      { id: 'p:muro', nombre: 'Muro', icono: caja(14, 10, 4, 18) + 'M4 28h24' },
+      { id: 'p:rampa', nombre: 'Rampa ↗', icono: 'M4 28L28 12V28Z', color: '--ocre' },
+      { id: 'p:rampa:i', nombre: 'Rampa ↖', icono: 'M4 12V28H28Z', color: '--ocre' },
+      { id: 'p:plataforma', nombre: 'Plataforma', icono: caja(6, 10, 20, 4) + 'M16 14v14M4 28h24' },
+    ],
+  },
+  {
+    id: 'suelos',
+    nombre: 'Suelos',
+    objetos: MATERIALES.map((m) => ({ id: `p:suelo:${m.t}`, nombre: `${m.t[0].toUpperCase()}${m.t.slice(1)} μ ${m.muD}`, icono: 'M4 20h24M4 24h24', color: COLOR_MATERIAL[m.t] })),
+  },
+  {
+    id: 'decorado',
+    nombre: 'Decorado',
+    objetos: [
+      { id: 'p:arbol', nombre: 'Árbol', icono: 'M16 28V18' + circ(16, 12, 7), color: '--aux' },
+      { id: 'p:farola', nombre: 'Farola', icono: 'M12 28V6h8' + circ(20, 9, 2), color: '--ocre' },
+    ],
+  },
+  {
+    id: 'moviles',
+    nombre: 'Móviles',
+    objetos: [
+      { id: 'm:pelota', nombre: 'Pelota', icono: circ(16, 18, 7) + 'M4 28h24', color: '--accent' },
+      { id: 'm:piedra', nombre: 'Piedra', icono: circ(16, 20, 5) + 'M4 28h24', color: '--ink-soft' },
+      { id: 'm:bloque', nombre: 'Bloque', icono: caja(9, 14, 14, 14) + 'M4 28h24', color: '--morado' },
+      { id: 'm:coche', nombre: 'Coche MRUA', icono: caja(4, 13, 24, 9) + circ(10, 24, 3) + circ(22, 24, 3), color: '--pos' },
+      { id: 'm:coche:mru', nombre: 'Coche MRU', icono: caja(4, 13, 24, 9) + circ(10, 24, 3) + circ(22, 24, 3) + 'M8 8h16', color: '--pos' },
+      { id: 'm:disco', nombre: 'Giro MCU', icono: circ(16, 16, 10) + 'M16 16L26 16' + circ(26, 16, 2), color: '--rosa' },
+    ],
+  },
+]
+
+const redondea = (v: number, k = 0.1) => Math.round(v / k) * k
+
+/** Coloca el objeto del pincel donde se ha hecho clic (x, y del mundo). */
+export function colocar(s: S, pincel: string, x: number, y: number): Partial<S> {
+  const [clase, tipo, variante] = pincel.split(':')
+  if (clase === 'p') {
+    const p = piezaNueva(tipo as TipoPieza, s, tipo === 'suelo' ? variante : undefined)
+    p.x = +redondea(x - p.ancho / 2, 0.5).toFixed(2)
+    if (tipo === 'rampa' && variante === 'i') p.derecha = false
+    // la plataforma, a la altura del clic
+    if (tipo === 'plataforma') p.alto = Math.max(1, +redondea(y, 0.5).toFixed(2))
+    return { piezas: [...s.piezas, p], sig: s.sig + 1, sel: p.id, ...reiniciar() }
+  }
+  const m = movilNuevo(tipo as TipoMovil, s, variante as Movimiento | undefined)
+  if (m.movimiento === 'mcu') {
+    m.x0 = +redondea(x).toFixed(2)
+    m.y0 = +Math.max(m.R, redondea(y)).toFixed(2)
+  } else {
+    const xx = redondea(x)
+    const apoyo = apoyarEn(activa(s), xx, y, m.r)
+    m.x0 = +xx.toFixed(2)
+    // cerca de una superficie (o dentro de algo sólido), apoyado en ella; si no, donde se ha hecho clic
+    m.y0 = +(y - apoyo < 0.8 ? apoyo : redondea(y)).toFixed(2)
+    if (m.tipo !== 'coche') m.v0 = 0
+  }
+  return { moviles: [...s.moviles, m], sig: s.sig + 1, sel: m.id, ...reiniciar() }
+}
+
+function duplicar(s: S, id: string): Partial<S> {
+  const p = s.piezas.find((q) => q.id === id)
+  if (p) {
+    const q = { ...p, id: `p${s.sig}`, x: p.x + p.ancho + 1 }
+    return { piezas: [...s.piezas, q], sig: s.sig + 1, sel: q.id, ...reiniciar() }
+  }
+  const m = s.moviles.find((q) => q.id === id)
+  if (!m) return {}
+  const n = s.moviles.filter((q) => q.tipo === m.tipo).length + 1
+  const q = { ...m, id: `m${s.sig}`, nombre: `${NOMBRE_MOVIL[m.tipo]} ${n}`, x0: m.x0 + Math.max(1, 3 * m.r) }
+  return { moviles: [...s.moviles, q], sig: s.sig + 1, sel: q.id, ...reiniciar() }
+}
+
+/** Los valores del seleccionado como campos de la barra. */
+export function camposDe(s: S, set: (p: Partial<S>) => void): Seleccion | null {
+  const p = s.piezas.find((q) => q.id === s.sel)
+  const soltar = () => set({ sel: null })
+  const quitar = () => s.sel && set(quitarObjeto(s, s.sel))
+  const dup = () => s.sel && set(duplicar(s, s.sel))
+  if (p) {
+    const cambia = (parche: Partial<Pieza>) => set({ ...moverPieza(s, p.id, parche), ...reiniciar() })
+    const campos: CampoEditor[] = [{ etiqueta: 'x (borde izq.)', valor: p.x, paso: 0.5, unidad: 'm', onChange: (x) => cambia({ x }) }]
+    if (p.tipo !== 'suelo') campos.push({ etiqueta: p.tipo === 'plataforma' ? 'Altura de la losa' : 'Altura', valor: p.alto, paso: 0.5, min: 0.2, unidad: 'm', onChange: (alto) => cambia({ alto }) })
+    campos.push({ etiqueta: p.tipo === 'arbol' ? 'Copa' : 'Ancho', valor: p.ancho, paso: p.tipo === 'muro' ? 0.1 : 0.5, min: p.tipo === 'muro' ? 0.1 : 0.5, unidad: 'm', onChange: (ancho) => cambia({ ancho }) })
+    if (p.tipo === 'rampa')
+      campos.push({
+        etiqueta: 'Inclinación θ',
+        valor: (Math.atan2(p.alto, p.ancho) * 180) / Math.PI,
+        paso: 1,
+        min: 1,
+        max: 80,
+        unidad: '°',
+        decimales: 1,
+        onChange: (a) => cambia({ alto: +(p.ancho * Math.tan((a * Math.PI) / 180)).toFixed(3) }),
+      })
+    if (p.tipo === 'suelo')
+      campos.push({
+        tipo: 'opciones',
+        etiqueta: 'Material',
+        valor: p.material ?? '',
+        opciones: MATERIALES.map((m) => ({ v: m.t, t: m.t })),
+        onChange: (t) => {
+          const m = MATERIALES.find((q) => q.t === t)!
+          cambia({ material: m.t, muE: m.muE, muD: m.muD })
+        },
+      })
+    if (p.tipo === 'arbol' || p.tipo === 'farola') campos.push({ tipo: 'si-no', etiqueta: 'Se choca con él', valor: !!p.solido, onChange: (solido) => cambia({ solido }) })
+    else {
+      campos.push({ etiqueta: 'μ estático', valor: p.muE, paso: 0.05, min: 0, max: 2, onChange: (muE) => cambia({ muE: Math.max(muE, p.muD) }) })
+      campos.push({ etiqueta: 'μ dinámico', valor: p.muD, paso: 0.05, min: 0, max: 2, onChange: (muD) => cambia({ muD, muE: Math.max(p.muE, muD) }) })
+    }
+    return {
+      nombre: `${NOMBRE_PIEZA[p.tipo]}${p.material ? ' de ' + p.material : ''}`,
+      color: colorPieza(p),
+      campos,
+      paso: 0.5,
+      mover: (dx, dy) => cambia(p.tipo === 'plataforma' ? { x: +(p.x + dx).toFixed(2), alto: Math.max(0.5, +(p.alto + dy).toFixed(2)) } : { x: +(p.x + dx).toFixed(2) }),
+      voltear: p.tipo === 'rampa' ? () => cambia({ derecha: p.derecha === false }) : undefined,
+      duplicar: dup,
+      quitar,
+      soltar,
+    }
+  }
+  const m = s.moviles.find((q) => q.id === s.sel)
+  if (!m) return null
+  const cambia = (parche: Partial<Movil>) => set({ ...moverMovil(s, m.id, parche), ...reiniciar() })
+  const campos: CampoEditor[] = [
+    { tipo: 'opciones', etiqueta: 'Movimiento', valor: m.movimiento, opciones: (Object.keys(NOMBRE_MOV) as Movimiento[]).map((v) => ({ v, t: NOMBRE_MOV[v] })), onChange: (v) => cambia({ movimiento: v as Movimiento }) },
+    { etiqueta: 'Masa m', valor: m.m, paso: m.tipo === 'coche' ? 50 : 0.1, min: 0.01, unidad: 'kg', onChange: (v) => cambia({ m: v }) },
+    { etiqueta: 'Radio', valor: m.r, paso: 0.05, min: 0.05, max: 5, unidad: 'm', onChange: (r) => cambia({ r }) },
+  ]
+  if (m.movimiento === 'mcu')
+    campos.push(
+      { etiqueta: 'Centro x', valor: m.x0, paso: 0.5, unidad: 'm', onChange: (x0) => cambia({ x0 }) },
+      { etiqueta: 'Centro y', valor: m.y0, paso: 0.5, unidad: 'm', onChange: (y0) => cambia({ y0 }) },
+      { etiqueta: 'Radio R', valor: m.R, paso: 0.1, min: 0.1, unidad: 'm', onChange: (R) => cambia({ R }) },
+      { etiqueta: 'ω₀', valor: m.w0, paso: 0.1, unidad: 'rad/s', onChange: (w0) => cambia({ w0 }) },
+      { etiqueta: 'α', valor: m.alfa, paso: 0.05, unidad: 'rad/s²', onChange: (alfa) => cambia({ alfa }) },
+      { etiqueta: 'Ángulo inicial', valor: m.fase, paso: 5, unidad: '°', onChange: (fase) => cambia({ fase }) },
+    )
+  else {
+    campos.push(
+      { etiqueta: 'x₀', valor: m.x0, paso: 0.1, unidad: 'm', onChange: (x0) => cambia({ x0 }) },
+      { etiqueta: 'y₀', valor: m.y0, paso: 0.1, min: 0, unidad: 'm', onChange: (y0) => cambia({ y0 }) },
+      { etiqueta: 'v₀', valor: m.v0, paso: 0.5, min: m.movimiento === 'libre' ? 0 : undefined, unidad: 'm/s', onChange: (v0) => cambia({ v0 }) },
+      { etiqueta: 'Dirección', valor: m.ang, paso: 5, min: -180, max: 180, unidad: '°', onChange: (ang) => cambia({ ang }) },
+    )
+    if (m.movimiento === 'mrua')
+      campos.push(
+        { etiqueta: 'Aceleración a', valor: m.a, paso: 0.1, unidad: 'm/s²', onChange: (a) => cambia({ a }) },
+        { tipo: 'si-no', etiqueta: 'Se para al frenar', valor: m.parar, onChange: (parar) => cambia({ parar }) },
+        { tipo: 'si-no', etiqueta: 'Rozamiento del suelo', valor: m.rozar, onChange: (rozar) => cambia({ rozar }) },
+      )
+  }
+  return {
+    nombre: m.nombre,
+    color: COLOR_MOVIL[m.tipo],
+    campos,
+    paso: 0.5,
+    mover: (dx, dy) => cambia({ x0: +(m.x0 + dx).toFixed(2), y0: +Math.max(m.movimiento === 'mcu' ? 0 : m.r, m.y0 + dy).toFixed(2) }),
+    voltear: m.movimiento === 'mcu' ? () => cambia({ w0: -m.w0, alfa: -m.alfa }) : () => cambia({ ang: m.ang >= 0 ? 180 - m.ang : -180 - m.ang }),
+    duplicar: dup,
+    quitar,
+    soltar,
+  }
+}
+
+function Barra({ s, set }: { s: S; set: (p: Partial<S>) => void }) {
+  return (
+    <BarraEditor
+      ed={s.ed}
+      set={(p) => set({ ed: { ...s.ed, ...p } })}
+      categorias={CATALOGO}
+      seleccion={s.ed.modo === 'editar' ? camposDe(s, set) : null}
+      extra={
+        <>
+          <button type="button" className="ed-boton" aria-pressed={s.jugando} onClick={() => set(s.jugando ? pausar(s) : reproducir(s))} title="Reproducir o pausar">
+            {s.jugando ? '❚❚' : '▶'}
+          </button>
+          <button type="button" className="ed-boton" onClick={() => set(reiniciar())} title="Volver a t = 0">
+            ⟲
+          </button>
+        </>
+      }
+    />
+  )
+}
+
+/** Clic en el lienzo según el modo del editor. */
+function pulsar(p: { x: number; y: number }, s: S): Partial<S> | void {
+  const bajo = objetoEn(s, p.x, p.y)
+  if (s.ed.modo === 'borrar') return bajo ? quitarObjeto(s, bajo) : undefined
+  if (s.ed.modo === 'construir' && s.ed.pincel) return colocar(s, s.ed.pincel, p.x, p.y)
+  // en Construir sin pincel, un clic sobre algo lo abre para editar
+  if (s.ed.modo === 'construir') return bajo ? { sel: bajo, ed: { ...s.ed, modo: 'editar' } } : undefined
+  return { sel: bajo }
+}
 
 /** Escala de las flechas: metros de flecha por m/s (velocidad) y por m/s² (aceleración). */
 const K_V = 0.25
@@ -390,110 +606,20 @@ function Campo({ etiqueta, valor, min, max, paso, unidad, onChange }: { etiqueta
   return <Rango etiqueta={etiqueta} valor={valor} min={min} max={max} paso={paso} formato={(v) => `${v.toFixed(dec)} ${unidad}`} onChange={onChange} />
 }
 
-function InspectorPieza({ p, s, set }: { p: Pieza; s: S; set: (x: Partial<S>) => void }) {
-  const cambia = (parche: Partial<Pieza>) => set(moverPieza(s, p.id, parche))
-  const ang = p.tipo === 'rampa' ? (Math.atan2(p.alto, p.ancho) * 180) / Math.PI : 0
-  return (
-    <>
-      <Campo etiqueta="Posición x" valor={p.x} min={-100} max={300} paso={0.5} unidad="m" onChange={(x) => cambia({ x })} />
-      {p.tipo !== 'suelo' && <Campo etiqueta={p.tipo === 'plataforma' ? 'Altura de la losa' : 'Altura'} valor={p.alto} min={0.2} max={p.tipo === 'edificio' ? 300 : 60} paso={0.5} unidad="m" onChange={(alto) => cambia({ alto })} />}
-      <Campo etiqueta={p.tipo === 'arbol' ? 'Copa' : 'Ancho'} valor={p.ancho} min={p.tipo === 'muro' ? 0.1 : 0.5} max={200} paso={p.tipo === 'muro' ? 0.1 : 0.5} unidad="m" onChange={(ancho) => cambia({ ancho })} />
-      {p.tipo === 'rampa' && (
-        <>
-          <Campo etiqueta="Inclinación θ" valor={ang} min={2} max={70} paso={1} unidad="°" onChange={(a) => cambia({ alto: +(p.ancho * Math.tan((a * Math.PI) / 180)).toFixed(3) })} />
-          <Segmentado valor={p.derecha !== false ? 'd' : 'i'} opciones={[{ v: 'i', t: 'Alta a la izquierda' }, { v: 'd', t: 'Alta a la derecha' }]} onChange={(v) => cambia({ derecha: v === 'd' })} />
-        </>
-      )}
-      {p.tipo === 'suelo' && (
-        <Atajos
-          opciones={MATERIALES.map((m) => ({ t: m.t, activo: p.material === m.t, onClick: () => cambia({ material: m.t, muE: m.muE, muD: m.muD }) }))}
-        />
-      )}
-      {(p.tipo === 'arbol' || p.tipo === 'farola') && (
-        <Interruptor activo={!!p.solido} onChange={(solido) => cambia({ solido })}>
-          Se choca con él
-        </Interruptor>
-      )}
-      {(p.tipo === 'edificio' || p.tipo === 'rampa' || p.tipo === 'plataforma' || p.tipo === 'suelo' || p.tipo === 'muro') && (
-        <>
-          <Campo etiqueta="μ estático" valor={p.muE} min={0} max={1.5} paso={0.01} unidad="" onChange={(muE) => cambia({ muE: Math.max(muE, p.muD) })} />
-          <Campo etiqueta="μ dinámico" valor={p.muD} min={0} max={1.5} paso={0.01} unidad="" onChange={(muD) => cambia({ muD, muE: Math.max(p.muE, muD) })} />
-        </>
-      )}
-    </>
-  )
-}
-
-function InspectorMovil({ m, s, set }: { m: Movil; s: S; set: (x: Partial<S>) => void }) {
-  const cambia = (parche: Partial<Movil>) => set({ ...moverMovil(s, m.id, parche), ...reiniciar() })
-  return (
-    <>
-      <Eleccion etiqueta="Movimiento" valor={m.movimiento} opciones={(Object.keys(NOMBRE_MOV) as Movimiento[]).map((v) => ({ v, t: NOMBRE_MOV[v] }))} onChange={(movimiento) => cambia({ movimiento })} />
-      <Campo etiqueta="Masa" valor={m.m} min={0.05} max={m.tipo === 'coche' ? 3000 : 100} paso={m.tipo === 'coche' ? 10 : 0.05} unidad="kg" onChange={(v) => cambia({ m: v })} />
-      <Campo etiqueta="Tamaño (radio)" valor={m.r} min={0.05} max={3} paso={0.05} unidad="m" onChange={(r) => cambia({ r })} />
-      {m.movimiento === 'mcu' ? (
-        <>
-          <Campo etiqueta="Centro x" valor={m.x0} min={-100} max={300} paso={0.5} unidad="m" onChange={(x0) => cambia({ x0 })} />
-          <Campo etiqueta="Centro y" valor={m.y0} min={0} max={100} paso={0.5} unidad="m" onChange={(y0) => cambia({ y0 })} />
-          <Campo etiqueta="Radio R" valor={m.R} min={0.2} max={50} paso={0.1} unidad="m" onChange={(R) => cambia({ R })} />
-          <Campo etiqueta="ω₀" valor={m.w0} min={-6} max={6} paso={0.05} unidad="rad/s" onChange={(w0) => cambia({ w0 })} />
-          <Campo etiqueta="α (0 = MCU)" valor={m.alfa} min={-3} max={3} paso={0.05} unidad="rad/s²" onChange={(alfa) => cambia({ alfa })} />
-          <Campo etiqueta="Ángulo inicial" valor={m.fase} min={-180} max={180} paso={1} unidad="°" onChange={(fase) => cambia({ fase })} />
-        </>
-      ) : (
-        <>
-          <Campo etiqueta="x₀" valor={m.x0} min={-100} max={300} paso={0.1} unidad="m" onChange={(x0) => cambia({ x0 })} />
-          <Campo etiqueta="y₀" valor={m.y0} min={0} max={400} paso={0.1} unidad="m" onChange={(y0) => cambia({ y0 })} />
-          <Campo etiqueta="v₀" valor={m.v0} min={m.movimiento === 'libre' ? 0 : -60} max={80} paso={0.1} unidad="m/s" onChange={(v0) => cambia({ v0 })} />
-          <Campo etiqueta="Dirección" valor={m.ang} min={-180} max={180} paso={1} unidad="°" onChange={(ang) => cambia({ ang })} />
-          {m.movimiento === 'mrua' && (
-            <>
-              <Campo etiqueta="Aceleración a" valor={m.a} min={-15} max={15} paso={0.1} unidad="m/s²" onChange={(a) => cambia({ a })} />
-              <div className="interruptores">
-                <Interruptor activo={m.parar} onChange={(parar) => cambia({ parar })}>
-                  Se para al frenar
-                </Interruptor>
-                <Interruptor activo={m.rozar} onChange={(rozar) => cambia({ rozar })}>
-                  Rozamiento del suelo
-                </Interruptor>
-              </div>
-            </>
-          )}
-        </>
-      )}
-    </>
-  )
-}
-
 function Panel({ s, set }: PropsPanel<S>) {
   const sim = calcular(s)
-  const objetos = [...s.piezas.map((p) => ({ v: p.id, t: `${NOMBRE_PIEZA[p.tipo]}${p.material ? ' (' + p.material + ')' : ''} · ${p.id}` })), ...s.moviles.map((m) => ({ v: m.id, t: m.nombre }))]
-  const pieza = s.piezas.find((p) => p.id === s.sel)
-  const movil = s.moviles.find((m) => m.id === s.sel)
   return (
     <>
       <Grupo titulo="Construir">
         <Atajos marcador="Ejemplos…" opciones={EJEMPLOS.map((e) => ({ t: e.t, onClick: () => set(ponerEjemplo(s, e.e)) }))} />
-        <Atajos
-          marcador="Añadir al escenario…"
-          opciones={[
-            ...(['edificio', 'muro', 'rampa', 'plataforma', 'arbol', 'farola'] as TipoPieza[]).map((t) => ({ t: NOMBRE_PIEZA[t], onClick: () => set(anadirPieza(s, t)) })),
-            ...MATERIALES.map((m) => ({ t: `Suelo de ${m.t}`, onClick: () => set(anadirPieza(s, 'suelo', m.t)) })),
-          ]}
-        />
-        <Atajos marcador="Añadir un móvil…" opciones={(Object.keys(NOMBRE_MOVIL) as TipoMovil[]).map((t) => ({ t: NOMBRE_MOVIL[t], onClick: () => set(anadirMovil(s, t)) }))} />
+        <p className="nota-editor">
+          Monta el escenario con la barra de abajo: <b>Construir</b> (elige un objeto y haz clic en el lienzo), <b>Editar</b> (clic en un objeto para
+          darle valores; flechas para moverlo) y <b>Borrar</b>.
+        </p>
         {(s.piezas.length > 0 || s.moviles.length > 0) && (
-          <Boton onClick={() => set({ piezas: [], moviles: [], sel: null, ocultos: [], ...reiniciar() })}>Vaciar el escenario</Boton>
+          <Boton onClick={() => set(vaciar(s))}>Vaciar el escenario</Boton>
         )}
       </Grupo>
-      {objetos.length > 0 && (
-        <Grupo titulo="Objeto">
-          <Eleccion etiqueta="Seleccionado" valor={s.sel ?? ''} opciones={[{ v: '', t: '—' }, ...objetos]} onChange={(sel) => set({ sel: sel || null })} />
-          {pieza && <InspectorPieza p={pieza} s={s} set={set} />}
-          {movil && <InspectorMovil m={movil} s={s} set={set} />}
-          {(pieza || movil) && <Boton onClick={() => set(quitarObjeto(s, s.sel!))}>Quitar</Boton>}
-        </Grupo>
-      )}
       <Resultado />
       <Grupo titulo="Tiempo">
         <div className="interruptores">
@@ -606,39 +732,26 @@ function cota(g: Pintor2D, x: number, y0: number, y1: number, texto: string) {
   g.texto(texto, x, (y0 + y1) / 2, c, { dx: 6 })
 }
 
+/**
+ * Dibujo de trazo simple: cada pieza es un contorno con un relleno muy suave, sin
+ * texturas ni ventanas; lo que importa (alturas, ángulos, μ) va rotulado.
+ */
 function dibujarPieza(g: Pintor2D, p: Pieza, s: S, sel: boolean) {
   const c = g.color(colorPieza(p))
   const tinta = g.color('--ink-soft')
   const x0 = p.x
   const x1 = p.x + p.ancho
   const h = p.alto
-  const grosor = sel ? 2.4 : 1.2
+  const grosor = sel ? 2.6 : 1.5
   switch (p.tipo) {
-    case 'edificio': {
-      g.rellenar(rect(x0, 0, x1, h), c, 0.16)
-      g.curva(rect(x0, 0, x1, h), tinta, grosor)
-      // ventanas: una planta cada 3 m y una ventana cada 2 m
-      const plantas = Math.floor(h / 3)
-      const cols = Math.max(1, Math.floor((p.ancho - 0.6) / 2))
-      const paso = (p.ancho - 0.6) / cols
-      if (g.escalaX * 0.8 > 3)
-        for (let i = 0; i < plantas; i++)
-          for (let j = 0; j < cols; j++) {
-            const wx = x0 + 0.3 + j * paso + paso * 0.25
-            const wy = i * 3 + 1
-            if (wy + 1.2 > h - 0.3) continue
-            g.rellenar(rect(wx, wy, wx + paso * 0.5, wy + 1.2).slice(0, 4), g.color('--accent'), 0.22)
-          }
-      if (s.verCotas) cota(g, x1 + 0.8, 0, h, `h = ${num(h, 1)} m`)
-      break
-    }
+    case 'edificio':
     case 'muro':
-      g.rellenar(rect(x0, 0, x1, h), c, 0.45)
+      g.rellenar(rect(x0, 0, x1, h), c, p.tipo === 'muro' ? 0.3 : 0.1)
       g.curva(rect(x0, 0, x1, h), tinta, grosor)
-      if (s.verCotas) cota(g, x1 + 0.5, 0, h, `${num(h, 1)} m`)
+      if (s.verCotas) cota(g, x1 + (p.tipo === 'muro' ? 0.5 : 0.8), 0, h, p.tipo === 'muro' ? `${num(h, 1)} m` : `h = ${num(h, 1)} m`)
       break
     case 'plataforma':
-      g.rellenar(rect(x0, h - 0.4, x1, h), c, 0.4)
+      g.rellenar(rect(x0, h - 0.4, x1, h), c, 0.3)
       g.curva(rect(x0, h - 0.4, x1, h), tinta, grosor)
       g.curva(
         [
@@ -664,7 +777,7 @@ function dibujarPieza(g: Pintor2D, p: Pieza, s: S, sel: boolean) {
             [x0, h],
             [x1, 0],
           ]
-      g.rellenar(pts, c, 0.25)
+      g.rellenar(pts, c, 0.12)
       g.curva([...pts, pts[0]], tinta, grosor)
       const ang = (Math.atan2(h, p.ancho) * 180) / Math.PI
       const pie = der ? x0 : x1
@@ -674,17 +787,23 @@ function dibujarPieza(g: Pintor2D, p: Pieza, s: S, sel: boolean) {
         return der ? [pie + r * Math.cos(a), r * Math.sin(a)] : [pie - r * Math.cos(a), r * Math.sin(a)]
       })
       g.curva(arco, tinta, 1)
-      g.texto(`${num(ang, 0)}°`, pie + (der ? r + 0.3 : -r - 0.3), 0.5, tinta, { alinea: der ? 'left' : 'right' })
+      g.texto(`θ = ${num(ang, 1)}°`, pie + (der ? r + 0.3 : -r - 0.3), 0.5, tinta, { alinea: der ? 'left' : 'right' })
       g.texto(`μ = ${num(p.muD)}`, (x0 + x1) / 2, h / 2, tinta, { dx: der ? -30 : 10, dy: -14 })
       if (s.verCotas) cota(g, der ? x1 + 0.6 : x0 - 0.6, 0, h, `${num(h, 2)} m`)
       break
     }
     case 'arbol': {
       const cx = (x0 + x1) / 2
-      g.rellenar(rect(cx - 0.2, 0, cx + 0.2, h * 0.55).slice(0, 4), g.color('--ocre'), 0.7)
       const rc = Math.max(p.ancho / 2, 0.5)
-      g.rellenar(circulo(cx, h - rc, rc), c, 0.45)
-      g.curva(circulo(cx, h - rc, rc), c, grosor)
+      g.curva(
+        [
+          [cx, 0],
+          [cx, h - 2 * rc],
+        ],
+        tinta,
+        sel ? 3 : 2,
+      )
+      g.curva(circulo(cx, h - rc, rc), c, grosor, !p.solido)
       break
     }
     case 'farola': {
@@ -698,12 +817,18 @@ function dibujarPieza(g: Pintor2D, p: Pieza, s: S, sel: boolean) {
         tinta,
         sel ? 3 : 2,
       )
-      g.rellenar(circulo(cx + 0.8, h - 0.25, 0.25), c, 0.9)
-      g.rellenar(circulo(cx + 0.8, h - 0.25, 0.8), c, 0.12)
+      g.curva(circulo(cx + 0.8, h - 0.25, 0.25, 14), c, 1.5)
       break
     }
     case 'suelo':
-      g.rellenar(rect(x0, -0.35, x1, 0).slice(0, 4), c, 0.55)
+      g.curva(
+        [
+          [x0, -0.05],
+          [x1, -0.05],
+        ],
+        c,
+        5,
+      )
       g.texto(`${p.material ?? 'suelo'} · μ = ${num(p.muD)}`, (x0 + x1) / 2, -0.35, tinta, { dy: 10, alinea: 'center' })
       break
   }
@@ -714,22 +839,14 @@ function dibujarMovil(g: Pintor2D, m: Movil, x: number, y: number, vx: number, v
   const c = g.color(COLOR_MOVIL[m.tipo])
   // nunca más pequeño que unos píxeles: un coche en una calle de 100 m sigue viéndose
   const r = Math.max(m.r, 6 / g.escalaX)
+  const grosor = sel ? 2.8 : 1.8
   switch (m.tipo) {
     case 'pelota':
     case 'disco':
-      g.rellenar(circulo(x, y, r), c, 0.85)
-      g.curva(circulo(x, y, r), c, sel ? 2.5 : 1.4)
+    case 'piedra':
+      g.rellenar(circulo(x, y, r), c, m.tipo === 'piedra' ? 0.6 : 0.25)
+      g.curva(circulo(x, y, r), c, grosor)
       break
-    case 'piedra': {
-      const pts: Array<[number, number]> = Array.from({ length: 9 }, (_, k) => {
-        const a = (2 * Math.PI * k) / 8
-        const rr = r * (0.8 + 0.25 * Math.sin(3 * a + 1))
-        return [x + rr * Math.cos(a), y + rr * Math.sin(a)]
-      })
-      g.rellenar(pts, c, 0.8)
-      g.curva(pts, g.color('--ink'), sel ? 2.2 : 1)
-      break
-    }
     case 'bloque': {
       // inclinado según la velocidad cuando se mueve por una rampa
       const ang = Math.hypot(vx, vy) > 0.05 && Math.abs(vy) < Math.abs(vx) * 3 ? Math.atan2(vy, vx) : 0
@@ -743,27 +860,25 @@ function dibujarMovil(g: Pintor2D, m: Movil, x: number, y: number, vx: number, v
         [-r, r],
         [-r, -r],
       ].map(([u, v]) => [x + u * cs - v * sn, y + u * sn + v * cs])
-      g.rellenar(pts, c, 0.75)
-      g.curva(pts, c, sel ? 2.5 : 1.4)
+      g.rellenar(pts, c, 0.25)
+      g.curva(pts, c, grosor)
       break
     }
     case 'coche': {
-      // mirando hacia donde va
+      // una caja y dos ruedas; la cabina, hacia donde va
       const sgn = vx < -1e-6 ? -1 : 1
       const L = 2.2 * r
-      const cuerpo: Array<[number, number]> = [
-        [x - L, y - 0.45 * r],
-        [x + L, y - 0.45 * r],
-        [x + L, y + 0.15 * r],
-        [x + sgn * 0.5 * L, y + 0.2 * r],
-        [x + sgn * 0.2 * L, y + 0.8 * r],
-        [x - sgn * 0.6 * L, y + 0.8 * r],
-        [x - sgn * 0.9 * L, y + 0.2 * r],
-        [x - L, y + 0.15 * r],
+      const cuerpo = rect(x - L, y - 0.4 * r, x + L, y + 0.3 * r)
+      const cabina: Array<[number, number]> = [
+        [x - sgn * 0.7 * L, y + 0.3 * r],
+        [x - sgn * 0.5 * L, y + 0.85 * r],
+        [x + sgn * 0.3 * L, y + 0.85 * r],
+        [x + sgn * 0.5 * L, y + 0.3 * r],
       ]
-      g.rellenar(cuerpo, c, 0.85)
-      g.curva([...cuerpo, cuerpo[0]], c, sel ? 2.5 : 1.2)
-      for (const k of [-0.6, 0.6]) g.rellenar(circulo(x + k * L, y - 0.5 * r, 0.42 * r, 14), g.color('--ink'), 0.9)
+      g.rellenar(cuerpo, c, 0.25)
+      g.curva(cuerpo, c, grosor)
+      g.curva(cabina, c, grosor)
+      for (const k of [-0.6, 0.6]) g.curva(circulo(x + k * L, y - 0.55 * r, 0.42 * r, 14), c, grosor)
       break
     }
   }
@@ -795,7 +910,9 @@ function encuadre(s: S): { x: [number, number]; y: [number, number] } {
   const ya = -0.08 * Math.max(...ys) - 1
   // proporción parecida a la del lienzo, estirando hacia arriba: el suelo queda abajo
   const yb = Math.max(Math.max(...ys) * 1.12 + 1, ya + (x1 - x0 + 2 * px) / 1.35)
-  return { x: [x0 - px, x1 + px], y: [ya, yb] }
+  // con la barra del editor abierta, el suelo sube por encima de ella (≈ 30 % del alto)
+  const yaBarra = s.ed.barra ? Math.min(ya, -0.45 * yb) : ya
+  return { x: [x0 - px, x1 + px], y: [yaBarra, yb] }
 }
 
 function vistaEscena(g: Pintor2D, s: S) {
@@ -900,7 +1017,7 @@ function vistaEscena(g: Pintor2D, s: S) {
   const ty = y[1] - 0.04 * (y[1] - y[0])
   g.texto(`t = ${num(t)} s${s.jugando ? '' : '  (pausa)'}`, tx, ty, g.color('--ink'), { fuente: `600 14px ${g.color('--mono') || 'monospace'}` })
   if (!s.piezas.length && !s.moviles.length)
-    g.texto('Escenario vacío: añade edificios, rampas, árboles, pelotas… desde el panel u Objeto ▸ Añadir. Doble clic: una pelota.', tx, ty - 0.06 * (y[1] - y[0]), tinta)
+    g.texto('Escenario vacío: en la barra de abajo, Construir → elige un objeto y haz clic aquí. Doble clic: una pelota.', tx, ty - 0.06 * (y[1] - y[0]), tinta)
 }
 
 /* ---------------------------------------------------------------- gráficas y tabla */
@@ -1201,6 +1318,8 @@ const INICIAL: S = {
   dtTabla: 0.1,
   sig: 1,
   ocultos: [],
+  ed: { ...EDITOR_INICIAL, modo: 'construir', categoria: 'terreno' },
+  marco: 0,
 }
 
 function asas(s: S): Asa[] {
@@ -1247,11 +1366,9 @@ function mover(id: string, t: { p: number[]; mayus: boolean }, s: S): Partial<S>
   if (!m) return
   if (que === 'p') {
     let y = Math.max(m.r, py)
-    // se pega a la superficie de debajo si pasa cerca (Mayús: sin imán)
-    if (!t.mayus) {
-      const h = superficieBajo(tramosDe(activa(s)), px, py)
-      if (Math.abs(y - (h + m.r)) < 0.6) y = h + m.r
-    }
+    // se pega a la superficie de debajo si pasa cerca (Mayús: sin imán); nunca se queda dentro de algo sólido
+    const apoyo = apoyarEn(activa(s), px, py, m.r)
+    if (solidoEn(activa(s), px, py) || (!t.mayus && Math.abs(y - apoyo) < 0.6)) y = apoyo
     return { ...moverMovil(s, oid, { x0: Math.round(px * 100) / 100, y0: Math.round(y * 100) / 100 }), ...reiniciar() }
   }
   if (que === 'v') {
@@ -1341,7 +1458,7 @@ function menu(s: S) {
       casilla<S>('Sucesos', s.verSucesos, (verSucesos) => ({ verSucesos })),
       casilla<S>('Cotas', s.verCotas, (verCotas) => ({ verCotas })),
       accion<S>('Quitar el seleccionado', (x) => (x.sel ? quitarObjeto(x, x.sel) : undefined), !s.sel),
-      accion<S>('Vaciar el escenario', () => ({ piezas: [], moviles: [], sel: null, ocultos: [], ...reiniciar() }), !s.piezas.length && !s.moviles.length),
+      accion<S>('Vaciar el escenario', (x) => vaciar(x), !s.piezas.length && !s.moviles.length),
     ],
   }
 }
@@ -1389,11 +1506,12 @@ export default definir<S>({
           }
         : {
             tipo: '2d',
-            clave: 'escena',
+            clave: `escena:${s.marco}:${s.ed.barra}`,
             ventana: encuadre(s),
             animada: (st) => st.jugando,
             dibujar: (g, st) => vistaEscena(g, st),
-            alPulsar: (p, st) => ({ sel: objetoEn(st, p.x, p.y) }),
+            alPulsar: pulsar,
+            barra: Barra,
             interaccion: {
               asas,
               mover,

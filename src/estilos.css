@@ -418,3 +418,44 @@ aside .tog:hover{color:var(--ink)}
 .hoja-atajos dd{margin:0;font-size:12px;color:var(--ink-soft);text-align:right}
 .cuerpo.presentacion{grid-template-columns:1fr}
 .cuerpo.presentacion>aside{display:none}
+
+/* ---------- editor de escenarios (al pie del lienzo, estilo editor de niveles) ---------- */
+.editor{position:absolute;left:12px;right:12px;bottom:12px;z-index:3;display:grid;grid-template-columns:auto 1fr auto;gap:10px;
+  height:156px;padding:8px;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.14);font-size:12px}
+.editor.recogido{left:50%;right:auto;transform:translateX(-50%);height:auto;display:block;padding:4px}
+.lienzo-lado:has(.editor:not(.recogido)) .leyenda,.lienzo-lado:has(.editor:not(.recogido)) .exportar-lienzo{bottom:180px}
+.lienzo-lado:has(.editor.recogido) .leyenda{bottom:56px}
+.ed-boton,.ed-modos button,.ed-pestanas button,.ed-objeto,.ed-num button,.ed-flechas button{font:inherit;font-size:11.5px;font-weight:600;color:var(--ink-soft);
+  background:var(--chip);border:1px solid transparent;border-radius:7px;cursor:pointer}
+.ed-boton{display:inline-flex;align-items:center;gap:5px;padding:5px 9px}
+.ed-boton:hover,.ed-modos button:hover,.ed-pestanas button:hover,.ed-objeto:hover,.ed-num button:hover,.ed-flechas button:hover{color:var(--ink);border-color:var(--accent)}
+.ed-boton[aria-pressed="true"],.ed-modos button[aria-pressed="true"],.ed-objeto[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.ed-boton.peligro:hover{border-color:var(--rosa);color:var(--rosa)}
+.ed-modos{display:flex;flex-direction:column;gap:4px;width:108px}
+.editor svg{flex:none}
+.ed-modos button{flex:1;display:flex;align-items:center;gap:6px;padding:4px 8px}
+.ed-centro{min-width:0;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.ed-pestanas{display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto}
+.ed-pestanas button{padding:3px 10px;background:transparent}
+.ed-pestanas button[aria-selected="true"]{background:var(--chip);color:var(--ink)}
+.ed-rejilla{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.ed-objeto{flex:0 0 70px;height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px 2px}
+.ed-objeto span{font-size:10.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:66px}
+.ed-pista{margin:0;color:var(--ink-soft);font-size:11.5px}
+.ed-titulo{display:flex;align-items:center;gap:6px;min-width:0}
+.ed-titulo b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ed-acciones{margin-left:auto;display:flex;gap:4px;align-items:center;flex-wrap:nowrap}
+.ed-flechas{display:inline-flex;gap:2px}
+.ed-flechas button{width:26px;height:26px}
+.ed-campos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 10px;overflow-y:auto;padding-right:4px}
+.ed-campo{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--ink-soft)}
+.ed-campo select{padding:4px 6px;font-size:12px}
+.ed-num{display:grid;grid-template-columns:22px 1fr 22px auto;gap:2px;align-items:center}
+.ed-num button{height:26px;padding:0}
+.ed-num input{padding:4px 4px;font-size:12px;text-align:center;-moz-appearance:textfield}
+.ed-num input::-webkit-outer-spin-button,.ed-num input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ed-num em{font-style:normal;font-size:11px;color:var(--ink-soft);min-width:18px}
+.ed-extra{display:flex;flex-direction:column;gap:4px;align-items:stretch;justify-content:flex-start}
+@media (max-width:760px){.editor{height:auto;max-height:55%;grid-template-columns:1fr}.ed-modos{flex-direction:row;width:auto}.ed-extra{flex-direction:row}}
+.nota-editor{margin:0;font-size:12px;color:var(--ink-soft);line-height:1.5}

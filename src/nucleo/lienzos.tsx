@@ -885,7 +885,8 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
           const cx = (g.ventana.x[0] + g.ventana.x[1]) / 2
           const cy = (g.ventana.y[0] + g.ventana.y[1]) / 2
           if (o.orden === 'encuadrar') {
-            g.ventana = v0.ventana ? { x: [...v0.ventana.x], y: [...v0.ventana.y] } : { x: [-5, 5], y: [-5, 5] }
+            const vv = estado.current.vista.ventana
+            g.ventana = vv ? { x: [...vv.x], y: [...vv.y] } : { x: [-5, 5], y: [-5, 5] }
             primeraVez = true
           }
           else if (o.orden === 'acercar')
@@ -912,7 +913,9 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
       canvas.removeEventListener('contextmenu', contextual)
       window.removeEventListener('keydown', tecla)
     }
-  }, [vista])
+    // la vista puede ser una función del estado: se remonta solo si cambia de verdad de
+    // lienzo (clave o navegable), no con cada objeto nuevo, que perdería el encuadre
+  }, [vista.clave, vista.navegable])
 
   useEffect(() => {
     sucio.current = true

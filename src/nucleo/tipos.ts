@@ -133,6 +133,8 @@ export interface Vista2D<S> {
   /** Clic sobre el lienzo, en coordenadas del mundo. */
   alPulsar?: (p: { x: number; y: number }, s: S) => Partial<S> | void
   interaccion?: Interaccion<S>
+  /** Barra de editor al pie del lienzo (Construir, Editar, Borrar): ver `nucleo/editor.tsx`. */
+  barra?: (p: PropsPanel<S>) => ReactNode
 }
 
 /** Vista de documento: el módulo pinta HTML en vez de un lienzo. */

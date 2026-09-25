@@ -9,7 +9,7 @@ import orbitas, { areaBarrida, campoCentral, elementos, estadoInicial, hohmann, 
 import { dormandPrince } from '../../lib/numerico'
 import { boost, componer, doppler, gamma, gemelos, intervalo, rapidez, type Suceso } from '../../lib/relatividad'
 import oscilaciones, { amplitudForzada, desfase, evolucion, forzadoExacto, modos, type EstadoOsc, type Modos } from '../../modulos/mecanica/oscilaciones'
-import { simular, estadoDado, tiempoAngulo, type Escena, type Movil, type Pieza } from '../../lib/escenario'
+import { apoyarEn, simular, solidoEn, estadoDado, tiempoAngulo, type Escena, type Movil, type Pieza } from '../../lib/escenario'
 import cinematica, { EJEMPLOS, lecturasDe, formulasDe, type EstadoCinematica } from '../../modulos/mecanica/cinematica'
 import { aTexto, generar, type Montaje } from '../../lib/montaje'
 import { EJEMPLOS_MONTAJE, asasMontaje, moverMontaje, textoDe, type EstadoMontaje } from '../../modulos/mecanica/montaje'
@@ -385,7 +385,7 @@ export function pruebasMecanica() {
     // deslizamiento con rozamiento: d = v₀²/(2 μ g)
     S = simular(esc([], [mv({ v0: 8 })]))
     cerca('frenada por rozamiento: d = v₀²/(2μg)', primero(S, 'parada')!.x, 64 / (2 * 0.4 * 9.8), 1e-6)
-    cerca('frenada por rozamiento: t = v₀/(μg)', primero(S, 'parada')!.t, 8 / (0.4 * 9.8), 2e-3)
+    cerca('frenada por rozamiento: t = v₀/(μg)', primero(S, 'parada')!.t, 8 / (0.4 * 9.8), 1e-9)
     // rampa: a = g(sin θ − μ cos θ)
     const rampa: Pieza = { id: 'r', tipo: 'rampa', x: 0, ancho: 10, alto: 10 * Math.tan(Math.PI / 6), muE: 0.2, muD: 0.1, derecha: false }
     S = simular(esc([rampa], [mv({ tipo: 'bloque', x0: 1, y0: 20 })], { tMax: 6 }))
@@ -394,6 +394,40 @@ export function pruebasMecanica() {
     // en una rampa con tan θ ≤ μₑ no arranca
     S = simular(esc([{ ...rampa, muE: 0.7, muD: 0.6 }], [mv({ tipo: 'bloque', x0: 5, y0: 5 * Math.tan(Math.PI / 6) + 0.2 / Math.cos(Math.PI / 6) })], { tMax: 2 }))
     cierto('rampa con tan θ ≤ μₑ: se queda quieto', S.recorridos[0].quieto === 0, String(S.recorridos[0].quieto))
+    // arranca desde el reposo en la rampa: v(t) = a t desde el primer paso (el rozamiento, en contra del movimiento)
+    {
+      const th = Math.PI / 6
+      S = simular(esc([{ ...rampa, muE: 0.2, muD: 0.1 }], [mv({ tipo: 'bloque', x0: 2, y0: (10 - 2) * Math.tan(th) + 0.2 / Math.cos(th) })], { tMax: 1 }))
+      const a = 9.8 * (Math.sin(th) - 0.1 * Math.cos(th))
+      const q1 = S.recorridos[0].muestras.find((m) => m.t >= 0.5 - 1e-9)!
+      cerca('rampa desde el reposo: |v| = g(sin θ − μ cos θ) t', Math.hypot(q1.vx, q1.vy), a * q1.t, 1e-9)
+    }
+    // esquinas: una pelota que va a rozar la arista de un muro no la atraviesa
+    for (const y0 of [3.1, 3.2, 3.3]) {
+      const muro: Pieza = { id: 'w', tipo: 'muro', x: 5, ancho: 1, alto: 3, muE: 0.5, muD: 0.4 }
+      S = simular(esc([muro], [mv({ r: 0.25, x0: 0, y0, v0: 30 })], { tMax: 1 }))
+      const pen = Math.max(...S.recorridos[0].muestras.map((q) => {
+        if (q.x > 5 && q.x < 6 && q.y < 3) return 1
+        return 0.25 - Math.hypot(q.x - Math.max(5, Math.min(6, q.x)), q.y - Math.max(0, Math.min(3, q.y)))
+      }))
+      cierto(`esquina de un muro (y₀ = ${y0}): no la atraviesa`, pen < 1e-6, `penetra ${pen}`)
+      if (y0 > 3.15) cierto(`esquina de un muro (y₀ = ${y0}): cuenta el choque`, S.recorridos[0].sucesos.some((e) => e.texto.includes('esquina')))
+    }
+    // una esquina entrante (pie de un edificio) no desvía: la pelota que rueda hacia él choca con la pared
+    {
+      const ed: Pieza = { id: 'e', tipo: 'edificio', x: 5, ancho: 4, alto: 6, muE: 0.5, muD: 0.4 }
+      S = simular(esc([ed], [mv({ r: 0.2, x0: 0, y0: 0.2, v0: 5 })], { tMax: 2, muE: 0, muD: 0 }))
+      const imp = primero(S, 'impacto')
+      cierto('pie de un edificio: choca con la pared, no con la esquina', !!imp && imp.texto.includes('pared'), imp?.texto)
+    }
+    // solidoEn / apoyarEn: nada se coloca dentro de un edificio
+    {
+      const ed: Pieza = { id: 'e', tipo: 'edificio', x: 0, ancho: 8, alto: 20, muE: 0.5, muD: 0.4 }
+      const E0 = esc([ed], [])
+      cierto('solidoEn: dentro del edificio', solidoEn(E0, 3, 5) && !solidoEn(E0, 9, 5) && !solidoEn(E0, 3, 21))
+      cerca('apoyarEn: dentro del edificio sube a la azotea', apoyarEn(E0, 3, 5, 0.25), 20.25, 1e-12)
+      cerca('apoyarEn: al lado, en el suelo', apoyarEn(E0, 10, 5, 0.25), 0.25, 1e-12)
+    }
     // rebote: la altura tras el bote es e²·h
     S = simular(esc([], [mv({ y0: 5.2 })], { e: 0.8, tMax: 4 }))
     cerca('rebote: h₁ = e² h₀', primero(S, 'altura-max')!.y - 0.2, 0.64 * 5, 1e-4)

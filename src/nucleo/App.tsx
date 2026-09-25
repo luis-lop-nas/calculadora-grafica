@@ -578,6 +578,7 @@ export default function App() {
           <Lienzo2D key={llave} vista={v} s={st} set={fijar} {...extras} />
         )}
         {prefs.leyenda && m.leyenda && !(superpuesto && lado === 'B') && <div className="leyenda">{m.leyenda(st)}</div>}
+        {v.tipo === '2d' && v.barra && !extras.secundario && !prefs.presentacion && v.barra({ s: st, set: fijar })}
       </>
     )
   }
