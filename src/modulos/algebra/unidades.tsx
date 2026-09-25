@@ -59,6 +59,13 @@ export default definir<S>({
   titulo: 'Unidades y <i>magnitudes</i>',
   entradilla: 'Convierte magnitudes físicas sin mezclar dimensiones incompatibles.',
   inicial: { familia: 'longitud', desde: 'm', hasta: 'km', valor: 1500 },
+  ejemplos: [
+    { t: '1500 m a km', e: { familia: 'longitud', desde: 'm', hasta: 'km', valor: 1500 } },
+    { t: '120 km/h a m/s', e: { familia: 'velocidad', desde: 'kmh', hasta: 'ms', valor: 120 } },
+    { t: '1 kWh a J', e: { familia: 'energia', desde: 'kWh', hasta: 'J', valor: 1 } },
+    { t: '1 atm a Pa', e: { familia: 'presion', desde: 'atm', hasta: 'Pa', valor: 1 } },
+    { t: '100 °C a K', e: { familia: 'temperatura', desde: 'C', hasta: 'K', valor: 100 } },
+  ],
   Panel,
   menu: (s) => ({
     acciones: [

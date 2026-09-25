@@ -216,6 +216,12 @@ export default definir<EstadoLaplace>({
   titulo: 'Ecuación de <i>Laplace</i>',
   entradilla: 'Δu = 0 con el valor prescrito en el borde: la solución más lisa que lo cumple.',
   inicial: { dominio: 'disco', dato: 'escalon', modo: 2, terminos: 40, expr: 'cos(3*t)+sin(t)/2', alambre: false, sonda: [0.25, -0.2] },
+  ejemplos: [
+    { t: 'Disco con dato escalón (Poisson)', e: { dominio: 'disco', dato: 'escalon' } },
+    { t: 'Disco con sin(nθ): u = rⁿ sin(nθ)', e: { dominio: 'disco', dato: 'seno', modo: 2 } },
+    { t: 'Rectángulo con un lado a sin(πx)', e: { dominio: 'rectangulo', dato: 'seno', modo: 1 } },
+    { t: 'Rectángulo con un pulso en un lado', e: { dominio: 'rectangulo', dato: 'pulso' } },
+  ],
   Panel,
   capas: (s) => [
     capaFija<EstadoLaplace>('pos', 'u > 0', '--pos'),

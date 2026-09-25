@@ -74,6 +74,13 @@ export default definir<S>({
   titulo: 'Grupos, anillos y <i>cuerpos</i>',
   entradilla: 'La tabla de la operación es la estructura entera: todo lo demás se lee en ella.',
   inicial: { tipo: 'anillo', n: 12 },
+  ejemplos: [
+    { t: 'Anillo Z₁₂', e: { tipo: 'anillo', n: 12 } },
+    { t: 'Cuerpo Z₇ (n primo)', e: { tipo: 'anillo', n: 7 } },
+    { t: 'Grupo simétrico S₃', e: { tipo: 'simetrico', n: 3 } },
+    { t: 'Diédrico D₄ (cuadrado)', e: { tipo: 'diedral', n: 4 } },
+    { t: 'Diédrico D₆ (hexágono)', e: { tipo: 'diedral', n: 6 } },
+  ],
   Panel,
   menu: (s) => ({
     acciones: [

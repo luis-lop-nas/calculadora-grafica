@@ -602,6 +602,14 @@ export default definir<EstadoOnda>({
     forma: 'rectangular', m: 3, n: 1, q: 1, ancho: 1, alto: 1, radio: 1, largoX: 2, largoY: 2, largoZ: 2, razon: 1, mezcla: 0, repr: 'iso', corte: 0,
     c: 1, jugando: true, alambre: false,
   },
+  ejemplos: [
+    { t: 'Cuerda pulsada', e: { dim: 1, inicial: 'pinzada', contorno: 'fijo-fijo', velocidad: 'reposo' } },
+    { t: 'Pulso gaussiano: dos ondas viajeras', e: { dim: 1, inicial: 'gaussiana', contorno: 'fijo-fijo', velocidad: 'reposo', dalembert: true } },
+    { t: 'Cuerda golpeada (martillo)', e: { dim: 1, inicial: 'modo', contorno: 'fijo-fijo', velocidad: 'martillo' } },
+    { t: 'Extremo libre: el pulso vuelve sin invertirse', e: { dim: 1, inicial: 'gaussiana', contorno: 'fijo-libre', velocidad: 'reposo' } },
+    { t: 'Membrana rectangular (3, 1)', e: { dim: 2, forma: 'rectangular', m: 3, n: 1 } },
+    { t: 'Tambor circular', e: { dim: 2, forma: 'circular', m: 1, n: 2 } },
+  ],
   Panel,
   capas: (s) =>
     s.dim === 1

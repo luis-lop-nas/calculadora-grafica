@@ -103,6 +103,13 @@ export default definir<S>({
     metricaA: 'euclidea', metricaB: 'manhattan', comparar: true,
     p: [-0.55, -0.3], q: [0.5, 0.45], pesoX: 1.8, pesoY: 0.8, orden: 3,
   },
+  ejemplos: [
+    { t: 'Euclídea frente a Manhattan', e: { metricaA: 'euclidea', metricaB: 'manhattan', comparar: true } },
+    { t: 'Euclídea frente a ponderada', e: { metricaA: 'euclidea', metricaB: 'ponderada', comparar: true, pesoX: 1.8, pesoY: 0.8 } },
+    { t: 'Minkowski p = 3 frente a Manhattan', e: { metricaA: 'minkowski', metricaB: 'manhattan', comparar: true, orden: 3 } },
+    { t: 'Minkowski p = 1,5', e: { metricaA: 'minkowski', comparar: false, orden: 1.5 } },
+    { t: 'Disco de Poincaré (hiperbólica)', e: { metricaA: 'hiperbolica', comparar: false } },
+  ],
   Panel,
   capas: (s) => [
     capaFija<S>('A', `Bola unidad · ${NOMBRES[s.metricaA]}`, '--accent'),

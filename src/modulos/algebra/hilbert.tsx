@@ -180,6 +180,14 @@ export default definir<S>({
   titulo: 'Bases de <i>Hilbert</i>',
   entradilla: 'La serie es la proyección sobre los primeros N vectores de una base ortonormal.',
   inicial: { base: 'fourier', objetivo: 'escalon', expr: 'exp(-x*x)', N: 9, verTerminos: false, verError: true, x0: 0.5 },
+  ejemplos: [
+    { t: 'Fourier de un escalón (Gibbs)', e: { base: 'fourier', objetivo: 'escalon', N: 9 } },
+    { t: 'Fourier de |x|', e: { base: 'fourier', objetivo: 'valorAbs', N: 5 } },
+    { t: 'Fourier del diente de sierra', e: { base: 'fourier', objetivo: 'diente', N: 15 } },
+    { t: 'Legendre de |x|', e: { base: 'legendre', objetivo: 'valorAbs', N: 8 } },
+    { t: 'Chebyshev del escalón', e: { base: 'chebyshev', objetivo: 'escalon', N: 12 } },
+    { t: 'Hermite de una gaussiana', e: { base: 'hermite', objetivo: 'gauss', N: 6 } },
+  ],
   Panel,
   capas: (s) => [
     capaFija<S>('f', 'f (la que se aproxima)', '--ink-soft'),

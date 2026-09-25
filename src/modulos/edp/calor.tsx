@@ -615,6 +615,14 @@ export default definir<EstadoCalor>({
     h: 4, expr: 'x*(1-x)*4', terminos: 40, jugando: true, verFamilia: true, corte: 0.5, color: 'fuego',
     focos: [[0.3, 0.35, 0.5, 1], [0.72, 0.6, 0.4, 0.7]], ancho: 0.08,
   },
+  ejemplos: [
+    { t: 'Barra con extremos a distinta temperatura', e: { dim: 1, contorno: 'dirichlet', inicial: 'escalon', T0: -0.6, T1: 0.8 } },
+    { t: 'Un modo que decae (e^{−k n²π² t})', e: { dim: 1, contorno: 'dirichlet', inicial: 'modo', modo: 3, T0: 0, T1: 0 } },
+    { t: 'Barra aislada (Neumann): se iguala a la media', e: { dim: 1, contorno: 'neumann', inicial: 'gaussiana' } },
+    { t: 'Enfriamiento con Robin', e: { dim: 1, contorno: 'robin', inicial: 'rampa', h: 4 } },
+    { t: 'Placa 2D con focos', e: { dim: 2, inicial: 'focos' } },
+    { t: 'Cubo 3D con focos', e: { dim: 3, inicial: 'focos' } },
+  ],
   Panel,
   capas: (s) =>
     s.dim === 1

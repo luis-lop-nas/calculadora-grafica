@@ -276,6 +276,12 @@ export default definir<S>({
     verResiduo: true,
     P: [],
   },
+  ejemplos: [
+    { t: 'Plano z = 0 y un vector fuera', e: { V: [[1, 0, 0], [0, 1, 0], [0.8, 0.6, 1.2]] } },
+    { t: 'Plano inclinado', e: { V: [[1, 0, 0], [0.4, 1, 0], [0.6, 0.5, 1.2]] } },
+    { t: 'Recta (dos vectores paralelos)', e: { V: [[1, 1, 0], [2, 2, 0], [1, 0, 1]] } },
+    { t: 'w ya está en W (residuo 0)', e: { V: [[1, 0, 0], [0, 1, 0], [0.7, -0.4, 0]] } },
+  ],
   Panel,
   capas: (s) => {
     const { dim } = piezas(s)

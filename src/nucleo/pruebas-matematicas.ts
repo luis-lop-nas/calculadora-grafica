@@ -1703,6 +1703,12 @@ seccion('Asas: ida y vuelta en todos los módulos')
     for (let k = 0; k < 512; k++) media += uEn(lap, x + r * Math.cos((2 * Math.PI * k) / 512), y + r * Math.sin((2 * Math.PI * k) / 512))
     cerca(`Laplace: media en |z − (${x}, ${y})| = ${r}`, media / 512, uEn(lap, x, y), 2e-3)
   }
+  // dato sin(nθ) en el disco: la solución es rⁿ sin(nθ)
+  for (const n of [1, 2, 3]) {
+    const st = { ...lap, dominio: 'disco' as const, dato: 'seno' as const, modo: n }
+    const [r, th] = [0.6, 0.7]
+    cerca(`Laplace: dato sin(${n}θ) ⇒ u = r^${n} sin(${n}θ)`, uEn(st, r * Math.cos(th), r * Math.sin(th)), r ** n * Math.sin(n * th), 5e-3)
+  }
 }
 
 seccion('Ejemplos del armazón: todos dan fórmulas y lecturas finitas')
@@ -1712,7 +1718,7 @@ seccion('Ejemplos del armazón: todos dan fórmulas y lecturas finitas')
     for (const ej of m.ejemplos ?? []) {
       const st = { ...m.inicial, ...ej.e }
       const textos = [...(m.formula?.(st) ?? []), ...(m.lecturas?.(st) ?? []).map(([a, b]) => `${a} ${b}`)]
-      const malo = textos.find((t) => /NaN|Infinity|undefined/.test(t))
+      const malo = textos.find((t) => /NaN|Infinity|undefined|desconocid|[Ee]rror/.test(t))
       cierto(`${m.id}: ejemplo «${ej.t}»`, textos.length > 0 && !malo, malo ?? 'sin fórmulas ni lecturas')
       // el ejemplo recién puesto sale marcado como activo
       cierto(`${m.id}: «${ej.t}» queda marcado`, ejemploActivo(st, ej.e))

@@ -205,6 +205,13 @@ export default definir<EstadoFiltro>({
   titulo: 'Filtros <i>digitales</i>',
   entradilla: 'y[n] = Σ bₖ x[n−k] − Σ aₖ y[n−k]: dónde caen sus polos y ceros y qué deja pasar.',
   inicial: { diseno: 'butter', M: 8, alfa: 0.2, r: 0.95, theta: 1, orden: 4, corte: 0.8, b: '1, 2, 1', a: '1, -0.5, 0.25', dB: false },
+  ejemplos: [
+    { t: 'Media móvil de 8 muestras', e: { diseno: 'media', M: 8 } },
+    { t: 'IIR de primer orden (paso bajo)', e: { diseno: 'iir1', alfa: 0.2 } },
+    { t: 'Resonador (polos cerca del círculo)', e: { diseno: 'resonador', r: 0.95, theta: 1 } },
+    { t: 'Filtro peine', e: { diseno: 'peine', M: 8, alfa: 0.8 } },
+    { t: 'Butterworth de orden 4', e: { diseno: 'butter', orden: 4, corte: 0.8 } },
+  ],
   Panel,
   capas: () => [capaFija<EstadoFiltro>('p', 'Polos', '--neg'), capaFija<EstadoFiltro>('c', 'Ceros', '--pos'), capaFija<EstadoFiltro>('h', '|H| y h[n]', '--accent')],
   menu: (s) => ({
