@@ -12,7 +12,8 @@ import oscilaciones, { amplitudForzada, desfase, evolucion, forzadoExacto, modos
 import { apoyarEn, simular, solidoEn, estadoDado, tiempoAngulo, type Escena, type Movil, type Pieza } from '../../lib/escenario'
 import cinematica, { EJEMPLOS, lecturasDe, formulasDe, type EstadoCinematica } from '../../modulos/mecanica/cinematica'
 import { aTexto, generar, type Montaje } from '../../lib/montaje'
-import { EJEMPLOS_MONTAJE, asasMontaje, moverMontaje, textoDe, type EstadoMontaje } from '../../modulos/mecanica/montaje'
+import { EJEMPLOS_MONTAJE, asasMontaje, moverMontaje, potencialReal, textoDe, y0De, type EstadoMontaje } from '../../modulos/mecanica/montaje'
+import { energiasNumericas } from '../../lib/montaje'
 import { calcularModulo } from '../../modulos/mecanica/lagrangiano'
 import { analizar } from '../../lib/expresion'
 import { desdeNodo, evaluar } from '../../lib/cas/expr'
@@ -536,6 +537,16 @@ export function pruebasMecanica() {
         const otra = asasMontaje({ ...est, ...(parche ?? {}) }).find((a) => a.id === asa.id)
         const d = otra ? Math.hypot(asa.p[0] - otra.p[0], asa.p[1] - otra.p[1]) : Infinity
         cierto(`montaje «${e.t}»: el asa ${asa.id} vuelve a su sitio`, d < 1e-2, `se movió ${d}`)
+      }
+      // el V del lagrangiano y el sumado a mano (Σ m g y + muelles) difieren solo en una constante
+      {
+        const gen = generar(e.mt)
+        const en = energiasNumericas(gen, gen.params)
+        const y0 = y0De(gen)
+        const otro = y0.map((v, k) => v + 0.37 * Math.sin(3.1 * k + 1))
+        const C0 = potencialReal(e.mt, gen, y0) - en.V(y0)
+        const C1 = potencialReal(e.mt, gen, otro) - en.V(otro)
+        cerca(`montaje «${e.t}»: V generado = Σ m g y + ½ k (d − l₀)² + cte`, C1, C0, 1e-9)
       }
       // el texto generado se vuelve a leer igual
       const t = textoDe(e.mt)

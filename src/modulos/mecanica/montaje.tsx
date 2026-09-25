@@ -2,12 +2,14 @@
  * Constructor del lagrangiano por piezas: el catálogo, los ejemplos, el panel de edición,
  * el dibujo del montaje y sus asas. El módulo `lagrangiano` lo usa en su modo «Construir».
  */
-import { Atajos, Boton, Eleccion, Grupo, Interruptor, Rango, Segmentado } from '../../nucleo/controles'
+import { Atajos, Boton, Grupo, Rango } from '../../nucleo/controles'
 import type { Asa, EntradaMenu } from '../../nucleo/tipos'
 import { accion, submenu } from '../../nucleo/menu'
 import type { Pintor2D } from '../../render/pintor2d'
 import { aTexto, energiasNumericas, generar, listaValores, posicionesNumericas, type Cuerpo, type Forma, type Generado, type Ligadura, type Montaje, type Polea, type Resorte, type Soporte } from '../../lib/montaje'
 import { vel } from '../../lib/mecanica'
+import type { ReactNode } from 'react'
+import { BarraEditor, EDITOR_INICIAL, caja, circ as circIcono, pasoRejilla, type CampoEditor, type Categoria, type EstadoEditor, type Seleccion } from '../../nucleo/editor'
 
 /** Lo que el módulo guarda del modo Construir. */
 export interface EstadoMontaje {
@@ -16,6 +18,8 @@ export interface EstadoMontaje {
   tMax: number
   selPieza: string | null
   sigPieza: number
+  /** Barra del editor (modo, pincel, pestaña). */
+  ed?: EstadoEditor
 }
 
 /* ---------------------------------------------------------------- generación con caché */
@@ -303,18 +307,6 @@ function Campo({ etiqueta, valor, min, max, paso, unidad, onChange }: { etiqueta
   return <Rango etiqueta={etiqueta} valor={valor} min={min} max={max} paso={paso} formato={(v) => `${v.toFixed(dec)} ${unidad}`.trim()} onChange={onChange} />
 }
 
-function nombrePieza(mt: Montaje, id: string): string {
-  const s = mt.soportes.find((x) => x.id === id)
-  if (s) return `Soporte ${s.id}`
-  const c = mt.cuerpos.find((x) => x.id === id)
-  if (c) return `${NOMBRES_FORMA[c.forma]} ${c.nombre}`
-  const p = mt.poleas.find((x) => x.id === id)
-  if (p) return `Polea ${p.id}`
-  const r = mt.resortes.find((x) => x.id === id)
-  if (r) return `Muelle ${r.id}`
-  return id
-}
-
 /** ¿`a` cuelga (directa o indirectamente) de `b`? */
 function desciende(mt: Montaje, a: string, b: string): boolean {
   let c = mt.cuerpos.find((x) => x.id === a)
@@ -325,125 +317,34 @@ function desciende(mt: Montaje, a: string, b: string): boolean {
   return false
 }
 
-function InspectorCuerpo({ c, st, set }: { c: Cuerpo; st: EstadoMontaje; set: (p: Partial<EstadoMontaje>) => void }) {
-  const mt = st.montaje
-  const pon = (m: Montaje) => set({ montaje: m })
-  const lig = c.lig
-  const padres = [
-    { v: '', t: 'el origen' },
-    ...mt.soportes.map((s) => ({ v: s.id, t: `soporte ${s.id}` })),
-    ...mt.cuerpos.filter((x) => x.id !== c.id && !desciende(mt, x.id, c.id)).map((x) => ({ v: x.id, t: x.nombre })),
-  ]
-  const tipoLig = lig.tipo
-  const cambiarTipo = (t: string) => {
-    const nuevas: Record<string, Ligadura> = {
-      varilla: { tipo: 'varilla', l: 1, q0: 30, v0: 0 },
-      rail: { tipo: 'rail', ang: 0, q0: 0, v0: 0, rueda: c.forma !== 'caja' },
-      muelle: { tipo: 'muelle', k: 20, l0: 1, eje: true, ang: -90, r0: 1.2, th0: 0, vr0: 0, vth0: 0 },
-      libre: { tipo: 'libre', x0: 0, y0: 1, vx0: 1, vy0: 0 },
-    }
-    if (nuevas[t]) pon(cambiarCuerpo(mt, c.id, (x) => ({ ...x, lig: nuevas[t] })))
-  }
-  return (
-    <>
-      <label className="fila-numeros">
-        nombre
-        <input style={{ width: 120 }} value={c.nombre} onChange={(e) => pon(cambiarCuerpo(mt, c.id, (x) => ({ ...x, nombre: e.target.value.replace(/[^\wáéíóúñ ]/g, '') || x.nombre })))} />
-      </label>
-      <Segmentado valor={c.forma} opciones={(Object.keys(NOMBRES_FORMA) as Forma[]).map((f) => ({ v: f, t: NOMBRES_FORMA[f].split(' ')[0] }))} onChange={(forma) => pon(cambiarCuerpo(mt, c.id, (x) => ({ ...x, forma })))} />
-      <Campo etiqueta="Masa m" valor={c.m} min={0.05} max={20} paso={0.05} unidad="kg" onChange={(m) => pon(cambiarCuerpo(mt, c.id, (x) => ({ ...x, m })))} />
-      <Campo etiqueta={lig.tipo === 'rail' && lig.rueda ? 'Radio R (rueda)' : 'Tamaño'} valor={c.R} min={0.05} max={1} paso={0.01} unidad="m" onChange={(R) => pon(cambiarCuerpo(mt, c.id, (x) => ({ ...x, R })))} />
-      {lig.tipo !== 'polea' && (
-        <>
-          <Eleccion etiqueta="Cómo se mueve" valor={tipoLig} opciones={[{ v: 'varilla', t: 'colgado de una varilla (θ)' }, { v: 'rail', t: 'por un raíl (s)' }, { v: 'muelle', t: 'con un muelle' }, { v: 'libre', t: 'libre en el plano (x, y)' }]} onChange={cambiarTipo} />
-          {lig.tipo !== 'libre' && <Eleccion etiqueta="Cuelga de" valor={c.padre ?? ''} opciones={padres} onChange={(v) => pon(cambiarCuerpo(mt, c.id, (x) => ({ ...x, padre: v || null })))} />}
-        </>
-      )}
-      {lig.tipo === 'varilla' && (
-        <>
-          <Campo etiqueta="Longitud l" valor={lig.l} min={0.1} max={4} paso={0.05} unidad="m" onChange={(l) => pon(cambiarLig(mt, c.id, { l }))} />
-          <Campo etiqueta="θ₀ (desde la vertical)" valor={lig.q0} min={-180} max={180} paso={1} unidad="°" onChange={(q0) => pon(cambiarLig(mt, c.id, { q0 }))} />
-          <Campo etiqueta="θ̇₀" valor={lig.v0} min={-10} max={10} paso={0.05} unidad="rad/s" onChange={(v0) => pon(cambiarLig(mt, c.id, { v0 }))} />
-        </>
-      )}
-      {lig.tipo === 'rail' && (
-        <>
-          <Campo etiqueta="Inclinación del raíl" valor={lig.ang} min={-80} max={80} paso={1} unidad="°" onChange={(ang) => pon(cambiarLig(mt, c.id, { ang }))} />
-          <Campo etiqueta="s₀" valor={lig.q0} min={-5} max={5} paso={0.05} unidad="m" onChange={(q0) => pon(cambiarLig(mt, c.id, { q0 }))} />
-          <Campo etiqueta="ṡ₀" valor={lig.v0} min={-10} max={10} paso={0.05} unidad="m/s" onChange={(v0) => pon(cambiarLig(mt, c.id, { v0 }))} />
-          <Interruptor activo={lig.rueda} onChange={(rueda) => pon(cambiarCuerpo(mt, c.id, (x) => ({ ...x, forma: rueda && x.forma === 'caja' ? 'disco' : x.forma, lig: { ...lig, rueda } })))}>
-            Rueda sin deslizar
-          </Interruptor>
-        </>
-      )}
-      {lig.tipo === 'muelle' && (
-        <>
-          <Campo etiqueta="Constante k" valor={lig.k} min={0.5} max={200} paso={0.5} unidad="N/m" onChange={(k) => pon(cambiarLig(mt, c.id, { k }))} />
-          <Campo etiqueta="Longitud natural l₀" valor={lig.l0} min={0.1} max={4} paso={0.05} unidad="m" onChange={(l0) => pon(cambiarLig(mt, c.id, { l0 }))} />
-          <Interruptor activo={!lig.eje} onChange={(v) => pon(cambiarLig(mt, c.id, { eje: !v }))}>
-            También oscila de lado (péndulo elástico)
-          </Interruptor>
-          {lig.eje && <Campo etiqueta="Dirección del muelle" valor={lig.ang} min={-180} max={180} paso={1} unidad="°" onChange={(ang) => pon(cambiarLig(mt, c.id, { ang }))} />}
-          <Campo etiqueta="r₀ (largo inicial)" valor={lig.r0} min={0.05} max={5} paso={0.01} unidad="m" onChange={(r0) => pon(cambiarLig(mt, c.id, { r0 }))} />
-          <Campo etiqueta="ṙ₀" valor={lig.vr0} min={-10} max={10} paso={0.05} unidad="m/s" onChange={(vr0) => pon(cambiarLig(mt, c.id, { vr0 }))} />
-          {!lig.eje && (
-            <>
-              <Campo etiqueta="θ₀" valor={lig.th0} min={-180} max={180} paso={1} unidad="°" onChange={(th0) => pon(cambiarLig(mt, c.id, { th0 }))} />
-              <Campo etiqueta="θ̇₀" valor={lig.vth0} min={-10} max={10} paso={0.05} unidad="rad/s" onChange={(vth0) => pon(cambiarLig(mt, c.id, { vth0 }))} />
-            </>
-          )}
-        </>
-      )}
-      {lig.tipo === 'libre' && (
-        <>
-          <Campo etiqueta="x₀" valor={lig.x0} min={-5} max={5} paso={0.05} unidad="m" onChange={(x0) => pon(cambiarLig(mt, c.id, { x0 }))} />
-          <Campo etiqueta="y₀" valor={lig.y0} min={-5} max={5} paso={0.05} unidad="m" onChange={(y0) => pon(cambiarLig(mt, c.id, { y0 }))} />
-          <Campo etiqueta="ẋ₀" valor={lig.vx0} min={-10} max={10} paso={0.05} unidad="m/s" onChange={(vx0) => pon(cambiarLig(mt, c.id, { vx0 }))} />
-          <Campo etiqueta="ẏ₀" valor={lig.vy0} min={-10} max={10} paso={0.05} unidad="m/s" onChange={(vy0) => pon(cambiarLig(mt, c.id, { vy0 }))} />
-        </>
-      )}
-    </>
-  )
-}
-
-function InspectorPolea({ p, st, set }: { p: Polea; st: EstadoMontaje; set: (x: Partial<EstadoMontaje>) => void }) {
-  const mt = st.montaje
-  const cambia = (parche: Partial<Polea>) => set({ montaje: { ...mt, poleas: mt.poleas.map((x) => (x.id === p.id ? { ...x, ...parche } : x)) } })
-  return (
-    <>
-      <Campo etiqueta="Masa de la polea M" valor={p.M} min={0} max={10} paso={0.05} unidad="kg" onChange={(M) => cambia({ M })} />
-      <Campo etiqueta="Radio" valor={p.R} min={0.05} max={1} paso={0.01} unidad="m" onChange={(R) => cambia({ R })} />
-      <Campo etiqueta="Cuerda izquierda: dirección" valor={p.izq.ang} min={90} max={270} paso={1} unidad="°" onChange={(ang) => cambia({ izq: { ...p.izq, ang } })} />
-      <Campo etiqueta="Cuerda izquierda: largo" valor={p.izq.d0} min={0.1} max={4} paso={0.05} unidad="m" onChange={(d0) => cambia({ izq: { ...p.izq, d0 } })} />
-      <Campo etiqueta="Cuerda derecha: dirección" valor={p.der.ang} min={-90} max={90} paso={1} unidad="°" onChange={(ang) => cambia({ der: { ...p.der, ang } })} />
-      <Campo etiqueta="Cuerda derecha: largo" valor={p.der.d0} min={0.1} max={4} paso={0.05} unidad="m" onChange={(d0) => cambia({ der: { ...p.der, d0 } })} />
-      <Campo etiqueta="Velocidad inicial de la cuerda" valor={p.v0} min={-5} max={5} paso={0.05} unidad="m/s" onChange={(v0) => cambia({ v0 })} />
-    </>
-  )
-}
-
-function InspectorResorte({ r, st, set }: { r: Resorte; st: EstadoMontaje; set: (x: Partial<EstadoMontaje>) => void }) {
-  const mt = st.montaje
-  const cambia = (parche: Partial<Resorte>) => set({ montaje: { ...mt, resortes: mt.resortes.map((x) => (x.id === r.id ? { ...x, ...parche } : x)) } })
-  const extremos = [...mt.soportes.map((s) => ({ v: s.id, t: `soporte ${s.id}` })), ...mt.cuerpos.map((c) => ({ v: c.id, t: c.nombre }))]
-  return (
-    <>
-      <Eleccion etiqueta="De" valor={r.a} opciones={extremos} onChange={(a) => cambia({ a })} />
-      <Eleccion etiqueta="A" valor={r.b} opciones={extremos} onChange={(b) => cambia({ b })} />
-      <Campo etiqueta="Constante k" valor={r.k} min={0.5} max={200} paso={0.5} unidad="N/m" onChange={(k) => cambia({ k })} />
-      <Campo etiqueta="Longitud natural l₀" valor={r.l0} min={0.1} max={5} paso={0.05} unidad="m" onChange={(l0) => cambia({ l0 })} />
-    </>
-  )
-}
-
 /** Energía inicial y un deslizador que reescala todas las velocidades iniciales para fijarla. */
+/**
+ * V con su cero en y = 0, sumado a mano: Σ m g yᵢ más ½ k (d − l₀)² de cada muelle. Difiere del
+ * V del lagrangiano solo en una constante (lo comprueba npm run mate).
+ */
+export function potencialReal(mt: Montaje, gen: Generado, y: number[]): number {
+  const d = dibujoDe(gen)
+  const pos = new Map<string, [number, number]>(mt.soportes.map((q) => [q.id, [q.x, q.y]]))
+  mt.cuerpos.forEach((c, i) => pos.set(c.id, d.pos[i](y)))
+  const donde = (id: string | null): [number, number] => (id === null ? [0, 0] : (pos.get(id) ?? [0, 0]))
+  const muelle = (k: number, l0: number, a: [number, number], b: [number, number]) => 0.5 * k * (Math.hypot(a[0] - b[0], a[1] - b[1]) - l0) ** 2
+  let V = 0
+  for (const c of mt.cuerpos) {
+    V += c.m * mt.g * donde(c.id)[1]
+    if (c.lig.tipo === 'muelle') V += muelle(c.lig.k, c.lig.l0, donde(c.id), donde(c.padre))
+  }
+  for (const r of mt.resortes) V += muelle(r.k, r.l0, donde(r.a), donde(r.b))
+  return V
+}
+
 function Energia({ st, set }: { st: EstadoMontaje; set: (x: Partial<EstadoMontaje>) => void }) {
   const g = generado(st.montaje)
   if ('error' in g) return null
   const en = energiasNumericas(g, g.params)
   const y0 = y0De(g)
   const T0 = en.T(y0)
-  const V0 = en.V(y0)
+  // el V del lagrangiano no lleva las constantes; el que se enseña, sí: cero de la gravitatoria en y = 0
+  const V0 = potencialReal(st.montaje, g, y0)
   const escalar = (E: number) => {
     const n = g.coords.length
     let y = y0
@@ -496,35 +397,17 @@ function conVelocidades(mt: Montaje, g: Generado, ci: Record<string, number>): M
 
 export function PanelMontaje({ st, set }: { st: EstadoMontaje; set: (x: Partial<EstadoMontaje>) => void }) {
   const mt = st.montaje
-  const piezas = [...mt.soportes.map((s) => s.id), ...mt.cuerpos.map((c) => c.id), ...mt.poleas.map((p) => p.id), ...mt.resortes.map((r) => r.id)]
-  const c = mt.cuerpos.find((x) => x.id === st.selPieza)
-  const p = mt.poleas.find((x) => x.id === st.selPieza)
-  const r = mt.resortes.find((x) => x.id === st.selPieza)
-  const s = mt.soportes.find((x) => x.id === st.selPieza)
+  const vacio = !mt.soportes.length && !mt.cuerpos.length && !mt.poleas.length && !mt.resortes.length
   return (
-    <>
-      <Grupo titulo="Montaje">
-        <Atajos marcador="Ejemplos de montaje…" opciones={EJEMPLOS_MONTAJE.map((e) => ({ t: e.t, onClick: () => set({ montaje: e.mt, selPieza: null, sigPieza: 100, tMax: e.tMax }) }))} />
-        <Atajos marcador="Añadir una pieza…" opciones={CATALOGO.map((o) => ({ t: o.t, onClick: () => set(anadir(st, o.tipo)) }))} />
-        <Campo etiqueta="Gravedad g" valor={mt.g} min={0} max={25} paso={0.01} unidad="m/s²" onChange={(g) => set({ montaje: { ...mt, g } })} />
-        <Energia st={st} set={set} />
-      </Grupo>
-      {piezas.length > 0 && (
-        <Grupo titulo="Pieza">
-          <Eleccion etiqueta="Seleccionada" valor={st.selPieza ?? ''} opciones={[{ v: '', t: '—' }, ...piezas.map((id) => ({ v: id, t: nombrePieza(mt, id) }))]} onChange={(v) => set({ selPieza: v || null })} />
-          {c && <InspectorCuerpo c={c} st={st} set={set} />}
-          {p && <InspectorPolea p={p} st={st} set={set} />}
-          {r && <InspectorResorte r={r} st={st} set={set} />}
-          {s && (
-            <>
-              <Campo etiqueta="x" valor={s.x} min={-5} max={5} paso={0.05} unidad="m" onChange={(x) => set({ montaje: { ...mt, soportes: mt.soportes.map((q) => (q.id === s.id ? { ...q, x } : q)) } })} />
-              <Campo etiqueta="y" valor={s.y} min={-5} max={5} paso={0.05} unidad="m" onChange={(y) => set({ montaje: { ...mt, soportes: mt.soportes.map((q) => (q.id === s.id ? { ...q, y } : q)) } })} />
-            </>
-          )}
-          {st.selPieza && <Boton onClick={() => set(quitarPieza(st, st.selPieza!))}>Quitar (con lo que cuelga de ella)</Boton>}
-        </Grupo>
-      )}
-    </>
+    <Grupo titulo="Montaje">
+      <Atajos marcador="Ejemplos de montaje…" opciones={EJEMPLOS_MONTAJE.map((e) => ({ t: e.t, onClick: () => set({ montaje: e.mt, selPieza: null, sigPieza: 100, tMax: e.tMax }) }))} />
+      <p className="nota-editor">
+        En la vista <b>Montaje</b>, la barra de abajo: <b>Construir</b> (elige una pieza y haz clic; péndulos y muelles cuelgan de lo más cercano), <b>Editar</b> (clic en una pieza para darle valores) y <b>Borrar</b>.
+      </p>
+      {!vacio && <Boton onClick={() => set({ montaje: { ...mt, soportes: [], cuerpos: [], poleas: [], resortes: [] }, selPieza: null })}>Vaciar el montaje</Boton>}
+      <Campo etiqueta="Gravedad g" valor={mt.g} min={0} max={25} paso={0.01} unidad="m/s²" onChange={(g) => set({ montaje: { ...mt, g } })} />
+      <Energia st={st} set={set} />
+    </Grupo>
   )
 }
 
@@ -873,4 +756,241 @@ export function moverMontaje(id: string, t: { p: number[]; mayus: boolean }, st:
     if (lig.tipo === 'polea') return { montaje: { ...mt, poleas: mt.poleas.map((x) => (x.id === lig.polea ? { ...x, v0: qd } : x)) }, selPieza: pid }
   }
   void n
+}
+
+/* ---------------------------------------------------------------- editor (barra al pie del lienzo) */
+
+export const ED_MONTAJE: EstadoEditor = { ...EDITOR_INICIAL, modo: 'construir', categoria: 'cuerpos', paso: 0.1 }
+export const edDe = (st: EstadoMontaje): EstadoEditor => st.ed ?? ED_MONTAJE
+
+const PATAS = 'M6 8h20M9 8l-3-4M14 8l-3-4M19 8l-3-4M24 8l-3-4'
+
+export const CATALOGO_BARRA: Categoria[] = [
+  {
+    id: 'cuerpos',
+    nombre: 'Cuerpos',
+    objetos: [
+      { id: 'pendulo', nombre: 'Péndulo', icono: PATAS + 'M16 8l6 14' + circIcono(22, 24, 3), color: '--accent' },
+      { id: 'carro', nombre: 'Carro', icono: 'M3 24h26' + caja(10, 15, 12, 7), color: '--pos' },
+      { id: 'plano', nombre: 'Plano incl.', icono: 'M4 26L28 12' + 'M12 16l4 7 6-3.5-4-7z', color: '--morado' },
+      { id: 'rueda', nombre: 'Rueda', icono: 'M4 26L28 14' + circIcono(14, 16, 5), color: '--aux' },
+      { id: 'libre', nombre: 'Masa libre', icono: circIcono(16, 16, 5) + 'M20 12l5-5', color: '--rosa' },
+    ],
+  },
+  {
+    id: 'muelles',
+    nombre: 'Muelles',
+    objetos: [
+      { id: 'muelleV', nombre: 'Colgado', icono: PATAS + 'M16 8l-3 2 6 2-6 2 6 2-6 2 3 2' + caja(12, 20, 8, 7), color: '--accent' },
+      { id: 'muelleH', nombre: 'Horizontal', icono: 'M4 8v18M4 17l3-3 3 6 3-6 3 6 3-3' + caja(19, 13, 8, 8), color: '--pos' },
+      { id: 'elastico', nombre: 'Péndulo elástico', icono: PATAS + 'M16 8l1 3 3-1 0 3 3-1 0 3 3-1' + circIcono(24, 20, 3), color: '--morado' },
+      { id: 'resorte', nombre: 'Entre dos', icono: circIcono(6, 16, 3) + 'M9 16l2-3 3 6 3-6 3 6 3-6 2 3' + circIcono(26, 16, 3), color: '--ink' },
+    ],
+  },
+  {
+    id: 'apoyos',
+    nombre: 'Apoyos y poleas',
+    objetos: [
+      { id: 'soporte', nombre: 'Soporte', icono: PATAS + circIcono(16, 8, 1.5) },
+      { id: 'atwood', nombre: 'Atwood', icono: circIcono(16, 8, 4) + 'M12 8v12M20 8v8' + caja(9, 20, 6, 6) + caja(17, 16, 6, 6) },
+      { id: 'mesa', nombre: 'Polea y mesa', icono: 'M2 14h20' + circIcono(24, 12, 3) + caja(8, 8, 7, 6) + 'M15 11h9M27 12v10' + caja(24, 22, 6, 5) },
+    ],
+  },
+]
+
+/** Posiciones en t = 0 de soportes y cuerpos (para colgar lo nuevo de lo más cercano). */
+function anclas(mt: Montaje): Array<{ id: string; p: [number, number]; cuerpo: boolean }> {
+  const out = mt.soportes.map((s) => ({ id: s.id, p: [s.x, s.y] as [number, number], cuerpo: false }))
+  const g = generado(mt)
+  if (!('error' in g)) {
+    const d = dibujoDe(g)
+    const y0 = y0De(g)
+    mt.cuerpos.forEach((c, i) => out.push({ id: c.id, p: d.pos[i](y0), cuerpo: true }))
+  }
+  return out
+}
+
+const r2 = (v: number) => Math.round(v * 100) / 100
+
+/** Añade la pieza del pincel donde se hace clic: lo que cuelga, del soporte o cuerpo más cercano. */
+export function colocarMontaje(st: EstadoMontaje, tipo: string, x: number, y: number): Partial<EstadoMontaje> {
+  const k = pasoRejilla(edDe(st))
+  x = Math.round(x / k) * k
+  y = Math.round(y / k) * k
+  const mt0 = st.montaje
+  const cerca = anclas(mt0)
+    .map((a) => ({ ...a, d: Math.hypot(a.p[0] - x, a.p[1] - y) }))
+    .sort((a, b) => a.d - b.d)
+  // de qué cuelga: lo más cercano (péndulos y muelles); los raíles, solo si se hace clic encima
+  const cuelga = ['pendulo', 'muelleV', 'elastico'].includes(tipo)
+  const encima = cerca.find((a) => a.d < 0.3)
+  const sel = tipo === 'resorte' ? (cerca.find((a) => a.cuerpo)?.id ?? null) : cuelga ? (cerca[0]?.id ?? null) : (encima?.id ?? null)
+  const antes = new Set([...mt0.soportes, ...mt0.cuerpos, ...mt0.poleas, ...mt0.resortes].map((o) => o.id))
+  const parche = anadir({ ...st, selPieza: sel }, tipo as Parameters<typeof anadir>[1])
+  if (!parche.montaje) return {}
+  let mt = parche.montaje
+  const nuevo = <T extends { id: string }>(xs: T[]) => xs.find((o) => !antes.has(o.id))
+  const sop = nuevo(mt.soportes)
+  const pol = nuevo(mt.poleas)
+  const cue = nuevo(mt.cuerpos)
+  // un soporte nuevo (el del raíl o el suelto) va donde se ha hecho clic
+  if (sop) mt = { ...mt, soportes: mt.soportes.map((s) => (s.id === sop.id ? { ...s, x: r2(x), y: r2(y) } : s)) }
+  if (pol) mt = { ...mt, poleas: mt.poleas.map((p) => (p.id === pol.id ? { ...p, x: r2(x), y: r2(y) } : p)) }
+  if (cue && cuelga) {
+    const padre = cerca.find((a) => a.id === cue.padre)
+    const [px, py] = padre?.p ?? [0, 0]
+    const dx = x - px
+    const dy = y - py
+    const L = Math.max(0.2, r2(Math.hypot(dx, dy)))
+    const th = Math.round((Math.atan2(dx, -dy) * 180) / Math.PI)
+    const lig = cue.lig
+    const nueva: Ligadura =
+      lig.tipo === 'varilla' ? { ...lig, l: L, q0: th } : lig.tipo === 'muelle' && lig.eje ? { ...lig, r0: L, l0: r2(L * 0.8) } : lig.tipo === 'muelle' ? { ...lig, r0: L, l0: r2(L * 0.8), th0: th } : lig
+    mt = cambiarLig(mt, cue.id, nueva)
+  }
+  if (cue && cue.lig.tipo === 'libre') mt = cambiarLig(mt, cue.id, { x0: r2(x), y0: r2(y) })
+  return { ...parche, montaje: mt }
+}
+
+/** Los valores de la pieza seleccionada como campos de la barra. */
+export function camposMontaje(st: EstadoMontaje, set: (p: Partial<EstadoMontaje>) => void): Seleccion | null {
+  const mt = st.montaje
+  const id = st.selPieza
+  if (!id) return null
+  const pon = (m: Montaje) => set({ montaje: m })
+  const comun = { quitar: () => set(quitarPieza(st, id)), soltar: () => set({ selPieza: null }), paso: pasoRejilla(edDe(st)) }
+  const s = mt.soportes.find((q) => q.id === id)
+  if (s) {
+    const cambia = (p: Partial<Soporte>) => pon({ ...mt, soportes: mt.soportes.map((q) => (q.id === s.id ? { ...q, ...p } : q)) })
+    return {
+      nombre: `Soporte ${s.id}`,
+      color: '--ink-soft',
+      campos: [
+        { etiqueta: 'x', valor: s.x, paso: 0.05, unidad: 'm', onChange: (x) => cambia({ x }) },
+        { etiqueta: 'y', valor: s.y, paso: 0.05, unidad: 'm', onChange: (y) => cambia({ y }) },
+      ],
+      mover: (dx, dy) => cambia({ x: r2(s.x + dx), y: r2(s.y + dy) }),
+      ...comun,
+    }
+  }
+  const p = mt.poleas.find((q) => q.id === id)
+  if (p) {
+    const cambia = (x: Partial<Polea>) => pon({ ...mt, poleas: mt.poleas.map((q) => (q.id === p.id ? { ...q, ...x } : q)) })
+    return {
+      nombre: `Polea ${p.id}`,
+      color: '--ink-soft',
+      campos: [
+        { etiqueta: 'Masa de la polea M', valor: p.M, paso: 0.1, min: 0, unidad: 'kg', onChange: (M) => cambia({ M }) },
+        { etiqueta: 'Radio', valor: p.R, paso: 0.01, min: 0.05, unidad: 'm', onChange: (R) => cambia({ R }) },
+        { etiqueta: 'Cuerda izq.: dirección', valor: p.izq.ang, paso: 5, min: 90, max: 270, unidad: '°', onChange: (ang) => cambia({ izq: { ...p.izq, ang } }) },
+        { etiqueta: 'Cuerda izq.: largo', valor: p.izq.d0, paso: 0.05, min: 0.1, unidad: 'm', onChange: (d0) => cambia({ izq: { ...p.izq, d0 } }) },
+        { etiqueta: 'Cuerda der.: dirección', valor: p.der.ang, paso: 5, min: -90, max: 90, unidad: '°', onChange: (ang) => cambia({ der: { ...p.der, ang } }) },
+        { etiqueta: 'Cuerda der.: largo', valor: p.der.d0, paso: 0.05, min: 0.1, unidad: 'm', onChange: (d0) => cambia({ der: { ...p.der, d0 } }) },
+        { etiqueta: 'Velocidad inicial', valor: p.v0, paso: 0.1, unidad: 'm/s', onChange: (v0) => cambia({ v0 }) },
+      ],
+      mover: (dx, dy) => cambia({ x: r2(p.x + dx), y: r2(p.y + dy) }),
+      ...comun,
+    }
+  }
+  const r = mt.resortes.find((q) => q.id === id)
+  if (r) {
+    const cambia = (x: Partial<Resorte>) => pon({ ...mt, resortes: mt.resortes.map((q) => (q.id === r.id ? { ...q, ...x } : q)) })
+    const extremos = [...mt.soportes.map((q) => ({ v: q.id, t: `soporte ${q.id}` })), ...mt.cuerpos.map((c) => ({ v: c.id, t: c.nombre }))]
+    return {
+      nombre: `Muelle ${r.id}`,
+      color: '--ink',
+      campos: [
+        { tipo: 'opciones', etiqueta: 'De', valor: r.a, opciones: extremos, onChange: (a) => cambia({ a }) },
+        { tipo: 'opciones', etiqueta: 'A', valor: r.b, opciones: extremos, onChange: (b) => cambia({ b }) },
+        { etiqueta: 'Constante k', valor: r.k, paso: 1, min: 0.1, unidad: 'N/m', onChange: (k) => cambia({ k }) },
+        { etiqueta: 'Longitud natural l₀', valor: r.l0, paso: 0.05, min: 0.05, unidad: 'm', onChange: (l0) => cambia({ l0 }) },
+      ],
+      ...comun,
+    }
+  }
+  const c = mt.cuerpos.find((q) => q.id === id)
+  if (!c) return null
+  const lig = c.lig
+  const cuerpo = (f: (x: Cuerpo) => Cuerpo) => pon(cambiarCuerpo(mt, c.id, f))
+  const ligar = (x: Partial<Ligadura>) => pon(cambiarLig(mt, c.id, x))
+  const padres = [
+    { v: '', t: 'el origen' },
+    ...mt.soportes.map((q) => ({ v: q.id, t: `soporte ${q.id}` })),
+    ...mt.cuerpos.filter((x) => x.id !== c.id && !desciende(mt, x.id, c.id)).map((x) => ({ v: x.id, t: x.nombre })),
+  ]
+  const nuevas: Record<string, Ligadura> = {
+    varilla: { tipo: 'varilla', l: 1, q0: 30, v0: 0 },
+    rail: { tipo: 'rail', ang: 0, q0: 0, v0: 0, rueda: c.forma !== 'caja' },
+    muelle: { tipo: 'muelle', k: 20, l0: 1, eje: true, ang: -90, r0: 1.2, th0: 0, vr0: 0, vth0: 0 },
+    libre: { tipo: 'libre', x0: 0, y0: 1, vx0: 1, vy0: 0 },
+  }
+  const campos: CampoEditor[] = [
+    { tipo: 'opciones', etiqueta: 'Forma', valor: c.forma, opciones: (Object.keys(NOMBRES_FORMA) as Forma[]).map((f) => ({ v: f, t: NOMBRES_FORMA[f] })), onChange: (forma) => cuerpo((x) => ({ ...x, forma: forma as Forma })) },
+    { etiqueta: 'Masa m', valor: c.m, paso: 0.1, min: 0.01, unidad: 'kg', onChange: (m) => cuerpo((x) => ({ ...x, m })) },
+    { etiqueta: lig.tipo === 'rail' && lig.rueda ? 'Radio R' : 'Tamaño', valor: c.R, paso: 0.01, min: 0.03, unidad: 'm', onChange: (R) => cuerpo((x) => ({ ...x, R })) },
+  ]
+  if (lig.tipo !== 'polea') {
+    campos.push({ tipo: 'opciones', etiqueta: 'Cómo se mueve', valor: lig.tipo, opciones: [{ v: 'varilla', t: 'varilla (θ)' }, { v: 'rail', t: 'raíl (s)' }, { v: 'muelle', t: 'muelle' }, { v: 'libre', t: 'libre (x, y)' }], onChange: (t) => cuerpo((x) => ({ ...x, lig: nuevas[t] })) })
+    if (lig.tipo !== 'libre') campos.push({ tipo: 'opciones', etiqueta: 'Cuelga de', valor: c.padre ?? '', opciones: padres, onChange: (v) => cuerpo((x) => ({ ...x, padre: v || null })) })
+  }
+  if (lig.tipo === 'varilla')
+    campos.push(
+      { etiqueta: 'Longitud l', valor: lig.l, paso: 0.05, min: 0.05, unidad: 'm', onChange: (l) => ligar({ l }) },
+      { etiqueta: 'θ₀ (desde abajo)', valor: lig.q0, paso: 5, min: -180, max: 180, unidad: '°', onChange: (q0) => ligar({ q0 }) },
+      { etiqueta: 'θ̇₀', valor: lig.v0, paso: 0.1, unidad: 'rad/s', onChange: (v0) => ligar({ v0 }) },
+    )
+  if (lig.tipo === 'rail')
+    campos.push(
+      { etiqueta: 'Inclinación', valor: lig.ang, paso: 5, min: -89, max: 89, unidad: '°', onChange: (ang) => ligar({ ang }) },
+      { etiqueta: 's₀', valor: lig.q0, paso: 0.05, unidad: 'm', onChange: (q0) => ligar({ q0 }) },
+      { etiqueta: 'ṡ₀', valor: lig.v0, paso: 0.1, unidad: 'm/s', onChange: (v0) => ligar({ v0 }) },
+      { tipo: 'si-no', etiqueta: 'Rueda sin deslizar', valor: lig.rueda, onChange: (rueda) => cuerpo((x) => ({ ...x, forma: rueda && x.forma === 'caja' ? 'disco' : x.forma, lig: { ...lig, rueda } })) },
+    )
+  if (lig.tipo === 'muelle') {
+    campos.push(
+      { etiqueta: 'Constante k', valor: lig.k, paso: 1, min: 0.1, unidad: 'N/m', onChange: (k) => ligar({ k }) },
+      { etiqueta: 'Longitud natural l₀', valor: lig.l0, paso: 0.05, min: 0.05, unidad: 'm', onChange: (l0) => ligar({ l0 }) },
+      { etiqueta: 'r₀ (largo inicial)', valor: lig.r0, paso: 0.05, min: 0.05, unidad: 'm', onChange: (r0) => ligar({ r0 }) },
+      { etiqueta: 'ṙ₀', valor: lig.vr0, paso: 0.1, unidad: 'm/s', onChange: (vr0) => ligar({ vr0 }) },
+      { tipo: 'si-no', etiqueta: 'También oscila de lado', valor: !lig.eje, onChange: (v) => ligar({ eje: !v }) },
+    )
+    if (lig.eje) campos.push({ etiqueta: 'Dirección', valor: lig.ang, paso: 5, min: -180, max: 180, unidad: '°', onChange: (ang) => ligar({ ang }) })
+    else
+      campos.push(
+        { etiqueta: 'θ₀', valor: lig.th0, paso: 5, min: -180, max: 180, unidad: '°', onChange: (th0) => ligar({ th0 }) },
+        { etiqueta: 'θ̇₀', valor: lig.vth0, paso: 0.1, unidad: 'rad/s', onChange: (vth0) => ligar({ vth0 }) },
+      )
+  }
+  if (lig.tipo === 'libre')
+    campos.push(
+      { etiqueta: 'x₀', valor: lig.x0, paso: 0.05, unidad: 'm', onChange: (x0) => ligar({ x0 }) },
+      { etiqueta: 'y₀', valor: lig.y0, paso: 0.05, unidad: 'm', onChange: (y0) => ligar({ y0 }) },
+      { etiqueta: 'ẋ₀', valor: lig.vx0, paso: 0.1, unidad: 'm/s', onChange: (vx0) => ligar({ vx0 }) },
+      { etiqueta: 'ẏ₀', valor: lig.vy0, paso: 0.1, unidad: 'm/s', onChange: (vy0) => ligar({ vy0 }) },
+    )
+  // voltear: la imagen especular respecto a la vertical que pasa por el padre
+  const voltear =
+    lig.tipo === 'varilla'
+      ? () => ligar({ q0: -lig.q0, v0: -lig.v0 })
+      : lig.tipo === 'rail'
+        ? () => ligar({ ang: -lig.ang, q0: -lig.q0, v0: -lig.v0 })
+        : lig.tipo === 'muelle'
+          ? () => ligar(lig.eje ? { ang: lig.ang >= 0 ? 180 - lig.ang : -180 - lig.ang } : { th0: -lig.th0, vth0: -lig.vth0 })
+          : lig.tipo === 'libre'
+            ? () => ligar({ x0: -lig.x0, vx0: -lig.vx0 })
+            : undefined
+  return {
+    nombre: `${NOMBRES_FORMA[c.forma]} ${c.nombre}`,
+    color: colorCuerpo(mt, c.id),
+    campos,
+    mover: lig.tipo === 'libre' ? (dx, dy) => ligar({ x0: r2(lig.x0 + dx), y0: r2(lig.y0 + dy) }) : undefined,
+    voltear,
+    ...comun,
+  }
+}
+
+/** La barra del editor para el modo Construir. */
+export function BarraMontaje({ st, set, extra }: { st: EstadoMontaje; set: (p: Partial<EstadoMontaje>) => void; extra?: ReactNode }) {
+  const ed = edDe(st)
+  return <BarraEditor ed={ed} set={(p) => set({ ed: { ...ed, ...p } })} categorias={CATALOGO_BARRA} seleccion={ed.modo === 'editar' ? camposMontaje(st, set) : null} extra={extra} />
 }

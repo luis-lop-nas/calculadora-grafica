@@ -4,7 +4,7 @@ import { Atajos, Boton, Expresion, Grupo, Muestra, Rango, Resultado, Segmentado 
 import { graficasTiempo } from '../../render/graficas'
 import { ADIM, DIM, div, ecuacionE, leerDim, type Dim, type Dims, type Dimensional, type Magnitud } from '../../lib/dimensiones'
 import { energiasNumericas } from '../../lib/montaje'
-import { EJEMPLOS_MONTAJE, PanelMontaje, quitarPieza, asasMontaje, colorCuerpo, dibujarMontaje, dibujoDe, generado, menuMontaje, moverMontaje, puntosMontaje, textoDe, y0De, type EstadoMontaje } from './montaje'
+import { BarraMontaje, EJEMPLOS_MONTAJE, PanelMontaje, colocarMontaje, edDe, quitarPieza, asasMontaje, colorCuerpo, dibujarMontaje, dibujoDe, generado, menuMontaje, moverMontaje, puntosMontaje, textoDe, y0De, type EstadoMontaje } from './montaje'
 import { tex } from '../../lib/cas/tex'
 import type { E } from '../../lib/cas/expr'
 import { compilarE } from '../../lib/cas/compilar'
@@ -307,12 +307,14 @@ function vistaMontaje(g: Pintor2D, s: EstadoLagrangiano) {
     g.ejes({ rejilla: true })
     for (const so of s.montaje.soportes) g.punto(so.x, so.y, g.color('--ink-soft'), 4)
     g.texto(gen.error, -1.9, 1.8, g.color('--pos'))
-    g.texto('Añade piezas desde el panel (Añadir una pieza…) o desde Objeto ▸ Añadir', -1.9, 1.6, g.color('--ink-soft'))
+    g.texto('Añade piezas con la barra de abajo: Construir → elige una pieza y haz clic aquí', -1.9, 1.6, g.color('--ink-soft'))
     return
   }
   const y0 = y0De(gen)
   const m = marcoMontaje(s, [y0])!
-  g.ventana = m.marco
+  // con la barra del editor abierta, se deja sitio abajo para que no tape el montaje
+  const alto = m.marco.y[1] - m.marco.y[0]
+  g.ventana = edDe(s).barra ? { x: m.marco.x, y: [m.marco.y[0] - 0.45 * alto, m.marco.y[1]] } : m.marco
   g.igualarEscala()
   g.ejes({ rejilla: true })
   dibujarMontaje(g, s.montaje, m.d, y0, { sel: s.selPieza, velocidades: true, rotulos: true })
@@ -537,6 +539,16 @@ function quitarPiezaMod(s: EstadoLagrangiano, id: string): Partial<EstadoLagrang
   return quitarPieza(s, id)
 }
 
+/** Clic en la vista Montaje según el modo del editor: colocar, borrar o seleccionar. */
+function pulsarMontaje(p: { x: number; y: number }, st: EstadoLagrangiano): Partial<EstadoLagrangiano> | void {
+  const ed = edDe(st)
+  const bajo = piezaEn(st, p.x, p.y)
+  if (ed.modo === 'borrar') return bajo ? quitarPiezaMod(st, bajo) : undefined
+  if (ed.modo === 'construir' && ed.pincel) return colocarMontaje(st, ed.pincel, p.x, p.y)
+  if (ed.modo === 'construir') return bajo ? { selPieza: bajo, ed: { ...ed, modo: 'editar' } } : undefined
+  return { selPieza: bajo }
+}
+
 /** Pieza del montaje bajo un clic en la vista Montaje. */
 function piezaEn(s: EstadoLagrangiano, x: number, y: number): string | null {
   const gen = generado(s.montaje)
@@ -708,7 +720,9 @@ export default definir<EstadoLagrangiano>({
             pista: 'Arrastra cuerpos, soportes y poleas; la punta verde fija la velocidad inicial. Mayús: cambia también la longitud de la varilla.',
           }
         : undefined,
-    alPulsar: s.vista === 'montaje' ? (p, st) => ({ selPieza: piezaEn(st, p.x, p.y) }) : undefined,
+    alPulsar: s.vista === 'montaje' ? pulsarMontaje : undefined,
+    barrer: (st) => st.vista === 'montaje' && st.modo === 'construir' && edDe(st).modo === 'borrar',
+    barra: s.vista === 'montaje' && s.modo === 'construir' ? ({ s: st, set }) => <BarraMontaje st={st} set={set} /> : undefined,
     dibujar(g, st, reloj0) {
       if (st.vista === 'montaje' && st.modo === 'construir') {
         vistaMontaje(g, st)
