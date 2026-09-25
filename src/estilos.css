@@ -336,6 +336,8 @@ aside .tog:hover{color:var(--ink)}
 .tabla-valores{width:100%;border-collapse:collapse;font:11.5px var(--mono);color:var(--ink)}
 .tabla-valores th{font-weight:600;color:var(--ink-soft);text-align:right;padding:2px 4px;border-bottom:.5px solid var(--line)}
 .tabla-valores td{text-align:right;padding:2px 4px}
+.tabla-valores tr.actual td{background:var(--chip);color:var(--accent);font-weight:600}
+.tabla-valores tr.futuro td{color:var(--ink-soft)}
 .fila-numeros{display:flex;gap:8px;font:12px var(--mono);color:var(--ink-soft);align-items:center}
 .fila-numeros input{width:60px;font:12px var(--mono);background:var(--chip);color:var(--ink);border:0;border-radius:6px;padding:3px 6px}
 

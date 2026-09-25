@@ -39,6 +39,7 @@ import laplaceT from '../modulos/senales/laplace'
 import control from '../modulos/senales/control'
 import circuito from '../modulos/senales/circuito'
 import filtros from '../modulos/senales/filtros'
+import cinematica from '../modulos/mecanica/cinematica'
 import lagrangiano from '../modulos/mecanica/lagrangiano'
 import orbitas from '../modulos/mecanica/orbitas'
 import oscilaciones from '../modulos/mecanica/oscilaciones'
@@ -63,7 +64,7 @@ export const MODULOS: ModuloAny[] = [
   edpPropia, onda, calor, laplace,
   superficies, parametricas, vectorial, teoremas,
   fourier, transformadaF, convolucionM, laplaceT, control, circuito, filtros,
-  lagrangiano, orbitas, oscilaciones, solido, relatividad,
+  cinematica, lagrangiano, orbitas, oscilaciones, solido, relatividad,
   electrostatica, magnetostatica, ondas, difraccion, geometrica, termodinamica, unidades,
   orbitales, paquete, pozo,
 ]

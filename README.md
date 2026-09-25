@@ -186,6 +186,7 @@ la figura ya colocada. «Recolocar la figura» la devuelve al origen.
 - Filtros digitales — media móvil, IIR, resonador, peine, Butterworth (bilineal) o coeficientes propios: plano z, |H(e^{iω})| y h[n].
 
 **Mecánica clásica y relatividad**
+- Escenarios de cinemática — se parte de un plano vacío y se monta el problema con piezas (edificios, muros, rampas, plataformas, árboles, farolas, tramos de suelo de hielo, asfalto, hierba…) y móviles (pelota, piedra, coche, bloque, disco) con movimiento libre (gravedad, rozamiento del aire lineal o cuadrático, rebotes con restitución e, deslizamiento con μ estático y dinámico), MRU, MRUA (con frenada y parada) o MCU/MCUA. Alturas, posiciones y la flecha de v₀ se arrastran. Vistas: escena animada con vectores v y a, trayectoria y sucesos (altura máxima, choques, paradas, encuentros); gráficas x(t), y(t), |v|, |a|, distancia y energías; tabla de valores con la fila del instante actual. Doce ejemplos.
 - Escribe tu lagrangiano — escribe L(q, q̇) con `q'` para las velocidades: ecuaciones de Euler–Lagrange y de Hamilton, animación, fases, energía y sección de Poincaré. Presets: péndulo, doble péndulo, elástico, carro y péndulo, Atwood, cono, oscilador.
 - Órbitas — potencial −μ/r (+ ε/r³ para la precesión), elementos orbitales, áreas iguales y transferencia de Hohmann.
 - Oscilaciones — cadena de N masas o M y K escritas: modos normales (problema generalizado), superposición y dispersión; oscilador forzado amortiguado con amplitud, fase y transitorio exacto.
@@ -252,6 +253,8 @@ dependen del tiempo.
 - `src/lib/control.ts` — respuesta temporal, Bode, márgenes, Nyquist, lugar de las raíces y Routh.
 - `src/lib/cas/laplace.ts` — Laplace directa, inversa y EDO lineales, con su comprobación numérica.
 - `src/lib/cas/compilar.ts` — pasa una expresión del CAS a un cierre numérico rápido.
+- `src/lib/escenario.ts` — escenarios de cinemática: contorno sólido de las piezas, vuelo con RK4 y choques por bisección, deslizamiento con rozamiento y paso por juntas, MRU/MRUA/MCU exactos y encuentros.
+- `src/render/graficas.ts` — cuadrícula de gráficas frente al tiempo con cursor y valores en el instante actual.
 - `src/lib/mecanica.ts` — de un lagrangiano a sus ecuaciones (simbólicas) y su integración (Dormand–Prince).
 - `src/lib/solido.ts` — tensor de inercia, rotación libre con orientación y peonza simétrica.
 - `src/lib/relatividad.ts` — boosts de Lorentz, intervalo, composición de velocidades, gemelos.

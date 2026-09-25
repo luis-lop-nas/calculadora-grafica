@@ -9,6 +9,8 @@ import orbitas, { areaBarrida, campoCentral, elementos, estadoInicial, hohmann, 
 import { dormandPrince } from '../../lib/numerico'
 import { boost, componer, doppler, gamma, gemelos, intervalo, rapidez, type Suceso } from '../../lib/relatividad'
 import oscilaciones, { amplitudForzada, desfase, evolucion, forzadoExacto, modos, type EstadoOsc, type Modos } from '../../modulos/mecanica/oscilaciones'
+import { simular, estadoDado, tiempoAngulo, type Escena, type Movil, type Pieza } from '../../lib/escenario'
+import cinematica, { EJEMPLOS, lecturasDe, formulasDe, type EstadoCinematica } from '../../modulos/mecanica/cinematica'
 import { cerca, cierto, parecido, seccion } from './comun'
 
 export function pruebasMecanica() {
@@ -355,5 +357,69 @@ export function pruebasMecanica() {
     cerca('gemelos: casa simultánea al giro (ida) = T/2 − βL', tGiroIda / g, gm.antes, 1e-12)
     const tGiroVuelta = boost(-b, giro)[0]
     cerca('gemelos: casa simultánea al giro (vuelta) = T/2 + βL', tGiroVuelta / g, gm.despues, 1e-12)
+  }
+
+  seccion('Mecánica · escenarios de cinemática')
+  {
+    const mv = (p: Partial<Movil>): Movil => ({ id: 'm', tipo: 'pelota', nombre: 'A', m: 1, r: 0.2, movimiento: 'libre', x0: 0, y0: 0.2, v0: 0, ang: 0, a: 0, parar: true, rozar: false, R: 2, w0: 1, alfa: 0, fase: 0, ...p })
+    const esc = (piezas: Pieza[], moviles: Movil[], extra: Partial<Escena> = {}): Escena => ({ g: 9.8, aire: 'no', kAire: 0, e: 0, muE: 0.5, muD: 0.4, tMax: 10, piezas, moviles, ...extra })
+    const edificio: Pieza = { id: 'e', tipo: 'edificio', x: -5, ancho: 5, alto: 20, muE: 0.5, muD: 0.4 }
+    const primero = (S: ReturnType<typeof simular>, tipo: string) => S.recorridos[0].sucesos.find((e) => e.tipo === tipo)
+    // caída libre de h = 20 m: t = √(2h/g), v = √(2gh)
+    let S = simular(esc([edificio], [mv({ x0: 2, y0: 20.2 })]))
+    cerca('caída libre: t = √(2h/g)', primero(S, 'impacto')!.t, Math.sqrt((2 * 20) / 9.8), 1e-9)
+    cerca('caída libre: v = √(2gh)', primero(S, 'impacto')!.v!, Math.sqrt(2 * 9.8 * 20), 1e-6)
+    // tiro parabólico desde el suelo: alcance v²sin2θ/g, altura v²sin²θ/2g
+    S = simular(esc([], [mv({ x0: 0, y0: 0.2 + 1e-9, v0: 20, ang: 40 })], { muD: 0, muE: 0 }))
+    const th = (40 * Math.PI) / 180
+    cerca('tiro parabólico: alcance = v₀² sin 2θ / g', primero(S, 'impacto')!.x, (400 * Math.sin(2 * th)) / 9.8, 1e-6)
+    cerca('tiro parabólico: h máx = v₀² sin²θ / 2g', primero(S, 'altura-max')!.y - 0.2, (400 * Math.sin(th) ** 2) / (2 * 9.8), 1e-4)
+    // tiro horizontal desde la azotea, sin rozamiento en ella: alcance v₀√(2h/g) desde el borde
+    S = simular(esc([{ ...edificio, muE: 0, muD: 0 }], [mv({ x0: 0.2 + 1e-9, y0: 20.2, v0: 10 })]))
+    cerca('tiro horizontal: alcance = v₀ √(2h/g)', primero(S, 'impacto')!.x - 0.2, 10 * Math.sqrt((2 * 20) / 9.8), 1e-6)
+    // deslizamiento con rozamiento: d = v₀²/(2 μ g)
+    S = simular(esc([], [mv({ v0: 8 })]))
+    cerca('frenada por rozamiento: d = v₀²/(2μg)', primero(S, 'parada')!.x, 64 / (2 * 0.4 * 9.8), 1e-6)
+    cerca('frenada por rozamiento: t = v₀/(μg)', primero(S, 'parada')!.t, 8 / (0.4 * 9.8), 2e-3)
+    // rampa: a = g(sin θ − μ cos θ)
+    const rampa: Pieza = { id: 'r', tipo: 'rampa', x: 0, ancho: 10, alto: 10 * Math.tan(Math.PI / 6), muE: 0.2, muD: 0.1, derecha: false }
+    S = simular(esc([rampa], [mv({ tipo: 'bloque', x0: 1, y0: 20 })], { tMax: 6 }))
+    const q = S.recorridos[0].muestras.find((m) => m.t >= 2.5)!
+    cerca('rampa: a = g(sin θ − μ cos θ)', Math.hypot(q.ax, q.ay), 9.8 * (0.5 - 0.1 * Math.cos(Math.PI / 6)), 1e-9)
+    // en una rampa con tan θ ≤ μₑ no arranca
+    S = simular(esc([{ ...rampa, muE: 0.7, muD: 0.6 }], [mv({ tipo: 'bloque', x0: 5, y0: 5 * Math.tan(Math.PI / 6) + 0.2 / Math.cos(Math.PI / 6) })], { tMax: 2 }))
+    cierto('rampa con tan θ ≤ μₑ: se queda quieto', S.recorridos[0].quieto === 0, String(S.recorridos[0].quieto))
+    // rebote: la altura tras el bote es e²·h
+    S = simular(esc([], [mv({ y0: 5.2 })], { e: 0.8, tMax: 4 }))
+    cerca('rebote: h₁ = e² h₀', primero(S, 'altura-max')!.y - 0.2, 0.64 * 5, 1e-4)
+    // sin rozamiento ni choques, la energía se conserva
+    S = simular(esc([], [mv({ y0: 30, v0: 12, ang: 70 })], { tMax: 2 }))
+    const E = (m: (typeof S.recorridos)[0]['muestras'][0]) => 0.5 * (m.vx ** 2 + m.vy ** 2) + 9.8 * m.y
+    cierto('vuelo libre: energía conservada', S.recorridos[0].muestras.every((m) => Math.abs(E(m) - E(S.recorridos[0].muestras[0])) < 1e-9))
+    // aire lineal: velocidad límite mg/b
+    S = simular(esc([], [mv({ m: 2, y0: 3000 })], { aire: 'lineal', kAire: 1, tMax: 20 }))
+    cerca('aire lineal: v límite = mg/b', -S.recorridos[0].muestras.at(-1)!.vy, (2 * 9.8) / 1, 1e-3)
+    S = simular(esc([], [mv({ m: 2, y0: 3000 })], { aire: 'cuadratico', kAire: 0.1, tMax: 20 }))
+    cerca('aire cuadrático: v límite = √(mg/c)', -S.recorridos[0].muestras.at(-1)!.vy, Math.sqrt((2 * 9.8) / 0.1), 1e-4)
+    // MRUA que frena y MCU
+    const coche = mv({ movimiento: 'mrua', v0: 20, a: -4 })
+    cerca('MRUA: distancia de frenado v₀²/2|a|', estadoDado(esc([], []), coche, 100).s, 50, 1e-12)
+    const noria = mv({ movimiento: 'mcu', x0: 0, y0: 5, R: 3, w0: 0.5 })
+    const e1 = estadoDado(esc([], []), noria, 1.3)
+    cerca('MCU: |a| = ω²R', Math.hypot(e1.ax, e1.ay), 0.25 * 3, 1e-12)
+    cerca('MCU: |v| = ωR', Math.hypot(e1.vx, e1.vy), 1.5, 1e-12)
+    cerca('MCU: periodo 2π/ω', tiempoAngulo(0.5, 0, 2 * Math.PI)!, 4 * Math.PI, 1e-12)
+    cerca('MCUA desde el reposo: θ = ½αt²', tiempoAngulo(0, 0.5, 2 * Math.PI)!, Math.sqrt((2 * 2 * Math.PI) / 0.5), 1e-12)
+    // encuentro de dos MRU enfrentados: t = (d − r₁ − r₂)/(v₁ + v₂)
+    S = simular(esc([], [mv({ id: 'a', movimiento: 'mru', v0: 15, r: 0.8 }), mv({ id: 'b', movimiento: 'mru', x0: 100, v0: 10, ang: 180, r: 0.8 })]))
+    cerca('MRU: encuentro', S.encuentros[0]?.t ?? NaN, (100 - 1.6) / 25, 1e-9)
+    // los ejemplos del módulo se simulan sin errores y dan lecturas
+    const base = cinematica.inicial as EstadoCinematica
+    for (const ej of EJEMPLOS) {
+      const st = { ...base, ...ej.e, sel: ej.e.moviles?.[0]?.id ?? null } as EstadoCinematica
+      const L = lecturasDe(st)
+      const F = formulasDe(st)
+      cierto(`cinemática: ejemplo «${ej.t}»`, L.length > 4 && F.length > 0 && L.every(([, v]) => !/NaN|Infinity/.test(v)), JSON.stringify(L))
+    }
   }
 }
