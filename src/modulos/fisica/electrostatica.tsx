@@ -1,3 +1,4 @@
+import { divergencia, gradiente, laplaciano, rotacional } from '../../lib/operadores'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
 import { accion, capaFija, capaVer, casilla, coords, radios } from '../../nucleo/menu'
 import { Atajos, Grupo, Interruptor, Muestra, Rango, Resultado, Segmentado } from '../../nucleo/controles'
@@ -209,7 +210,19 @@ export default definir<EstadoElectro>({
     if (dentro(s.conductor, s.R, x, y)) filas.push(['En la sonda', 'dentro del conductor: V = 0, E = 0'])
     else {
       const [ex, ey] = campo(ts, x, y)
-      filas.push(['V en la sonda', potencial(ts, x, y).toFixed(6)], ['|E| en la sonda', Math.hypot(ex, ey).toFixed(6)])
+      filas.push(['V en la sonda', potencial(ts, x, y).toFixed(6)], ['|E| en la sonda', Math.hypot(ex, ey).toFixed(6)], ['E en la sonda', `(${ex.toFixed(4)}, ${ey.toFixed(4)})`])
+      // los operadores sobre los campos de verdad (en 3D, en el plano z = 0)
+      const p = [x, y, 0]
+      const V = (a: number, b: number, c: number) => potencial(ts, a, b, c)
+      const E = (a: number, b: number, c: number) => campo(ts, a, b, c)
+      const gV = gradiente(V, p, 1e-5)
+      filas.push(
+        ['−∇V (numérico)', `(${(-gV[0]).toFixed(4)}, ${(-gV[1]).toFixed(4)})`],
+        ['|E + ∇V| (E = −∇V)', Math.hypot(ex + gV[0], ey + gV[1], gV[2]).toExponential(1)],
+        ['∇·E (4πρ: 0 sin carga)', divergencia(E, p, 1e-4).toExponential(1)],
+        ['|∇×E| (siempre 0)', Math.hypot(...rotacional(E, p, 1e-4)).toExponential(1)],
+        ['∇²V (Laplace: 0)', laplaciano(V, p, 1e-3).toExponential(1)],
+      )
     }
     const qtot = rs.reduce((a, c) => a + c.q, 0)
     filas.push(['Carga total', qtot.toFixed(3)])

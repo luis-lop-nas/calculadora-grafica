@@ -1567,6 +1567,30 @@ seccion('Geometría: cada construcción cumple la propiedad que la define')
   const ee = evaluarGeo([o('F', 'libre', '', -2, 1), o('G', 'libre', '', 3, -1), o('P', 'libre', '', 1, 3), o('e', 'elipse', 'F,G,P'), o('D', 'libre', '', 0, -3), o('E', 'libre', '', 1, 3), o('r', 'recta', 'D,E'), o('e2', 'simetria_axial', 'e,r'), o('P2', 'simetria_axial', 'P,r')])
   cerca('la elipse reflejada pasa por el reflejo de P', evalConica((ee.get('e2') as any).q, pt(ee, 'P2')), 0, 1e-9)
 
+  // proyecciones y vectores
+  const pv = evaluarGeo([o('O', 'libre'), o('A', 'libre', '', 4, 1), o('B', 'libre', '', 1.5, 3), o('u', 'vector', 'O,A'), o('v', 'vector', 'O,B'),
+    o('p', 'proy_vector', 'v,u'), o('q', 'perp_vector', 'v,u'), o('m', 'modulo', 'v'), o('e', 'producto_escalar', 'u,v'), o('t', 'angulo_lineas', 'u,v'),
+    o('g1', 'gram', 'u,v', 0, 0, 0), o('g2', 'gram', 'u,v', 0, 0, 1), o('r', 'recta', 'O,A'), o('P', 'proyeccion', 'B,r'), o('d', 'distancia', 'B,r')])
+  const vg = (id: string) => { const l = pv.get(id) as any; return { x: l.b.x - l.a.x, y: l.b.y - l.a.y } }
+  const pp = vg('p')
+  const qq = vg('q')
+  cerca('proyección de v sobre u: (v·u/u·u) u', pp.x, (4 * (4 * 1.5 + 3)) / 17, 1e-12)
+  cerca('v = proyección + componente perpendicular', pp.x + qq.x, 1.5, 1e-12)
+  cerca('la componente perpendicular es ⟂ a u', qq.x * 4 + qq.y * 1, 0, 1e-12)
+  cerca('módulo de v', (pv.get('m') as any).v, Math.hypot(1.5, 3), 1e-12)
+  cerca('producto escalar', (pv.get('e') as any).v, 4 * 1.5 + 3, 1e-12)
+  cerca('ángulo entre u y v', (pv.get('t') as any).v, (Math.acos(9 / (Math.hypot(4, 1) * Math.hypot(1.5, 3))) * 180) / Math.PI, 1e-10)
+  const e1 = vg('g1')
+  const e2 = vg('g2')
+  cerca('Gram–Schmidt: ‖e₁‖ = 1', Math.hypot(e1.x, e1.y), 1, 1e-12)
+  cerca('Gram–Schmidt: ‖e₂‖ = 1', Math.hypot(e2.x, e2.y), 1, 1e-12)
+  cerca('Gram–Schmidt: e₁ · e₂ = 0', e1.x * e2.x + e1.y * e2.y, 0, 1e-12)
+  const pie = pt(pv, 'P')
+  cerca('pie de la perpendicular: BP ⟂ recta', (1.5 - pie.x) * 4 + (3 - pie.y) * 1, 0, 1e-12)
+  cerca('distancia punto–recta = |BP|', (pv.get('d') as any).v, distGeo(pie, { x: 1.5, y: 3 }), 1e-12)
+  const sombra = evaluarGeo([o('D', 'libre', '', -5, 0), o('E', 'libre', '', 5, 0), o('r', 'recta', 'D,E'), o('O', 'libre', '', 1, 3), o('c', 'circ_cr', 'O', 0, 0, 2), o('s', 'proyeccion', 'c,r')]).get('s') as any
+  cerca('la sombra de una circunferencia es un diámetro', distGeo(sombra.a, sombra.b), 4, 1e-12)
+
   const hex = evaluarGeo([o('A', 'libre', '', 0, 0), o('B', 'libre', '', 2, 0), o('h', 'regular', 'A,B', 0, 0, 6), o('s', 'area', 'h')])
   const vh = (hex.get('h') as any).pts
   cierto('hexágono regular: seis lados iguales', vh.every((p: any, i: number) => Math.abs(distGeo(p, vh[(i + 1) % 6]) - 2) < 1e-12))
@@ -1602,6 +1626,27 @@ seccion('Espacio: sólidos, filas y curvas de corte')
   const k = tipos.objetos.map((o) => o.k).join(',')
   cierto('cada fila del espacio se reconoce', k === 'implicita,implicita,punto,curva,param,linea,implicita,solido,corte,implicita,error', k)
   cierto('deslizador automático en el espacio', tipos.parametros.join() === 'a', tipos.parametros.join())
+
+  // proyecciones, distancias, ángulos y bases en el espacio
+  const pr = analizarFilas3(['p = plano((2,0,0), (0,2,0), (0,0,1))', 'A = (2, 2, 2)', 'P = proy(A, p)', 'dist(A, p)', 'v = vector((0,0,0), (1,2,2.5))', 'proy(v, p)', 'perp(v, p)', 'angulo(v, p)',
+    'r = recta((-2,0,0), (2,0,1))', 's = recta((0,-2,2.5), (0,2,0.5))', 'dist(r, s)', 'B = simetrico(A, r)', 'gram((2,1,0), (1,2,1), (0,1,2))', 'x + y + z = 1', 'dist((1,1,1), 14)'], {}).objetos
+  const ob = (i: number) => pr[i] as any
+  cierto('espacio: pie en el plano', ob(2).k === 'punto' && Math.hypot(ob(2).p[0] - 1, ob(2).p[1] - 1, ob(2).p[2]) < 1e-12)
+  cerca('espacio: distancia punto–plano |n·A − d|/‖n‖', ob(3).v, 6 / Math.sqrt(6), 1e-12)
+  const pv = ob(5).b
+  const qv = ob(6).b
+  cerca('espacio: proyección de v sobre el plano ⟂ n', pv[0] + pv[1] + 2 * pv[2], 0, 1e-12)
+  cerca('espacio: proyección + parte normal = v', pv[2] + (qv[2] - ob(6).a[2]), 2.5, 1e-12)
+  cierto('espacio: la parte normal sale de la punta de la proyección', ob(6).a.every((c: number, i: number) => Math.abs(c - pv[i]) < 1e-12))
+  cerca('espacio: ángulo vector–plano = 90° − ∠(v, n)', ob(7).v, 90 - (Math.acos(8 / (Math.sqrt(11.25) * Math.sqrt(6))) * 180) / Math.PI, 1e-10)
+  cerca('espacio: distancia entre rectas que se cruzan', ob(10).v, 16 / Math.sqrt(336), 1e-12)
+  const Bs = ob(11).p
+  const Aa = [2, 2, 2]
+  const Mm = Aa.map((c, i) => (c + Bs[i]) / 2)
+  cerca('espacio: el punto medio de A y su simétrico está en la recta', (Mm[0] + 2) * 0 + Mm[1], 0, 1e-12)
+  const e = ob(12).vs
+  cierto('espacio: Gram–Schmidt da una base ortonormal', e.length === 3 && e.every((a: number[], i: number) => e.every((b: number[], j: number) => Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] - (i === j ? 1 : 0)) < 1e-12)))
+  cerca('espacio: un plano escrito como ecuación también sirve', ob(14).v, 2 / Math.sqrt(3), 1e-12)
 
   const r = recortarACaja([0, 0, 0], [1, 1, 0], 3)
   cierto('recta recortada a la caja', !!r && Math.abs(r[0] + 3) < 1e-12 && Math.abs(r[1] - 3) < 1e-12)

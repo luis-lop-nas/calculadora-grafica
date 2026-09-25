@@ -530,4 +530,78 @@ export function svd(A: number[][]): { sigma: number[]; U: number[][]; V: number[
   return { sigma, U, V: Vs }
 }
 
+/* ---------- ortogonalidad exacta ---------- */
+
+export const productoR = (u: R[], v: R[]) => u.reduce((acc, x, i) => rSuma(acc, rProd(x, v[i])), R0)
+
+function raizEntera(n: bigint): bigint | null {
+  if (n < 0n) return null
+  if (n < 2n) return n
+  let x = BigInt(Math.floor(Math.sqrt(Number(n))))
+  while (x * x > n) x--
+  while ((x + 1n) * (x + 1n) <= n) x++
+  return x * x === n ? x : null
+}
+
+/** √q exacta si q es un cuadrado de racionales; si no, null. */
+export function raizR(q: R): R | null {
+  const a = raizEntera(q.n)
+  const b = raizEntera(q.d)
+  return a !== null && b !== null ? r(a, b) : null
+}
+
+/** TeX de √q, exacta cuando se puede. */
+export const texRaizR = (q: R) => {
+  const e = raizR(q)
+  return e ? texR(e) : `\\sqrt{${texR(q)}}`
+}
+
+export interface PasoGram {
+  /** vₖ, los coeficientes ⟨vₖ, wⱼ⟩/⟨wⱼ, wⱼ⟩ de cada wⱼ anterior, wₖ y ⟨wₖ, wₖ⟩. */
+  v: R[]
+  coef: R[]
+  w: R[]
+  n2: R
+  /** vₖ ya dependía de los anteriores. */
+  nulo: boolean
+}
+
+/**
+ * Gram–Schmidt exacto (sin normalizar, que pediría raíces): wₖ = vₖ − Σ ⟨vₖ,wⱼ⟩/⟨wⱼ,wⱼ⟩ wⱼ. La base
+ * ortonormal es uₖ = wₖ/‖wₖ‖, con ‖wₖ‖ = √⟨wₖ,wₖ⟩.
+ */
+export function gramSchmidtR(vs: R[][]): PasoGram[] {
+  const pasos: PasoGram[] = []
+  const ws: Array<{ w: R[]; n2: R }> = []
+  for (const v of vs) {
+    const coef = ws.map((b) => rDiv(productoR(v, b.w), b.n2))
+    let w = v.slice()
+    ws.forEach((b, j) => (w = w.map((x, i) => rResta(x, rProd(coef[j], b.w[i])))))
+    const n2 = productoR(w, w)
+    const nulo = n2.n === 0n
+    pasos.push({ v, coef, w, n2, nulo })
+    if (!nulo) ws.push({ w, n2 })
+  }
+  return pasos
+}
+
+/**
+ * Proyección ortogonal sobre el espacio columna de A: con las columnas independientes C (una base
+ * de col A), P = C (CᵀC)⁻¹ Cᵀ, y x̂ = (CᵀC)⁻¹ Cᵀ b son los mínimos cuadrados.
+ */
+export function proyeccionR(A: MR, b: R[]): { C: MR; P: MR; p: R[]; x: R[]; residuo: R[] } | null {
+  const { vectores } = baseImagen(A)
+  if (!vectores.length) return null
+  const C = transpuestaR(vectores)
+  const Ct = vectores
+  const G = mulR(Ct, C)
+  const Gi = inversa(G).inv
+  if (!Gi) return null
+  const P = mulR(mulR(C, Gi), Ct)
+  const bc = b.map((x) => [x])
+  const x = mulR(mulR(Gi, Ct), bc).map((f) => f[0])
+  const p = mulR(P, bc).map((f) => f[0])
+  return { C, P, p, x, residuo: b.map((y, i) => rResta(y, p[i])) }
+}
+
 export { divP, principalP, r }

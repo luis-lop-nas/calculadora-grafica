@@ -640,6 +640,101 @@ function calcular(o: Obj, ctx: Contexto): Valor {
       if (d2 < EPS) return NADA
       return { k: 'punto', p: sumaP(circ.c, escala(w, (circ.r * circ.r) / d2)) }
     }
+    case 'proyeccion': {
+      // proyección ortogonal de cualquier objeto sobre la recta que contiene a la línea: su «sombra»
+      const l = lineaDe(vs[1])
+      if (!l) return NADA
+      const d = resta(l.b, l.a)
+      const dd = punto(d, d)
+      if (dd < EPS) return NADA
+      const u = escala(d, 1 / Math.sqrt(dd))
+      const t = (p: P) => punto(resta(p, l.a), u)
+      const pie = (x: number) => sumaP(l.a, escala(u, x))
+      const tramo = (ts: number[]): Valor => {
+        const lo = Math.min(...ts)
+        const hi = Math.max(...ts)
+        return hi - lo < EPS ? { k: 'punto', p: pie(lo) } : { k: 'linea', tipo: 'segmento', a: pie(lo), b: pie(hi) }
+      }
+      const v = vs[0]
+      switch (v.k) {
+        case 'punto':
+          return { k: 'punto', p: pie(t(v.p)) }
+        case 'linea': {
+          if (v.tipo === 'recta' || v.tipo === 'semirrecta') {
+            const dv = resta(v.b, v.a)
+            if (Math.abs(punto(dv, u)) < EPS * norma(dv)) return { k: 'punto', p: pie(t(v.a)) }
+            return v.tipo === 'recta' ? { k: 'linea', tipo: 'recta', a: l.a, b: l.b } : { k: 'linea', tipo: 'semirrecta', a: pie(t(v.a)), b: pie(t(v.b)) }
+          }
+          const [ta, tb] = [t(v.a), t(v.b)]
+          if (Math.abs(tb - ta) < EPS) return { k: 'punto', p: pie(ta) }
+          return { k: 'linea', tipo: v.tipo, a: pie(ta), b: pie(tb) }
+        }
+        case 'circ':
+        case 'arco':
+          return tramo([t(v.c) - v.r, t(v.c) + v.r])
+        case 'poligono':
+          return tramo(v.pts.map(t))
+        case 'lugar':
+          return tramo(v.pts.filter((q) => Number.isFinite(q.x)).map(t))
+        default:
+          return NADA
+      }
+    }
+    case 'proy_vector':
+    case 'perp_vector': {
+      // v = (a → b) descompuesto respecto de la dirección de la segunda línea
+      const v = lineaDe(vs[0])
+      const l = lineaDe(vs[1])
+      if (!v || !l) return NADA
+      const d = resta(l.b, l.a)
+      const dd = punto(d, d)
+      if (dd < EPS) return NADA
+      const w = resta(v.b, v.a)
+      const par = escala(d, punto(w, d) / dd)
+      // la perpendicular sale de la punta de la proyección: así se ve v = proyección + perpendicular
+      const origen = o.def === 'proy_vector' ? v.a : sumaP(v.a, par)
+      const comp = o.def === 'proy_vector' ? par : resta(w, par)
+      if (norma(comp) < EPS) return { k: 'punto', p: origen }
+      return { k: 'linea', tipo: 'vector', a: origen, b: sumaP(origen, comp) }
+    }
+    case 'modulo': {
+      const v = lineaDe(vs[0])
+      return v ? { k: 'medida', v: dist(v.a, v.b), unidad: '', en: escala(sumaP(v.a, v.b), 0.5) } : NADA
+    }
+    case 'producto_escalar': {
+      const v = lineaDe(vs[0])
+      const w = lineaDe(vs[1])
+      if (!v || !w) return NADA
+      return { k: 'medida', v: punto(resta(v.b, v.a), resta(w.b, w.a)), unidad: '', en: v.a }
+    }
+    case 'angulo_lineas': {
+      // ángulo entre las direcciones (0°–180°); con vectores cuenta el sentido
+      const v = lineaDe(vs[0])
+      const w = lineaDe(vs[1])
+      if (!v || !w) return NADA
+      const a = resta(v.b, v.a)
+      const b = resta(w.b, w.a)
+      const c = punto(a, b) / ((norma(a) * norma(b)) || 1)
+      let grados = (Math.acos(Math.max(-1, Math.min(1, c))) * 180) / Math.PI
+      const vectores = v.tipo === 'vector' && w.tipo === 'vector'
+      if (!vectores && grados > 90) grados = 180 - grados
+      const corte = cortesLineaLinea({ ...v, tipo: 'recta' }, { ...w, tipo: 'recta' })[0] ?? v.a
+      return { k: 'medida', v: grados, unidad: '°', en: sumaP(corte, { x: 0.4, y: 0.4 }) }
+    }
+    case 'gram': {
+      // base ortonormal por Gram–Schmidt: e₁ = v₁/‖v₁‖, e₂ = (v₂ − (v₂·e₁)e₁)/‖…‖, con origen en el de v₁
+      const v = lineaDe(vs[0])
+      const w = lineaDe(vs[1])
+      if (!v || !w) return NADA
+      const a = resta(v.b, v.a)
+      if (norma(a) < EPS) return NADA
+      const e1 = unit(a)
+      if (o.v === 0) return { k: 'linea', tipo: 'vector', a: v.a, b: sumaP(v.a, e1) }
+      const b = resta(w.b, w.a)
+      const r = resta(b, escala(e1, punto(b, e1)))
+      if (norma(r) < 1e-9) return NADA
+      return { k: 'linea', tipo: 'vector', a: v.a, b: sumaP(v.a, unit(r)) }
+    }
     case 'pendiente': {
       const l = lineaDe(vs[0])
       if (!l) return NADA
@@ -749,6 +844,14 @@ export const HERRAMIENTAS: Record<string, Herramienta> = {
   area: { nombre: 'Área', grupo: 'Medidas', def: 'area', huecos: ['superficie'], pista: 'Un polígono o una circunferencia' },
   perimetro: { nombre: 'Perímetro', grupo: 'Medidas', def: 'perimetro', huecos: ['superficie'], pista: 'Un polígono o una circunferencia' },
   pendiente: { nombre: 'Pendiente', grupo: 'Medidas', def: 'pendiente', huecos: ['linea'], pista: 'Una recta' },
+  distancia_pr: { nombre: 'Distancia punto–recta', grupo: 'Medidas', def: 'distancia', huecos: ['punto', 'linea'], pista: 'Un punto y una recta (o un segmento)' },
+  modulo: { nombre: 'Módulo de un vector', grupo: 'Vectores', def: 'modulo', huecos: ['vector'], pista: 'Un vector (o un segmento): su longitud ‖v‖' },
+  producto_escalar: { nombre: 'Producto escalar', grupo: 'Vectores', def: 'producto_escalar', huecos: ['vector', 'vector'], pista: 'Dos vectores: v · w = ‖v‖‖w‖ cos θ' },
+  angulo_lineas: { nombre: 'Ángulo entre vectores o rectas', grupo: 'Vectores', def: 'angulo_lineas', huecos: ['linea', 'linea'], pista: 'Dos vectores (0°–180°) o dos rectas (0°–90°)' },
+  proy_vector: { nombre: 'Proyección de un vector', grupo: 'Vectores', def: 'proy_vector', huecos: ['vector', 'linea'], ordenada: true, pista: 'El vector v y luego la dirección (otro vector o una recta): (v · û) û' },
+  perp_vector: { nombre: 'Componente perpendicular', grupo: 'Vectores', def: 'perp_vector', huecos: ['vector', 'linea'], ordenada: true, pista: 'El vector v y luego la dirección: v − (v · û) û' },
+  gram: { nombre: 'Base ortonormal (Gram–Schmidt)', grupo: 'Vectores', def: 'gram', huecos: ['vector', 'vector'], ordenada: true, soluciones: 2, pista: 'Dos vectores: e₁ = v₁/‖v₁‖ y e₂, lo que queda de v₂ normalizado' },
+  proyeccion: { nombre: 'Proyección ortogonal', grupo: 'Transformar', def: 'proyeccion', huecos: ['objeto', 'linea'], ordenada: true, pista: 'Cualquier objeto y luego la recta: su sombra perpendicular (un punto da el pie de la perpendicular)' },
   simetria_axial: { nombre: 'Simetría axial', grupo: 'Transformar', def: 'simetria_axial', huecos: ['objeto', 'linea'], ordenada: true, pista: 'El objeto y luego el eje' },
   simetria_central: { nombre: 'Simetría central', grupo: 'Transformar', def: 'simetria_central', huecos: ['objeto', 'punto'], ordenada: true, pista: 'El objeto y luego el centro' },
   rotacion: {
@@ -765,7 +868,7 @@ export const HERRAMIENTAS: Record<string, Herramienta> = {
   borrar: { nombre: 'Borrar', grupo: 'Especiales', def: '', huecos: ['cualquiera'], pista: 'Pulsa un objeto: se va con todo lo que depende de él' },
 }
 
-export const GRUPOS = ['Mover', 'Puntos', 'Rectas', 'Polígonos', 'Circunferencias', 'Cónicas', 'Medidas', 'Transformar', 'Especiales']
+export const GRUPOS = ['Mover', 'Puntos', 'Rectas', 'Polígonos', 'Circunferencias', 'Cónicas', 'Medidas', 'Vectores', 'Transformar', 'Especiales']
 
 /** ¿Encaja este valor en el hueco? */
 export function encaja(h: Hueco, v: Valor): boolean {
@@ -809,7 +912,7 @@ export function nombreNuevo(objs: Obj[], tipo: 'punto' | 'medida' | 'otro'): str
 }
 
 export const tipoDeDef = (def: string): 'punto' | 'medida' | 'otro' =>
-  ['libre', 'sobre', 'medio', 'interseccion', 'centro', 'inversion'].includes(def) ? 'punto' : ['angulo', 'distancia', 'area', 'pendiente', 'perimetro'].includes(def) ? 'medida' : 'otro'
+  ['libre', 'sobre', 'medio', 'interseccion', 'centro', 'inversion'].includes(def) ? 'punto' : ['angulo', 'distancia', 'area', 'pendiente', 'perimetro', 'modulo', 'producto_escalar', 'angulo_lineas'].includes(def) ? 'medida' : 'otro'
 
 const f2 = (v: number) => {
   const r = +v.toFixed(2)

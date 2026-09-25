@@ -5,10 +5,11 @@ import { Atajos, Grupo, Nota, Numero, Resultado, Segmentado } from '../../nucleo
 import {
   aNum, autovalores, baseImagen, determinante, diagonalizar, fmtNum, gaussJordan, identidadR, inversa, leerR, lu, mulR, nucleo, qr, R0, rango,
   sistema, sumaR, svd, texM, texMnum, texPolinomio, texR, textoR, trazaR, transpuestaR, type MR, type Paso,
+  gramSchmidtR, proyeccionR, productoR, texRaizR,
 } from '../../lib/matrizExacta'
 import type { R } from '../../lib/cas/polinomios'
 
-type Op = 'rref' | 'det' | 'inversa' | 'sistema' | 'rango' | 'autovalores' | 'lu' | 'qr' | 'producto' | 'potencia'
+type Op = 'rref' | 'det' | 'inversa' | 'sistema' | 'rango' | 'autovalores' | 'lu' | 'qr' | 'gram' | 'proyeccion' | 'cambio' | 'producto' | 'potencia'
 
 export interface EstadoMatrices {
   op: Op
@@ -27,10 +28,13 @@ const NOMBRES: Record<Op, string> = {
   autovalores: 'Autovalores y diagonalización',
   lu: 'Factorización LU',
   qr: 'QR y valores singulares',
+  gram: 'Gram–Schmidt de las columnas',
+  proyeccion: 'Proyección de b sobre col(A) y mínimos cuadrados',
+  cambio: 'Cambio de base (columnas de A)',
   producto: 'Producto y suma con B',
   potencia: 'Potencia Aᵏ',
 }
-const CUADRADA = new Set<Op>(['det', 'inversa', 'autovalores', 'lu', 'potencia'])
+const CUADRADA = new Set<Op>(['det', 'inversa', 'autovalores', 'lu', 'potencia', 'cambio'])
 
 const aTexto = (M: number[][]) => M.map((f) => f.map(String))
 
@@ -48,6 +52,10 @@ const EJEMPLOS: Array<{ t: string; A: number[][] | string[][]; b?: number[]; B?:
   { t: 'LU con permutación', A: [[0, 2, 1], [1, 1, 0], [2, 1, 1]], op: 'lu' },
   { t: 'Rectangular 3×4', A: [[1, 2, 0, 3], [2, 4, 1, 7], [1, 2, 1, 4]], op: 'rango' },
   { t: 'Fibonacci (potencia)', A: [[1, 1], [1, 0]], op: 'potencia' },
+  { t: 'Gram–Schmidt de tres vectores', A: [[1, 1, 0], [1, 0, 1], [0, 1, 1]], op: 'gram' },
+  { t: 'Recta de mínimos cuadrados', A: [[1, 0], [1, 1], [1, 2], [1, 3]], b: [1, 2, 2, 4], op: 'proyeccion' },
+  { t: 'Proyección sobre un plano de ℝ³', A: [[1, 0], [0, 1], [1, 1]], b: [1, 2, 6], op: 'proyeccion' },
+  { t: 'Cambio de base en ℝ²', A: [[1, 1], [1, -1]], b: [3, 1], B: [[2, 1], [1, 2]], op: 'cambio' },
 ]
 
 /* ---------- lectura de las celdas ---------- */
@@ -146,6 +154,7 @@ function Panel({ s, set }: PropsPanel<EstadoMatrices>) {
                 A: e.A.map((f) => f.map(String)),
                 ...(e.op ? { op: e.op } : {}),
                 ...(e.b ? { b: e.b.map(String) } : { b: e.A.map(() => '0') }),
+                ...(e.B ? { B: e.B.map((f) => f.map(String)) } : {}),
               }),
           }))}
         />
@@ -156,15 +165,17 @@ function Panel({ s, set }: PropsPanel<EstadoMatrices>) {
           nombre="A"
           malas={lA.malas}
           onChange={(A) => set({ A })}
-          derecha={s.op === 'sistema' ? redimensionaV(s.b, s.A.length) : undefined}
+          derecha={s.op === 'sistema' || s.op === 'proyeccion' || s.op === 'cambio' ? redimensionaV(s.b, s.A.length) : undefined}
           onDerecha={(b) => set({ b })}
         />
         <Nota>
           Cada casilla admite enteros, fracciones (−2/5) y decimales (0,25 se toma como 1/4): todo se calcula con fracciones exactas.
-          {s.op === 'sistema' && ' La columna tras la raya es b.'}
+          {(s.op === 'sistema' || s.op === 'proyeccion' || s.op === 'cambio') && ' La columna tras la raya es b.'}
+          {s.op === 'gram' && ' Se ortogonalizan las columnas de A, de izquierda a derecha.'}
+          {s.op === 'cambio' && ' Las columnas de A son la base nueva; B es una aplicación en la base canónica.'}
         </Nota>
       </Grupo>
-      {s.op === 'producto' && (
+      {(s.op === 'producto' || s.op === 'cambio') && (
         <Grupo titulo="Matriz B">
           <EditorMatriz T={s.B} nombre="B" malas={lB.malas} onChange={(B) => set({ B })} />
         </Grupo>
@@ -407,6 +418,77 @@ function Vista({ s }: { s: EstadoMatrices }) {
         </div>
       )
     }
+    case 'gram': {
+      const cols = transpuestaR(A)
+      const pasos = gramSchmidtR(cols)
+      const w = (k: number) => `w_{${k + 1}}`
+      const buenos = pasos.map((p, k) => ({ p, k })).filter((x) => !x.p.nulo)
+      return (
+        <div>
+          {titulo}
+          <p>Cada columna vₖ pierde su sombra sobre las anteriores: lo que queda, wₖ, es perpendicular a todas ellas. Se hace con fracciones exactas; al normalizar aparecen raíces.</p>
+          <h3>Pasos</h3>
+          {pasos.map((p, k) => {
+            const previos = pasos.slice(0, k).map((q, j) => ({ q, j })).filter((x) => !x.q.nulo)
+            const resta = previos.map(({ j }, i) => `- ${texR(p.coef[i])}\\,${w(j)}`).join(' ')
+            return (
+              <div key={k} style={{ margin: '8px 0' }}>
+                <Tex bloque t={`${w(k)} = v_{${k + 1}} ${resta} = ${vector(p.v)}${previos.length ? ' ' + previos.map(({ q, j }, i) => `- ${texR(p.coef[i])}${vector(q.w)}`).join(' ') : ''} = ${vector(p.w)}`} />
+                {previos.length > 0 && <Tex bloque t={previos.map(({ j }, i) => `\\frac{\\langle v_{${k + 1}},\\,${w(j)}\\rangle}{\\langle ${w(j)},\\,${w(j)}\\rangle} = ${texR(p.coef[i])}`).join(',\\qquad ')} />}
+                {p.nulo ? <p>w{k + 1} = 0: la columna {k + 1} es combinación de las anteriores y no aporta a la base.</p> : <Tex bloque t={`\\lVert ${w(k)}\\rVert^2 = ${texR(p.n2)},\\qquad u_{${k + 1}} = \\frac{${w(k)}}{${texRaizR(p.n2)}}`} />}
+              </div>
+            )
+          })}
+          <h3>Base ortonormal</h3>
+          <Tex bloque t={buenos.map(({ p, k }) => `u_{${k + 1}} = \\frac{1}{${texRaizR(p.n2)}}${vector(p.w)}`).join(',\\quad ')} />
+          <p>Comprobación: {buenos.length > 1 ? `⟨wᵢ, wⱼ⟩ = 0 para i ≠ j (${buenos.every(({ p }, i) => buenos.every(({ p: q }, j) => i === j || productoR(p.w, q.w).n === 0n)) ? 'se cumple, exacto' : 'no se cumple'}).` : 'solo hay un vector.'} Dimensión del espacio generado: {buenos.length}.</p>
+        </div>
+      )
+    }
+    case 'proyeccion': {
+      const b = redimensionaV(s.b, m).map((t) => leerR(t))
+      if (!b.every(Boolean)) return <p>Alguna casilla de b no es un número.</p>
+      const pr = proyeccionR(A, b as R[])
+      if (!pr) return <><h2>{NOMBRES[s.op]}</h2><p>A no tiene columnas independientes: su espacio columna es solo el 0.</p></>
+      const bc = b as R[]
+      const ortogonal = transpuestaR(pr.C).every((c) => productoR(c, pr.residuo).n === 0n)
+      const n2 = productoR(pr.residuo, pr.residuo)
+      return (
+        <div>
+          {titulo}
+          <p>Con una base C del espacio columna (las columnas pivote de A), la proyección ortogonal es P = C (CᵀC)⁻¹ Cᵀ. Si A·x = b no tiene solución, x̂ es la que deja el menor error ‖b − A x‖: los mínimos cuadrados.</p>
+          <Tex bloque t={`C = ${texM(pr.C)},\\qquad P = C\\,(C^{T}C)^{-1}C^{T} = ${texM(pr.P)}`} />
+          <Tex bloque t={`P\\,b = ${texM(pr.P)}${vector(bc)} = ${vector(pr.p)}`} />
+          <Tex bloque t={`b - P\\,b = ${vector(pr.residuo)},\\qquad \\lVert b - Pb\\rVert = ${texRaizR(n2)}`} />
+          <p>La parte que sobra es perpendicular a todas las columnas: Cᵀ(b − Pb) = 0 ({ortogonal ? 'se cumple, exacto' : 'no se cumple'}). Además P² = P y Pᵀ = P.</p>
+          <h3>Mínimos cuadrados</h3>
+          <Tex bloque t={`\\hat x = (C^{T}C)^{-1}C^{T}b = ${vector(pr.x)}`} />
+          {pr.C[0].length < n && <p>A tiene columnas dependientes: x̂ da los coeficientes de las columnas pivote {baseImagen(A).indices.map((c) => c + 1).join(', ')}.</p>}
+        </div>
+      )
+    }
+    case 'cambio': {
+      const inv = inversa(A).inv
+      if (!inv) return <><h2>{NOMBRES[s.op]}</h2><p>Las columnas de A no son base: A no es invertible.</p></>
+      const b = redimensionaV(s.b, m).map((t) => leerR(t))
+      const { M: B } = leer(s.B)
+      const coords = b.every(Boolean) ? mulR(inv, (b as R[]).map((x) => [x])).map((f) => f[0]) : null
+      return (
+        <div>
+          {titulo}
+          <p>Las columnas de A son la base nueva 𝓑. Un vector con coordenadas c en 𝓑 es A·c en la canónica; al revés, c = A⁻¹·b.</p>
+          <Tex bloque t={`A^{-1} = ${texM(inv)}`} />
+          {coords && <Tex bloque t={`[b]_{\\mathcal B} = A^{-1}b = ${texM(inv)}${vector(b as R[])} = ${vector(coords)}`} />}
+          {coords && <Tex bloque t={`b = ${coords.map((c, j) => `${texR(c)}\\,${vector(A.map((f) => f[j]))}`).join(' + ')}`} />}
+          <h3>Una aplicación en la base nueva</h3>
+          {B && B.length === m && B[0].length === m ? (
+            <Tex bloque t={`[B]_{\\mathcal B} = A^{-1} B\\, A = ${texM(inv)}${texM(B)}${texM(A)} = ${texM(mulR(mulR(inv, B), A))}`} />
+          ) : (
+            <p>B tiene que ser {m}×{m}.</p>
+          )}
+        </div>
+      )
+    }
     case 'producto': {
       const { M: B } = leer(s.B)
       if (!B) return <p>Alguna casilla de B no es un número.</p>
@@ -481,7 +563,7 @@ function lecturas(s: EstadoMatrices): Array<[string, string]> {
 export default definir<EstadoMatrices>({
   id: 'matrices',
   area: 'algebra',
-  resumen: 'Matrices paso a paso: Gauss–Jordan, determinante, inversa, sistemas, núcleo, autovalores, diagonalización, Jordan, LU, QR y SVD',
+  resumen: 'Matrices paso a paso: Gauss–Jordan, determinante, inversa, sistemas, núcleo, autovalores, diagonalización, Jordan, LU, QR, SVD, Gram–Schmidt, proyecciones, mínimos cuadrados y cambio de base',
   corto: 'Matrices',
   titulo: 'Matrices <i>paso a paso</i>',
   entradilla: 'Con fracciones exactas y cada operación de fila a la vista, como en papel.',
@@ -493,6 +575,7 @@ export default definir<EstadoMatrices>({
         A: e.A.map((f) => f.map(String)),
         ...(e.op ? { op: e.op } : {}),
         ...(e.b ? { b: e.b.map(String) } : { b: e.A.map(() => '0') }),
+        ...(e.B ? { B: e.B.map((f) => f.map(String)) } : {}),
       })),
     ),
     acciones: [
@@ -513,6 +596,12 @@ export default definir<EstadoMatrices>({
         return [String.raw`\det(AB) = \det A\,\det B,\qquad A^{-1} = \frac{\operatorname{adj}(A)^{T}}{\det A}`]
       case 'rango':
         return [String.raw`\dim \ker A + \operatorname{rg} A = n`]
+      case 'gram':
+        return [String.raw`w_k = v_k-\sum_{j<k}\frac{\langle v_k,w_j\rangle}{\langle w_j,w_j\rangle}\,w_j,\qquad u_k=\frac{w_k}{\lVert w_k\rVert}`]
+      case 'proyeccion':
+        return [String.raw`P = A(A^{T}A)^{-1}A^{T},\qquad A^{T}A\,\hat x = A^{T}b`, String.raw`P^2=P,\qquad P^{T}=P,\qquad (b-Pb)\perp \operatorname{col}A`]
+      case 'cambio':
+        return [String.raw`b = A\,[b]_{\mathcal B},\qquad [T]_{\mathcal B}=A^{-1}[T]\,A`]
       default:
         return []
     }

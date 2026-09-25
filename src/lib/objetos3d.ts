@@ -17,13 +17,17 @@ export type Objeto3 = { tex: string | null } & (
   | { k: 'vacio' }
   | { k: 'error'; error: string }
   /** F(x, y, z) = 0; `esfera` añade volumen y área. */
-  | { k: 'implicita'; F: F3; medidas?: Medidas }
+  | { k: 'implicita'; F: F3; medidas?: Medidas; plano?: { n: V3; d: number } }
   | { k: 'punto'; nombre: string | null; p: V3; libre: boolean }
   | { k: 'curva'; f: (t: number) => V3; dom: [number, number] }
   | { k: 'param'; f: (u: number, v: number) => V3; du: [number, number]; dv: [number, number] }
   | { k: 'linea'; tipo: 'recta' | 'segmento' | 'vector'; a: V3; b: V3 }
   | { k: 'solido'; forma: Forma; c: V3; a: number; h: number; n: number; medidas: Medidas }
   | { k: 'corte'; i: number; j: number }
+  /** Distancias, ángulos y módulos: el valor, y lo que se dibuja para verlo. */
+  | { k: 'medida'; v: number; unidad: '' | '°'; texto: string; en: V3; seg?: [V3, V3] }
+  /** Base de vectores con origen común (Gram–Schmidt). */
+  | { k: 'base'; o: V3; vs: V3[] }
 )
 
 export interface Medidas {
@@ -33,7 +37,7 @@ export interface Medidas {
 
 export const TIPOS3: Record<Objeto3['k'], string> = {
   vacio: '', error: '', implicita: 'superficie', punto: 'punto', curva: 'curva', param: 'superficie paramétrica',
-  linea: 'recta', solido: 'sólido', corte: 'curva de corte',
+  linea: 'recta', solido: 'sólido', corte: 'curva de corte', medida: 'medida', base: 'base ortonormal',
 }
 
 const RESERVADAS = ['x', 'y', 'z', 't', 'u', 'v']
@@ -91,7 +95,109 @@ export function circunradio(forma: Forma, a: number) {
   }
 }
 
-const COMANDOS = new Set(['recta', 'segmento', 'vector', 'plano', 'esfera', 'cubo', 'prisma', 'piramide', 'cono', 'cilindro', 'tetraedro', 'octaedro', 'dodecaedro', 'icosaedro', 'revolucion', 'corte', 'interseccion'])
+const COMANDOS = new Set([
+  'recta', 'segmento', 'vector', 'plano', 'esfera', 'cubo', 'prisma', 'piramide', 'cono', 'cilindro', 'tetraedro', 'octaedro', 'dodecaedro', 'icosaedro', 'revolucion', 'corte', 'interseccion',
+  'proy', 'proyeccion', 'pie', 'perp', 'dist', 'distancia', 'norma', 'modulo', 'angulo', 'gram', 'simetrico', 'escalar', 'vectorial',
+])
+/** Órdenes cuyos argumentos son objetos de otras filas (o números de fila), no expresiones. */
+const DE_OBJETOS = new Set(['proy', 'proyeccion', 'pie', 'perp', 'dist', 'distancia', 'norma', 'modulo', 'angulo', 'gram', 'simetrico', 'escalar', 'vectorial'])
+
+/* ---------- geometría vectorial ---------- */
+
+const sub3 = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+const add3 = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+const mul3 = (a: V3, k: number): V3 => [a[0] * k, a[1] * k, a[2] * k]
+const dot3 = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+const cross3 = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+const len3 = (a: V3) => Math.hypot(a[0], a[1], a[2])
+
+/** Lo que una fila es, geométricamente, para las órdenes de proyecciones y medidas. */
+export type Geo = { t: 'punto'; p: V3 } | { t: 'linea'; tipo: 'recta' | 'segmento' | 'vector'; a: V3; d: V3 } | { t: 'plano'; n: V3; d: number }
+
+/** Pie de la perpendicular desde p a la recta o al plano. */
+export function pie3(p: V3, g: Extract<Geo, { t: 'linea' | 'plano' }>): V3 {
+  if (g.t === 'linea') return add3(g.a, mul3(g.d, dot3(sub3(p, g.a), g.d) / dot3(g.d, g.d)))
+  return sub3(p, mul3(g.n, (dot3(g.n, p) - g.d) / dot3(g.n, g.n)))
+}
+
+/** Puntos más cercanos de dos rectas (la perpendicular común si se cruzan). */
+function cercanosRectas(a1: V3, d1: V3, a2: V3, d2: V3): [V3, V3] {
+  const w = sub3(a1, a2)
+  const a = dot3(d1, d1)
+  const b = dot3(d1, d2)
+  const c = dot3(d2, d2)
+  const d = dot3(d1, w)
+  const e = dot3(d2, w)
+  const den = a * c - b * b
+  // paralelas: cualquier punto de la primera y su pie en la segunda
+  if (Math.abs(den) < 1e-12 * a * c) return [a1, add3(a2, mul3(d2, e / c))]
+  const s = (b * e - c * d) / den
+  const t = (a * e - b * d) / den
+  return [add3(a1, mul3(d1, s)), add3(a2, mul3(d2, t))]
+}
+
+/** Distancia entre dos objetos y los dos puntos que la realizan. */
+export function distancia3(A: Geo, B: Geo): { v: number; seg: [V3, V3] } {
+  const mk = (p: V3, q: V3) => ({ v: len3(sub3(p, q)), seg: [p, q] as [V3, V3] })
+  if (A.t === 'punto' && B.t === 'punto') return mk(A.p, B.p)
+  if (A.t === 'punto' && B.t !== 'punto') return mk(A.p, pie3(A.p, B))
+  if (B.t === 'punto' && A.t !== 'punto') return mk(pie3(B.p, A), B.p)
+  if (A.t === 'linea' && B.t === 'linea') {
+    const [p, q] = cercanosRectas(A.a, A.d, B.a, B.d)
+    return mk(p, q)
+  }
+  if (A.t === 'linea' && B.t === 'plano') {
+    // si la recta corta al plano, la distancia es 0
+    return Math.abs(dot3(A.d, B.n)) > 1e-12 * len3(A.d) * len3(B.n) ? mk(A.a, A.a) : mk(A.a, pie3(A.a, B))
+  }
+  if (A.t === 'plano' && B.t === 'linea') {
+    const r = distancia3(B, A)
+    return { v: r.v, seg: [r.seg[1], r.seg[0]] }
+  }
+  if (A.t === 'plano' && B.t === 'plano') {
+    if (len3(cross3(A.n, B.n)) > 1e-9 * len3(A.n) * len3(B.n)) return { v: 0, seg: [[0, 0, 0], [0, 0, 0]] }
+    const p = mul3(A.n, A.d / dot3(A.n, A.n))
+    return mk(p, pie3(p, B))
+  }
+  return { v: NaN, seg: [[0, 0, 0], [0, 0, 0]] }
+}
+
+/** Ángulo (grados) entre vectores (0–180°), rectas (0–90°), recta y plano, o dos planos. */
+export function angulo3(A: Geo, B: Geo): number {
+  const dir = (g: Geo): V3 => (g.t === 'punto' ? g.p : g.t === 'linea' ? g.d : g.n)
+  const u = dir(A)
+  const v = dir(B)
+  const c = dot3(u, v) / (len3(u) * len3(v))
+  const g = (Math.acos(Math.max(-1, Math.min(1, c))) * 180) / Math.PI
+  const esVector = (x: Geo) => x.t === 'punto' || (x.t === 'linea' && x.tipo === 'vector')
+  const agudo = Math.min(g, 180 - g)
+  // recta–plano: el complementario del que forman la dirección y la normal
+  if ((A.t === 'plano') !== (B.t === 'plano')) return 90 - agudo
+  if (esVector(A) && esVector(B)) return g
+  return agudo
+}
+
+/** Base ortonormal por Gram–Schmidt (se saltan los vectores que ya dependen de los anteriores). */
+export function gramSchmidt3(vs: V3[]): V3[] {
+  const out: V3[] = []
+  for (const v of vs) {
+    let w = v
+    for (const e of out) w = sub3(w, mul3(e, dot3(w, e)))
+    const n = len3(w)
+    if (n > 1e-10 * Math.max(1, len3(v))) out.push(mul3(w, 1 / n))
+  }
+  return out
+}
+
+/** ¿F(x, y, z) = 0 es un plano n·x = d? Se mira si es afín en puntos cualesquiera. */
+function comoPlano(F: F3): { n: V3; d: number } | null {
+  const f0 = F(0, 0, 0)
+  const n: V3 = [F(1, 0, 0) - f0, F(0, 1, 0) - f0, F(0, 0, 1) - f0]
+  if (!n.every(Number.isFinite) || len3(n) < 1e-12) return null
+  const pruebas: V3[] = [[0.7, -1.3, 2.1], [-2.2, 0.4, -0.9], [3.1, 2.7, -1.6]]
+  for (const p of pruebas) if (Math.abs(F(p[0], p[1], p[2]) - (f0 + dot3(n, p))) > 1e-9 * (1 + Math.abs(f0) + len3(n) * len3(p))) return null
+  return { n, d: -f0 }
+}
 const sinAcentos = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 export function analizarFilas3(filas: string[], params: Record<string, Param>): Analisis3 {
@@ -101,6 +207,9 @@ export function analizarFilas3(filas: string[], params: Record<string, Param>): 
     const m = f.trim().match(/^([A-Za-z][A-Za-z0-9_]*)\s*=\s*\(/)
     // los nombres de punto se comparan tal cual: A es un punto y a puede ser un deslizador
     if (m) puntos.set(m[1], i)
+    // r = recta(A, B), P = proy(A, 2)…: también son nombres de objetos
+    const c = f.trim().match(/^([A-Za-z][A-Za-z0-9_]*)\s*=\s*([A-Za-zÁÉÍÓÚáéíóú]+)\s*\(/)
+    if (c && COMANDOS.has(sinAcentos(c[2]))) puntos.set(c[1], i)
   })
   const parametros: string[] = []
   const anota = (src: string) => {
@@ -113,11 +222,11 @@ export function analizarFilas3(filas: string[], params: Record<string, Param>): 
     }
   }
   for (const f of filas) {
-    const t = f.trim()
+    const t = f.trim().replace(/^[A-Za-z][A-Za-z0-9_]*\s*=\s*(?=[A-Za-zÁÉÍÓÚáéíóú]+\s*\()/, '')
     if (!t) continue
     const cmd = t.match(/^([A-Za-zÁÉÍÓÚáéíóú]+)\s*\((.*)\)\s*$/s)
     if (cmd && COMANDOS.has(sinAcentos(cmd[1]))) {
-      if (sinAcentos(cmd[1]) === 'corte' || sinAcentos(cmd[1]) === 'interseccion') continue
+      if (sinAcentos(cmd[1]) === 'corte' || sinAcentos(cmd[1]) === 'interseccion' || DE_OBJETOS.has(sinAcentos(cmd[1]))) continue
       for (const a of nivel0(cmd[2], ',')) {
         const tp = tupla(a)
         for (const e of tp ?? [a]) if (!puntos.has(e.trim()) && !/^[xyz]$/i.test(e.trim())) anota(e)
@@ -153,6 +262,21 @@ export function analizarFilas3(filas: string[], params: Record<string, Param>): 
     return tp.map(num) as V3
   }
 
+  /** Un argumento de las órdenes de medidas: nombre de fila, número de fila o punto (x, y, z). */
+  const geo = (src: string): Geo => {
+    const t = src.trim()
+    let o: Objeto3 | undefined
+    const i = puntos.get(t)
+    if (i !== undefined) o = objetos[i]
+    else if (/^\d+$/.test(t)) o = objetos[Number(t) - 1]
+    else return { t: 'punto', p: punto(t) }
+    if (!o) throw new Error(`${t} no existe (o va después)`)
+    if (o.k === 'punto') return { t: 'punto', p: o.p }
+    if (o.k === 'linea') return { t: 'linea', tipo: o.tipo, a: o.a, d: sub3(o.b, o.a) }
+    if (o.k === 'implicita' && o.plano) return { t: 'plano', n: o.plano.n, d: o.plano.d }
+    throw new Error(`${t}: aquí va un punto, un vector, una recta o un plano`)
+  }
+
   filas.forEach((src) => {
     objetos.push(fila(src))
   })
@@ -163,6 +287,13 @@ export function analizarFilas3(filas: string[], params: Record<string, Param>): 
     try {
       const cmd = t.match(/^([A-Za-zÁÉÍÓÚáéíóú]+)\s*\((.*)\)\s*$/s)
       if (cmd && COMANDOS.has(sinAcentos(cmd[1]))) return orden(sinAcentos(cmd[1]), nivel0(cmd[2], ',').map((a) => a.trim()))
+      // con nombre: r = recta(A, B)
+      const cmdN = t.match(/^([A-Za-z][A-Za-z0-9_]*)\s*=\s*([A-Za-zÁÉÍÓÚáéíóú]+)\s*\((.*)\)\s*$/s)
+      if (cmdN && COMANDOS.has(sinAcentos(cmdN[2]))) {
+        const o = orden(sinAcentos(cmdN[2]), nivel0(cmdN[3], ',').map((a) => a.trim()))
+        if (o.k === 'punto') return { ...o, nombre: cmdN[1], tex: `${cmdN[1]} = ${o.tex ?? ''}` }
+        return { ...o, tex: o.tex ? `${cmdN[1]}:\ ${o.tex}` : o.tex }
+      }
 
       // A = (x, y, z)
       const nombrado = t.match(/^([A-Za-z][A-Za-z0-9_]*)\s*=\s*(\(.*\))$/s)
@@ -193,7 +324,8 @@ export function analizarFilas3(filas: string[], params: Record<string, Param>): 
         const der = t.slice(eq[0] + 1)
         const a = compila(izq, ['x', 'y', 'z'])
         const b = compila(der, ['x', 'y', 'z'])
-        return { k: 'implicita', F: (x, y, z) => a.f(x, y, z) - b.f(x, y, z), tex: `${tex(a.n)} = ${tex(b.n)}` }
+        const F: F3 = (x, y, z) => a.f(x, y, z) - b.f(x, y, z)
+        return { k: 'implicita', F, plano: comoPlano(F) ?? undefined, tex: `${tex(a.n)} = ${tex(b.n)}` }
       }
       // una expresión suelta es z = f(x, y)
       const f = compila(t, ['x', 'y'])
@@ -276,7 +408,7 @@ export function analizarFilas3(filas: string[], params: Record<string, Param>): 
         if (Math.hypot(...n) < 1e-12) throw new Error('los tres puntos están alineados')
         const d = n[0] * A[0] + n[1] * A[1] + n[2] * A[2]
         const f2 = (x: number) => +x.toFixed(3)
-        return { k: 'implicita', F: (x, y, z) => n[0] * x + n[1] * y + n[2] * z - d, tex: `${f2(n[0])}x + ${f2(n[1])}y + ${f2(n[2])}z = ${f2(d)}`.replace(/\+ -/g, '- ') }
+        return { k: 'implicita', F: (x, y, z) => n[0] * x + n[1] * y + n[2] * z - d, plano: { n: n as V3, d }, tex: `${f2(n[0])}x + ${f2(n[1])}y + ${f2(n[2])}z = ${f2(d)}`.replace(/\+ -/g, '- ') }
       }
       case 'esfera': {
         pide(2, 'centro, radio')
@@ -330,6 +462,92 @@ export function analizarFilas3(filas: string[], params: Record<string, Param>): 
           dv: [0, DOS_PI],
           tex: `${alrededorZ ? 'z' : 'y'} = ${tex(f.n)}\\ \\text{girando alrededor de } ${alrededorZ ? 'z' : 'x'}`,
         }
+      }
+      case 'proy':
+      case 'proyeccion':
+      case 'pie':
+      case 'perp': {
+        pide(2, 'objeto, recta o plano')
+        const [X, Y] = [geo(a[0]), geo(a[1])]
+        const tx = `\\operatorname{${nombre}}\\left(${a[0]},\\,${a[1]}\\right)`
+        const vec = X.t === 'linea' && X.tipo === 'vector'
+        // dos puntos sueltos: se leen como vectores desde el origen
+        const comoVec = vec || (X.t === 'punto' && Y.t === 'punto')
+        if (comoVec) {
+          const o: V3 = X.t === 'linea' ? X.a : [0, 0, 0]
+          const w = X.t === 'linea' ? X.d : (X as Extract<Geo, { t: 'punto' }>).p
+          let par: V3
+          if (Y.t === 'plano') par = sub3(w, mul3(Y.n, dot3(w, Y.n) / dot3(Y.n, Y.n)))
+          else {
+            const d = Y.t === 'linea' ? Y.d : Y.p
+            par = mul3(d, dot3(w, d) / dot3(d, d))
+          }
+          // la parte perpendicular sale de la punta de la proyección: w = proyección + perpendicular
+          if (nombre === 'perp') return { k: 'linea', tipo: 'vector', a: add3(o, par), b: add3(o, w), tex: tx }
+          return { k: 'linea', tipo: 'vector', a: o, b: add3(o, par), tex: tx }
+        }
+        if (Y.t === 'punto') throw new Error('se proyecta sobre una recta o un plano')
+        if (nombre === 'perp') throw new Error('perp(v, w): la parte de v perpendicular a w; v tiene que ser un vector')
+        if (X.t === 'punto') return { k: 'punto', nombre: null, p: pie3(X.p, Y), libre: false, tex: tx }
+        if (X.t === 'linea') {
+          const b = add3(X.a, X.d)
+          const [pa, pb] = [pie3(X.a, Y), pie3(b, Y)]
+          if (len3(sub3(pa, pb)) < 1e-12) return { k: 'punto', nombre: null, p: pa, libre: false, tex: tx }
+          return { k: 'linea', tipo: X.tipo, a: pa, b: pb, tex: tx }
+        }
+        throw new Error('un plano no se proyecta')
+      }
+      case 'simetrico': {
+        pide(2, 'P, punto, recta o plano')
+        const X = geo(a[0])
+        const Y = geo(a[1])
+        if (X.t !== 'punto') throw new Error('simetrico(P, …): P tiene que ser un punto')
+        const c = Y.t === 'punto' ? Y.p : pie3(X.p, Y)
+        return { k: 'punto', nombre: null, p: sub3(mul3(c, 2), X.p), libre: false, tex: `\\operatorname{simétrico}\\left(${a[0]},\\,${a[1]}\\right)` }
+      }
+      case 'dist':
+      case 'distancia': {
+        pide(2, 'A, B')
+        const r = distancia3(geo(a[0]), geo(a[1]))
+        const en = mul3(add3(r.seg[0], r.seg[1]), 0.5)
+        return { k: 'medida', v: r.v, unidad: '', texto: `d(${a[0]}, ${a[1]})`, en, seg: r.v > 1e-12 ? r.seg : undefined, tex: `d\\left(${a[0]},\\,${a[1]}\\right)` }
+      }
+      case 'norma':
+      case 'modulo': {
+        pide(1, 'v')
+        const X = geo(a[0])
+        if (X.t === 'plano') throw new Error('norma(v): un vector, un segmento o un punto')
+        const o: V3 = X.t === 'linea' ? X.a : [0, 0, 0]
+        const w = X.t === 'linea' ? X.d : X.p
+        return { k: 'medida', v: len3(w), unidad: '', texto: `‖${a[0]}‖`, en: add3(o, mul3(w, 0.5)), seg: [o, add3(o, w)], tex: `\\left\\lVert ${a[0]}\\right\\rVert` }
+      }
+      case 'angulo': {
+        pide(2, 'a, b')
+        const [X, Y] = [geo(a[0]), geo(a[1])]
+        const donde = X.t === 'linea' ? X.a : X.t === 'punto' ? [0, 0, 0] as V3 : mul3(X.n, X.d / dot3(X.n, X.n))
+        return { k: 'medida', v: angulo3(X, Y), unidad: '°', texto: `∠(${a[0]}, ${a[1]})`, en: donde, tex: `\\angle\\left(${a[0]},\\,${a[1]}\\right)` }
+      }
+      case 'escalar': {
+        pide(2, 'v, w')
+        const [X, Y] = [geo(a[0]), geo(a[1])]
+        const d = (g: Geo): V3 => (g.t === 'punto' ? g.p : g.t === 'linea' ? g.d : g.n)
+        const o: V3 = X.t === 'linea' ? X.a : [0, 0, 0]
+        return { k: 'medida', v: dot3(d(X), d(Y)), unidad: '', texto: `${a[0]} · ${a[1]}`, en: o, tex: `${a[0]}\\cdot ${a[1]}` }
+      }
+      case 'vectorial': {
+        pide(2, 'v, w')
+        const [X, Y] = [geo(a[0]), geo(a[1])]
+        const d = (g: Geo): V3 => (g.t === 'punto' ? g.p : g.t === 'linea' ? g.d : g.n)
+        const o: V3 = X.t === 'linea' ? X.a : [0, 0, 0]
+        return { k: 'linea', tipo: 'vector', a: o, b: add3(o, cross3(d(X), d(Y))), tex: `${a[0]}\\times ${a[1]}` }
+      }
+      case 'gram': {
+        pide(2, 'v₁, v₂[, v₃]')
+        const gs = a.map(geo)
+        const o: V3 = gs[0].t === 'linea' ? gs[0].a : [0, 0, 0]
+        const vs = gs.map((g) => (g.t === 'punto' ? g.p : g.t === 'linea' ? g.d : g.n))
+        const base = gramSchmidt3(vs)
+        return { k: 'base', o, vs: base, tex: `\\operatorname{GS}\\left(${a.join(',\\,')}\\right)` }
       }
       case 'corte':
       case 'interseccion': {

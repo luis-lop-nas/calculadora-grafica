@@ -30,9 +30,21 @@ const EJEMPLOS = [
   { t: 'Sólidos', f: ['cubo((-2,-2,0), 1.5)', 'cono((2,-2,-1), 1, 2)', 'cilindro((2,2,-1), 0.8, 2)', 'piramide((-2,2,-1), 4, 1, 2)', 'icosaedro((0,0,0), 1.2)'] },
   { t: 'Recta y plano', f: ['A = (1, 1, 2)', 'B = (-1, 0, -1)', 'recta(A, B)', 'C = (2, -1, 0)', 'plano(A, B, C)'] },
   { t: 'Cilindro ∩ esfera', f: ['x^2+y^2=1', 'x^2+y^2+z^2=4', 'corte(1, 2)'] },
+  {
+    t: 'Proyecciones sobre un plano',
+    f: ['p = plano((2,0,0), (0,2,0), (0,0,1))', 'A = (2, 2, 2)', 'P = proy(A, p)', 'segmento(A, P)', 'dist(A, p)', 'v = vector((0,0,0), (1,2,2.5))', 'proy(v, p)', 'perp(v, p)', 'angulo(v, p)'],
+  },
+  {
+    t: 'Distancia entre rectas que se cruzan',
+    f: ['r = recta((-2,0,0), (2,0,1))', 's = recta((0,-2,2.5), (0,2,0.5))', 'dist(r, s)', 'angulo(r, s)', 'A = (1, 1, 2)', 'dist(A, r)', 'B = simetrico(A, r)'],
+  },
+  {
+    t: 'Base ortonormal (Gram–Schmidt)',
+    f: ['u = vector((0,0,0), (2,1,0))', 'v = vector((0,0,0), (1,2,1))', 'w = vector((0,0,0), (0,1,2))', 'gram(u, v, w)', 'norma(v)', 'escalar(u, v)', 'vectorial(u, v)'],
+  },
 ]
 
-const PIEZAS = ['x', 'y', 'z', '=', '^', '(', ')', 'sqrt(', 'sin(', 'cos(', 'pi', 't', 'u', 'v', 'esfera(', 'plano(', 'recta(', 'corte(']
+const PIEZAS = ['x', 'y', 'z', '=', '^', '(', ')', 'sqrt(', 'sin(', 'cos(', 'pi', 't', 'u', 'v', 'esfera(', 'plano(', 'recta(', 'corte(', 'proy(', 'dist(', 'angulo(', 'norma(', 'gram(']
 
 let cache: { clave: string; an: Analisis3 } | null = null
 function analisis(s: S): Analisis3 {
@@ -172,6 +184,22 @@ function construir(e: Escena3D, s: S) {
         e.punto(o.p, color, 0.03 * L)
         if (o.nombre) e.rotulo(o.nombre, [o.p[0], o.p[1], o.p[2] + 0.09 * L], 0.12 * L)
         break
+      case 'medida': {
+        // el segmento que realiza la distancia (o el vector medido), fino, y el valor encima
+        if (o.seg) {
+          tubo(e, [o.seg[0], o.seg[1]], color, grosor * 0.45)
+          e.punto(o.seg[0], color, 0.018 * L)
+          e.punto(o.seg[1], color, 0.018 * L)
+        }
+        e.rotulo(`${o.texto} = ${fmt(o.v, 3)}${o.unidad}`, [o.en[0], o.en[1], o.en[2] + 0.12 * L], 0.16 * L)
+        break
+      }
+      case 'base':
+        o.vs.forEach((v, k) => {
+          e.flecha(v, color, o.o, grosor)
+          e.rotulo(`e${'₁₂₃'[k]}`, [o.o[0] + v[0] * 1.12, o.o[1] + v[1] * 1.12, o.o[2] + v[2] * 1.12 + 0.05 * L], 0.12 * L)
+        })
+        break
     }
   })
 
@@ -277,7 +305,7 @@ function Panel({ s, set }: PropsPanel<S>) {
 export default definir<S>({
   id: 'espacio',
   area: 'geometria',
-  resumen: 'Geometría en el espacio: superficies, sólidos y cortes',
+  resumen: 'Geometría en el espacio: superficies, sólidos, cortes, proyecciones, distancias, ángulos y bases ortonormales',
   corto: 'Espacio 3D',
   titulo: 'Geometría en el <i>espacio</i>',
   entradilla: 'Superficies implícitas, planos, rectas, curvas, sólidos y la curva donde se cortan dos superficies.',
@@ -317,6 +345,18 @@ export default definir<S>({
           fila('Paramétrica r(u, v)', '(cos(u)sin(v), sin(u)sin(v), cos(v))'),
           fila('Revolución', 'revolucion(sqrt(x), 0, 3)'),
         ]),
+        submenu<S>('Proyecciones y medidas', [
+          fila('Proyección de un punto sobre la fila 1', 'P = proy((1, 1, 1), 1)'),
+          fila('Proyección de un vector', 'proy(vector((0,0,0), (1,2,2)), (1,0,0))'),
+          fila('Parte perpendicular de un vector', 'perp(vector((0,0,0), (1,2,2)), (1,0,0))'),
+          fila('Simétrico respecto de la fila 1', 'simetrico((1, 1, 1), 1)'),
+          fila('Distancia de un punto a la fila 1', 'dist((1, 1, 1), 1)'),
+          fila('Ángulo entre las filas 1 y 2', 'angulo(1, 2)'),
+          fila('Módulo de un vector', 'norma(vector((0,0,0), (1,2,2)))'),
+          fila('Producto escalar', 'escalar((1,2,2), (2,0,1))'),
+          fila('Producto vectorial', 'vectorial((1,0,0), (0,1,0))'),
+          fila('Base ortonormal (Gram–Schmidt)', 'gram((1,1,0), (1,0,1), (0,1,1))'),
+        ]),
         submenu<S>('Curvas', [fila('Hélice', '(2cos(t), 2sin(t), t/4), -12 < t < 12'), fila('Corte de las filas 1 y 2', 'corte(1, 2)')]),
         submenu<S>('Sólidos', [
           fila('Cubo', 'cubo((0,0,0), 1.5)'),
@@ -342,6 +382,10 @@ export default definir<S>({
         const nombre = o.k === 'solido' ? o.forma : 'esfera'
         filas.push([`${i + 1} · volumen del ${nombre}`, fmt(o.medidas.volumen, 4)], [`${i + 1} · área`, fmt(o.medidas.area, 4)])
       }
+      if (o.k === 'medida') filas.push([`${i + 1} · ${o.texto}`, `${fmt(o.v, 6)}${o.unidad}`])
+      if (o.k === 'base') o.vs.forEach((v, k) => filas.push([`${i + 1} · e${'₁₂₃'[k]}`, `(${v.map((c) => fmt(c, 4)).join(', ')})`]))
+      if (o.k === 'punto' && !o.libre) filas.push([`${i + 1} · ${o.nombre ?? 'punto'}`, `(${o.p.map((c) => fmt(c, 4)).join(', ')})`])
+      if (o.k === 'linea' && o.tipo === 'vector') filas.push([`${i + 1} · vector`, `(${o.b.map((c, k) => fmt(c - o.a[k], 4)).join(', ')})`])
       if (o.k === 'error') filas.push([`fila ${i + 1}`, o.error])
     })
     return filas

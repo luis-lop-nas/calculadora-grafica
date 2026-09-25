@@ -14,6 +14,41 @@ interface S {
   P: number[][]
   /** Ejes x′, y′, z′ (filas, en coordenadas del mundo): el panel da las coordenadas en esta base. */
   B?: number[][]
+  /** Gram–Schmidt dibujado paso a paso: la proyección de v₂ sobre u₁ y lo que queda. */
+  verPasos?: boolean
+  /** Proyección oblicua sobre W a lo largo de la dirección U. */
+  verOblicua?: boolean
+  U?: number[]
+}
+
+const U_INICIAL = [0.6, -0.3, 1]
+
+/** Gram–Schmidt de v₁, v₂ con los pasos intermedios. */
+export function pasosGram(v1: number[], v2: number[]) {
+  const n1 = norma(v1)
+  if (n1 < 1e-9) return null
+  const u1 = v1.map((c) => c / n1)
+  const c = producto(v2, u1)
+  const proy = u1.map((x) => c * x)
+  const w2 = v2.map((x, i) => x - proy[i])
+  const n2 = norma(w2)
+  const u2 = n2 > 1e-9 ? w2.map((x) => x / n2) : null
+  return { n1, u1, c, proy, w2, n2, u2 }
+}
+
+/** Proyección oblicua de w sobre el plano W a lo largo de U: w − (n·w)/(n·U) U. Null si U está en W. */
+export function oblicua(w: number[], base: number[][], U: number[]): number[] | null {
+  if (base.length !== 2) return null
+  const n = cruz(base[0], base[1])
+  const nU = producto(n, U)
+  if (Math.abs(nU) < 1e-9 * norma(U)) return null
+  const t = producto(n, w) / nU
+  return w.map((c, i) => c - t * U[i])
+}
+
+/** Matriz de la proyección ortogonal sobre W: Σ uᵢ uᵢᵀ con la base ortonormal. */
+export function matrizProyeccion(base: number[][]): number[][] {
+  return [0, 1, 2].map((i) => [0, 1, 2].map((j) => base.reduce((acc, u) => acc + u[i] * u[j], 0)))
 }
 
 const I3 = () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
@@ -158,10 +193,21 @@ function Panel({ s, set }: PropsPanel<S>) {
         <Nota>W₁ aparece en azul y W₂ en verde. Así puedes comparar planos, rectas y bases ortonormales.</Nota>
       </Grupo>
 
+      <Grupo titulo="Proyección oblicua">
+        <Interruptor activo={!!s.verOblicua} onChange={(verOblicua) => set({ verOblicua })}>
+          Proyectar w sobre W a lo largo de U
+        </Interruptor>
+        {s.verOblicua && <Matriz {...enEjes(s, [s.U ?? U_INICIAL], (A) => set({ U: A[0] }))} paso={0.1} filas={[{ nombre: 'U', color: 'var(--rosa)' }]} />}
+        <Nota>Con U perpendicular a W es la ortogonal; si U está dentro de W no hay proyección. Solo para W plano.</Nota>
+      </Grupo>
+
       <Grupo titulo="Qué se dibuja">
         <div className="interruptores">
           <Interruptor activo={s.verGram} onChange={(verGram) => set({ verGram })}>
             Base ortonormal
+          </Interruptor>
+          <Interruptor activo={!!s.verPasos} onChange={(verPasos) => set({ verPasos })}>
+            Gram–Schmidt paso a paso
           </Interruptor>
           <Interruptor activo={s.verResiduo} onChange={(verResiduo) => set({ verResiduo })}>
             Residuo w − p
@@ -188,6 +234,7 @@ function asas(s: S): Asa[] {
   if (s.verSegundo) s.V2.forEach((v, i) => out.push({ id: `W${i}`, p: v, color: '--aux' }))
   s.P.forEach((q, i) => out.push({ id: `P${i}`, p: q, color: '--pos' }))
   baseDe(s).forEach((b, i) => out.push({ id: `E${i}`, p: b.map((c) => c * LARGO), color: '--ink-soft' }))
+  if (s.verOblicua) out.push({ id: 'U0', p: s.U ?? U_INICIAL, color: '--rosa' })
   return out
 }
 
@@ -197,6 +244,7 @@ function mover(id: string, p: number[], s: S): Partial<S> {
   const cambia = (A: number[][]) => A.map((f, i) => (i === k ? q : f))
   if (id[0] === 'V') return { V: cambia(s.V) }
   if (id[0] === 'W') return { V2: cambia(s.V2) }
+  if (id[0] === 'U') return { U: q }
   if (id[0] === 'E') {
     // la punta del eje está a LARGO del origen: el vector de la base es p / LARGO
     const B = baseDe(s).map((f, i) => (i === k ? p.map((c) => Math.round((c / LARGO) * 100) / 100) : f))
@@ -208,7 +256,7 @@ function mover(id: string, p: number[], s: S): Partial<S> {
 export default definir<S>({
   id: 'subespacios',
   area: 'algebra',
-  resumen: 'Subespacios y proyección ortogonal',
+  resumen: 'Subespacios, proyección ortogonal y oblicua, Gram–Schmidt paso a paso y cambio de base',
   corto: 'Subespacios y proyección',
   titulo: 'Subespacios y <i>proyección</i>',
   entradilla: 'La proyección es el punto del subespacio más cercano a w; el resto es perpendicular.',
@@ -239,6 +287,8 @@ export default definir<S>({
       capaVer(s, 'verResiduo', 'Residuo w − p', '--aux'),
       capaVer(s, 'verComplemento', 'Complemento ortogonal W⊥', '--aux'),
       capaVer(s, 'verSegundo', 'Segundo subespacio W₂', '--aux'),
+      { id: 'pasos', nombre: 'Gram–Schmidt paso a paso', color: '--morado', visible: !!s.verPasos, alternar: (t: S) => ({ verPasos: !t.verPasos }) },
+      { id: 'oblicua', nombre: 'Proyección oblicua a lo largo de U', color: '--rosa', visible: !!s.verOblicua, alternar: (t: S) => ({ verOblicua: !t.verOblicua }) },
     ]
     s.P.forEach((q, i) =>
       out.push({ id: `P${i}`, nombre: `Punto q${sub(i + 1)}`, color: '--pos', detalle: coords(q), quitar: (t) => ({ P: t.P.filter((_, k) => k !== i) }) }),
@@ -263,7 +313,13 @@ export default definir<S>({
       apunte: `dim W = ${dim}, dim W⊥ = ${3 - dim}`,
     }
   },
-  formula: () => [
+  formula: (s) => [
+    ...(s.verPasos
+      ? [
+          String.raw`u_1=\frac{v_1}{\|v_1\|},\qquad w_2=v_2-\langle v_2,u_1\rangle\,u_1,\qquad u_2=\frac{w_2}{\|w_2\|}`,
+        ]
+      : []),
+    ...(s.verOblicua ? [String.raw`P^{U}_W w = w-\frac{\langle n,w\rangle}{\langle n,U\rangle}\,U,\qquad n\perp W`] : []),
     String.raw`P_W w=\sum_i \langle w, u_i\rangle\, u_i \quad (u_i \text{ ortonormal})`,
     String.raw`\|w\|^2=\|P_W w\|^2+\|w-P_W w\|^2`,
     String.raw`\mathbb{R}^3 = W \oplus W^{\perp}`,
@@ -286,6 +342,20 @@ export default definir<S>({
     if (nw > 1e-9 && np > 1e-9)
       filas.push(['Ángulo w–W', `${((Math.acos(Math.min(1, np / nw)) * 180) / Math.PI).toFixed(2)}°`])
     base.forEach((u, i) => filas.push([`u${i + 1}`, `(${u.map((c) => c.toFixed(3)).join(', ')})`]))
+    const P = matrizProyeccion(base)
+    P.forEach((f, i) => filas.push([`P_W = Σ uᵢuᵢᵀ, fila ${i + 1}`, `[${f.map((c) => c.toFixed(3)).join('  ')}]`]))
+    if (s.verPasos) {
+      const g = pasosGram(s.V[0], s.V[1])
+      if (g) {
+        filas.push(['‖v₁‖', g.n1.toFixed(4)], ['⟨v₂, u₁⟩', g.c.toFixed(4)], ['⟨v₂, u₁⟩ u₁', `(${g.proy.map((c) => c.toFixed(3)).join(', ')})`], ['w₂ = v₂ − ⟨v₂, u₁⟩u₁', `(${g.w2.map((c) => c.toFixed(3)).join(', ')})`], ['‖w₂‖', g.n2.toFixed(4)])
+        if (!g.u2) filas.push(['Paso 2', 'w₂ = 0: v₂ depende de v₁'])
+      }
+    }
+    if (s.verOblicua) {
+      const q = oblicua(w, base, s.U ?? U_INICIAL)
+      filas.push(['Proyección oblicua', q ? `(${q.map((c) => c.toFixed(3)).join(', ')})` : dim !== 2 ? 'W tiene que ser un plano' : 'U está en W: no hay'])
+      if (q) filas.push(['‖w − P^U w‖ (≥ ‖w − P w‖)', norma(w.map((c, i) => c - q[i])).toFixed(5)])
+    }
     if (!esCanonica(s)) {
       const B = baseDe(s)
       const d = det(B)
@@ -317,6 +387,8 @@ export default definir<S>({
       <Muestra color="var(--pos)">proyección P_W w</Muestra>
       {s.verResiduo && <Muestra color="var(--aux)">residuo ⊥ W</Muestra>}
       {s.verSegundo && <Muestra color="var(--rosa)">W₁ ∩ W₂</Muestra>}
+      {s.verOblicua && <Muestra color="var(--rosa)">proyección oblicua (paralela a U)</Muestra>}
+      {s.verPasos && <Muestra color="var(--morado)">pasos de Gram–Schmidt</Muestra>}
     </>
   ),
   vista: {
@@ -400,6 +472,34 @@ export default definir<S>({
       for (const v of [v1, v2]) if (norma(v) > 1e-9) e.flecha(v as [number, number, number], suave, [0, 0, 0], 0.007)
 
       if (s.verGram) for (const u of base) e.flecha(u as [number, number, number], acento, [0, 0, 0], 0.011)
+
+      // Gram–Schmidt paso a paso: la sombra de v₂ sobre u₁ y lo que queda (w₂), que se normaliza
+      if (s.verPasos) {
+        const g = pasosGram(v1, v2)
+        if (g) {
+          const rosa = e.color('--morado')
+          e.flecha(g.proy as [number, number, number], rosa, [0, 0, 0], 0.008)
+          e.rotulo('⟨v₂,u₁⟩u₁', [g.proy[0] * 1.05, g.proy[1] * 1.05, g.proy[2] * 1.05 - 0.12], 0.16)
+          e.flecha(g.w2 as [number, number, number], rosa, g.proy as [number, number, number], 0.008)
+          e.linea([[0, 0, 0], g.w2 as [number, number, number]], rosa, 0.5)
+          e.rotulo('w₂', [(g.proy[0] + g.w2[0]) * 1.02, (g.proy[1] + g.w2[1]) * 1.02, (g.proy[2] + g.w2[2]) * 1.02 + 0.1], 0.18)
+          e.rotulo('u₁', [g.u1[0] * 1.15, g.u1[1] * 1.15, g.u1[2] * 1.15 + 0.08], 0.18)
+          if (g.u2) e.rotulo('u₂', [g.u2[0] * 1.15, g.u2[1] * 1.15, g.u2[2] * 1.15 + 0.08], 0.18)
+        }
+      }
+
+      // proyección oblicua a lo largo de U
+      if (s.verOblicua) {
+        const U = (s.U ?? U_INICIAL) as [number, number, number]
+        const rosa = e.color('--rosa')
+        e.flecha(U, rosa, [0, 0, 0], 0.008)
+        e.rotulo('U', [U[0] * 1.1, U[1] * 1.1, U[2] * 1.1 + 0.08], 0.18)
+        const q = oblicua(w, base, U)
+        if (q) {
+          e.flecha(q as [number, number, number], rosa, [0, 0, 0], 0.012)
+          e.linea([w as [number, number, number], q as [number, number, number]], rosa, 0.8)
+        }
+      }
 
       e.flecha(w as [number, number, number], e.color('--ink'), [0, 0, 0], 0.014)
       e.rotulo('w', [w[0] * 1.12, w[1] * 1.12, w[2] * 1.12], 0.2)

@@ -59,6 +59,24 @@ const EJEMPLOS: Array<{ t: string; objs: Obj[] }> = [
     ],
   },
   {
+    t: 'Proyecciones de vectores',
+    objs: [
+      libre('O', 0, 0), libre('A', 4, 1), libre('B', 1.5, 3), def('u', 'vector', 'O,A'), def('v', 'vector', 'O,B'),
+      def('p', 'proy_vector', 'v,u'), def('q', 'perp_vector', 'v,u'), def('θ', 'angulo_lineas', 'u,v'), def('μ', 'producto_escalar', 'u,v'), def('ν', 'modulo', 'v'),
+    ],
+  },
+  {
+    t: 'Base ortonormal (Gram–Schmidt)',
+    objs: [libre('O', 0, 0), libre('A', 3, 1), libre('B', 1, 2.5), def('a', 'vector', 'O,A'), def('b', 'vector', 'O,B'), def('e', 'gram', 'a,b', 0), def('f', 'gram', 'a,b', 1), def('θ', 'angulo_lineas', 'e,f')],
+  },
+  {
+    t: 'Proyección ortogonal sobre una recta',
+    objs: [
+      libre('D', -5, -2), libre('E', 5, 0), def('r', 'recta', 'D,E'), libre('A', -2, 2), libre('B', 1, 3.5), libre('C', 2.5, 1.5),
+      def('t', 'poligono', 'A,B,C'), def('s', 'proyeccion', 't,r'), def('P', 'proyeccion', 'B,r'), def('a', 'segmento', 'B,P'), def('δ', 'distancia', 'B,r'),
+    ],
+  },
+  {
     t: 'Ángulo inscrito',
     objs: [
       libre('O', 0, 0), def('c', 'circ_cr', 'O', 3), def('A', 'sobre', 'c', 3.6), def('B', 'sobre', 'c', -0.3), def('P', 'sobre', 'c', 1.6),

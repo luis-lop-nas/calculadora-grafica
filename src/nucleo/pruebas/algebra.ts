@@ -115,4 +115,19 @@ export function pruebasAlgebra() {
   const qrA = X.qr(An)!
   cerca('QR: Q·R = A', Math.max(...mulNum(qrA.Q, qrA.R).flatMap((f, i) => f.map((v, j) => Math.abs(v - An[i][j])))), 0, 1e-12)
   cerca('QR: QᵀQ = I', Math.abs(qrA.Q.reduce((s, f) => s + f[0] * f[1], 0)), 0, 1e-12)
+  // Gram–Schmidt exacto, proyección sobre col(A) y mínimos cuadrados
+  {
+    const R = (n: number, d = 1) => X.r(n, d)
+    const g = X.gramSchmidtR([[R(1), R(1), R(0)], [R(1), R(0), R(1)], [R(0), R(1), R(1)]])
+    cierto('Gram–Schmidt exacto: w₂ = (1/2, −1/2, 1)', g[1].w.map(X.textoR).join(' ') === '1/2 −1/2 1', g[1].w.map(X.textoR).join(' '))
+    cierto('Gram–Schmidt exacto: los wₖ son ortogonales', g.every((a, i) => g.every((b, j) => i === j || X.productoR(a.w, b.w).n === 0n)))
+    cierto('Gram–Schmidt: una columna dependiente da w = 0', X.gramSchmidtR([[R(1), R(2)], [R(2), R(4)]])[1].nulo)
+    cierto('√(9/4) exacta = 3/2', X.texRaizR(R(9, 4)) === '\\frac{3}{2}')
+    // recta de mínimos cuadrados por (0,1), (1,2), (2,2), (3,4): y = 0.9 + 0.9 x
+    const A = [[1, 0], [1, 1], [1, 2], [1, 3]].map((f) => f.map((v) => R(v)))
+    const pr = X.proyeccionR(A, [1, 2, 2, 4].map((v) => R(v)))!
+    cierto('mínimos cuadrados: x̂ = (9/10, 9/10)', pr.x.map(X.textoR).join(' ') === '9/10 9/10', pr.x.map(X.textoR).join(' '))
+    cierto('mínimos cuadrados: el residuo es ⟂ a las columnas', X.transpuestaR(A).every((c) => X.productoR(c, pr.residuo).n === 0n))
+    cierto('la matriz de proyección es idempotente', X.igualM(X.mulR(pr.P, pr.P), pr.P))
+  }
 }

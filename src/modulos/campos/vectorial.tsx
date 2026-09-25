@@ -1,10 +1,21 @@
 import { definir, type Asa, type PropsPanel } from '../../nucleo/tipos'
 import { accion, capaVer, coords } from '../../nucleo/menu'
-import { Atajos, Expresion, Grupo, Interruptor, Matriz, Muestra, Nota, Rango } from '../../nucleo/controles'
+import { Atajos, Expresion, Grupo, Interruptor, Matriz, Muestra, Nota, Rango, Segmentado } from '../../nucleo/controles'
 import { compilarSuave } from '../../lib/expresion'
 import { altura } from '../../render/tema'
+import { divergencia, escalarSimbolico, laplaciano, norma, rotacional } from '../../lib/operadores'
+import { construirRejilla, marching } from '../../lib/mallado'
+import { tex } from '../../lib/cas/tex'
 
 interface S {
+  /** Campo vectorial escrito o gradiente de un campo escalar φ. */
+  modo: 'vectorial' | 'escalar'
+  phi: string
+  /** Superficie de nivel de φ que pasa por la primera sonda. */
+  verNivel: boolean
+  /** Dirección û: derivada direccional y proyección de F sobre ella. */
+  dir: number[]
+  verDir: boolean
   P: string
   Q: string
   R: string
@@ -53,7 +64,35 @@ const PRESETS: Array<{ t: string; P: string; Q: string; R: string }> = [
   { t: 'Espiral', P: '-y+x/4', Q: 'x+y/4', R: '-z/2' },
 ]
 
-function campo(s: S) {
+export const ESCALARES: Array<{ t: string; phi: string }> = [
+  { t: 'r² = x² + y² + z²', phi: 'x^2 + y^2 + z^2' },
+  { t: 'Potencial de una carga 1/r', phi: '1/sqrt(x^2 + y^2 + z^2)' },
+  { t: 'Silla x² − y²', phi: 'x^2 - y^2' },
+  { t: 'xyz', phi: 'x*y*z' },
+  { t: 'Gaussiana e^(−r²)', phi: 'exp(-2*(x^2 + y^2 + z^2))' },
+  { t: 'Ondulado sin x · cos y', phi: 'sin(3*x)*cos(3*y) + z' },
+  { t: 'Plano inclinado', phi: 'x + 2*y - z' },
+]
+
+let cacheEscalar: { src: string; v: ReturnType<typeof escalarSimbolico> | { error: string } } | null = null
+export function escalar(src: string) {
+  if (cacheEscalar?.src === src) return cacheEscalar.v
+  let v: ReturnType<typeof escalarSimbolico> | { error: string }
+  try {
+    v = escalarSimbolico(src)
+  } catch (e) {
+    v = { error: (e as Error).message }
+  }
+  cacheEscalar = { src, v }
+  return v
+}
+
+export function campo(s: S) {
+  if (s.modo === 'escalar') {
+    const e = escalar(s.phi)
+    if ('error' in e) return { F: null, error: e.error }
+    return { F: e.F, error: null as string | null }
+  }
   const a = compilarSuave(s.P, ['x', 'y', 'z'])
   const b = compilarSuave(s.Q, ['x', 'y', 'z'])
   const c = compilarSuave(s.R, ['x', 'y', 'z'])
@@ -64,33 +103,53 @@ function campo(s: S) {
 }
 
 function divRot(F: (x: number, y: number, z: number) => number[], p: number[]) {
-  const h = 1e-4
-  const d = (k: number, c: number) => {
-    const a = p.slice()
-    const b = p.slice()
-    a[c] += h
-    b[c] -= h
-    return (F(a[0], a[1], a[2])[k] - F(b[0], b[1], b[2])[k]) / (2 * h)
-  }
-  const div = d(0, 0) + d(1, 1) + d(2, 2)
-  const rot = [d(2, 1) - d(1, 2), d(0, 2) - d(2, 0), d(1, 0) - d(0, 1)]
-  return { div, rot }
+  return { div: divergencia(F, p), rot: rotacional(F, p) }
 }
+
+const f2 = (v: number) => (Math.abs(v) < 5e-6 ? '0' : v.toFixed(Math.abs(v) >= 100 ? 1 : 3))
+const vec = (v: number[]) => `(${v.map(f2).join(', ')})`
 
 function Panel({ s, set }: PropsPanel<S>) {
   return (
     <>
-      <Grupo titulo="Campo F(x, y, z)">
-        <Expresion etiqueta="P =" valor={s.P} variables={['x', 'y', 'z']} onChange={(P: string) => set({ P })} />
-        <Expresion etiqueta="Q =" valor={s.Q} variables={['x', 'y', 'z']} onChange={(Q: string) => set({ Q })} />
-        <Expresion etiqueta="R =" valor={s.R} variables={['x', 'y', 'z']} onChange={(R: string) => set({ R })} />
-        <Atajos
-          opciones={PRESETS.map((p) => ({
-            t: p.t,
-            activo: s.P === p.P && s.Q === p.Q && s.R === p.R,
-            onClick: () => set({ P: p.P, Q: p.Q, R: p.R }),
-          }))}
+      <Grupo titulo="Campo">
+        <Segmentado
+          valor={s.modo}
+          opciones={[
+            { v: 'vectorial', t: 'Vectorial F' },
+            { v: 'escalar', t: 'Escalar φ y ∇φ' },
+          ]}
+          onChange={(modo) => set({ modo })}
         />
+        {s.modo === 'vectorial' ? (
+          <>
+            <Expresion etiqueta="P =" valor={s.P} variables={['x', 'y', 'z']} onChange={(P: string) => set({ P })} />
+            <Expresion etiqueta="Q =" valor={s.Q} variables={['x', 'y', 'z']} onChange={(Q: string) => set({ Q })} />
+            <Expresion etiqueta="R =" valor={s.R} variables={['x', 'y', 'z']} onChange={(R: string) => set({ R })} />
+            <Atajos
+              opciones={PRESETS.map((p) => ({
+                t: p.t,
+                activo: s.P === p.P && s.Q === p.Q && s.R === p.R,
+                onClick: () => set({ P: p.P, Q: p.Q, R: p.R }),
+              }))}
+            />
+          </>
+        ) : (
+          <>
+            <Expresion etiqueta="φ =" valor={s.phi} variables={['x', 'y', 'z']} onChange={(phi: string) => set({ phi })} />
+            <Atajos opciones={ESCALARES.map((p) => ({ t: p.t, activo: s.phi === p.phi, onClick: () => set({ phi: p.phi }) }))} />
+            <Interruptor activo={s.verNivel} onChange={(verNivel) => set({ verNivel })}>
+              Superficie de nivel por p₁
+            </Interruptor>
+            <Nota>Las flechas son ∇φ: perpendiculares a las superficies de nivel y hacia donde φ crece más deprisa.</Nota>
+          </>
+        )}
+      </Grupo>
+      <Grupo titulo="Dirección û">
+        <Matriz A={[s.dir]} onChange={(A: number[][]) => set({ dir: A[0] })} paso={0.05} filas={[{ nombre: 'u', color: 'var(--pos)' }]} />
+        <Interruptor activo={s.verDir} onChange={(verDir) => set({ verDir })}>
+          {s.modo === 'escalar' ? 'Derivada direccional en p₁' : 'Proyección de F sobre û en p₁'}
+        </Interruptor>
       </Grupo>
 
       <Grupo titulo="Sondas">
@@ -128,20 +187,48 @@ function Panel({ s, set }: PropsPanel<S>) {
   )
 }
 
+/** ¿∇²φ = 0? El CAS no siempre lo reduce (1/r): se mira en puntos cualesquiera. */
+function armonica(e: ReturnType<typeof escalarSimbolico>): boolean {
+  const pts = [[0.31, -0.52, 0.77], [-0.64, 0.23, 0.45], [0.12, 0.86, -0.39], [-0.9, -0.4, -0.2], [0.55, 0.61, 0.08]]
+  return pts.every(([x, y, z]) => {
+    const l = e.L(x, y, z)
+    const esc = Math.max(1, Math.abs(e.f(x, y, z)), Math.hypot(...e.F(x, y, z)))
+    return Number.isFinite(l) && Math.abs(l) < 1e-9 * esc
+  })
+}
+
+function formulasEscalar(s: S): string[] {
+  const e = escalar(s.phi)
+  if ('error' in e) return [String.raw`\nabla\varphi=\left(\varphi_x,\ \varphi_y,\ \varphi_z\right)`]
+  return [
+    String.raw`\varphi=${tex(e.phi)}`,
+    String.raw`\nabla\varphi=\left(${e.grad.map(tex).join(',\\ ')}\right)`,
+    String.raw`\nabla^2\varphi=\nabla\cdot\nabla\varphi=${armonica(e) ? String.raw`0\quad(\varphi\ \text{es armónica})` : tex(e.lap)}`,
+    String.raw`D_{\hat u}\varphi=\nabla\varphi\cdot\hat u,\qquad \nabla\times\nabla\varphi=\mathbf 0`,
+  ]
+}
+
 export default definir<S>({
   id: 'vectorial',
   area: 'campos',
-  resumen: 'Campos vectoriales, divergencia y rotacional',
+  resumen: 'Campos vectoriales y escalares: módulo, gradiente, divergencia, rotacional, laplaciano y derivada direccional',
   corto: 'Campos vectoriales',
   titulo: 'Campos <i>vectoriales</i>',
   entradilla: 'La divergencia dice si el punto es fuente o sumidero; el rotacional, cuánto gira a su alrededor.',
   inicial: {
+    modo: 'vectorial',
+    phi: ESCALARES[0].phi,
+    verNivel: true,
+    dir: [1, 0, 0],
+    verDir: true,
     P: PRESETS[4].P, Q: PRESETS[4].Q, R: PRESETS[4].R,
     n: 7, escala: 1, verFlechas: true, verLineas: true, sonda: [[0.5, 0.3, 0.4]],
     verLineaSonda: true, verRot: true,
   },
   Panel,
   capas: (s) => [
+    ...(s.modo === 'escalar' ? [capaVer(s, 'verNivel', 'Superficie de nivel', '--pos')] : []),
+    capaVer(s, 'verDir', 'Dirección û y proyección', '--aux'),
     capaVer(s, 'verFlechas', 'Flechas coloreadas por ‖F‖', '--accent'),
     capaVer(s, 'verLineas', 'Líneas de campo', '--accent'),
     capaVer(s, 'verLineaSonda', 'Línea por la sonda', '--accent'),
@@ -153,10 +240,11 @@ export default definir<S>({
     ejemplos: PRESETS.map((p) => ({ t: p.t, tipo: 'radio' as const, activo: s.P === p.P && s.Q === p.Q && s.R === p.R, hacer: () => ({ P: p.P, Q: p.Q, R: p.R }) })),
   }),
   rotulo: (s) => {
+    if (s.modo === 'escalar') return { nombre: ESCALARES.find((q) => q.phi === s.phi)?.t ?? 'Campo escalar propio', apunte: 'F = ∇φ' }
     const p = PRESETS.find((q) => q.P === s.P && q.Q === s.Q && q.R === s.R)
     return { nombre: p?.t ?? 'Campo propio', apunte: 'F = (P, Q, R)' }
   },
-  formula: () => [
+  formula: (s) => s.modo === 'escalar' ? formulasEscalar(s) : [
     String.raw`\operatorname{div}\mathbf F=\nabla\!\cdot\!\mathbf F=P_x+Q_y+R_z`,
     String.raw`\operatorname{rot}\mathbf F=\nabla\times\mathbf F=(R_y-Q_z,\;P_z-R_x,\;Q_x-P_y)`,
     String.raw`\operatorname{div}(\operatorname{rot}\mathbf F)=0,\qquad \operatorname{rot}(\nabla f)=\mathbf 0`,
@@ -169,14 +257,38 @@ export default definir<S>({
     if (!v.every(Number.isFinite)) return [['F en p', 'no definido en ese punto']]
     const { div, rot } = divRot(F, p)
     const nr = Math.hypot(...rot)
+    const nu = norma(s.dir)
+    const u = nu > 1e-12 ? s.dir.map((c) => c / nu) : null
+    const Fu = u ? v[0] * u[0] + v[1] * u[1] + v[2] * u[2] : NaN
+    const esc = s.modo === 'escalar' ? escalar(s.phi) : null
+    const propias: Array<[string, string]> =
+      esc && !('error' in esc)
+        ? [
+            ['φ(p₁)', f2(esc.f(p[0], p[1], p[2]))],
+            ['∇φ(p₁)', vec(v)],
+            ['‖∇φ‖ (ritmo máximo de subida)', f2(norma(v))],
+            ['∇²φ (exacto · numérico)', `${f2(esc.L(p[0], p[1], p[2]))} · ${f2(laplaciano(esc.f, p))}`],
+            ...(u ? ([['D_û φ = ∇φ · û', f2(Fu)]] as Array<[string, string]>) : []),
+            ['‖rot ∇φ‖ (siempre 0)', f2(nr)],
+          ]
+        : [
+            ['F(p₁)', vec(v)],
+            ['‖F(p₁)‖', f2(norma(v))],
+            ['div F', f2(div)],
+            ['rot F', vec(rot)],
+            ['‖rot F‖', f2(nr)],
+            ...(u
+              ? ([
+                  ['F · û (componente sobre û)', f2(Fu)],
+                  ['Proyección (F · û) û', vec(u.map((c) => Fu * c))],
+                  ['Parte perpendicular ‖F − (F · û) û‖', f2(norma(v.map((c, i) => c - Fu * u[i])))],
+                ] as Array<[string, string]>)
+              : []),
+            ['¿Solenoidal aquí?', Math.abs(div) < 1e-3 ? 'sí (div ≈ 0)' : 'no'],
+            ['¿Irrotacional aquí?', nr < 1e-3 ? 'sí (rot ≈ 0)' : 'no'],
+          ]
     return [
-      ['F(p)', `(${v.map((c) => c.toFixed(2)).join(', ')})`],
-      ['‖F(p)‖', Math.hypot(...v).toFixed(5)],
-      ['div F', div.toFixed(5)],
-      ['‖rot F‖', nr.toFixed(5)],
-      ['rot F', `(${rot.map((c) => c.toFixed(2)).join(', ')})`],
-      ['¿Solenoidal aquí?', Math.abs(div) < 1e-3 ? 'sí (div ≈ 0)' : 'no'],
-      ['¿Irrotacional aquí?', nr < 1e-3 ? 'sí (rot ≈ 0)' : 'no'],
+      ...propias,
       ...s.sonda.slice(1).flatMap((q, i): Array<[string, string]> => {
         const w = F(q[0], q[1], q[2])
         if (!w.every(Number.isFinite)) return [[`p${sub(i + 2)}`, 'no definido']]
@@ -187,7 +299,9 @@ export default definir<S>({
   },
   leyenda: (s) => (
     <>
-      <span>color = ‖F‖</span>
+      <span>color = ‖{s.modo === 'escalar' ? '∇φ' : 'F'}‖</span>
+      {s.modo === 'escalar' && s.verNivel && <Muestra color="var(--pos)">φ = φ(p₁)</Muestra>}
+      {s.verDir && <Muestra color="var(--aux)">{s.modo === 'escalar' ? '(∇φ · û) û' : '(F · û) û'}</Muestra>}
       {s.verLineas && <Muestra color="var(--accent)">líneas de campo</Muestra>}
       <Muestra color="var(--ink)">sondas y F</Muestra>
       {s.verLineaSonda && <Muestra color="var(--accent)">línea por la sonda</Muestra>}
@@ -287,6 +401,38 @@ export default definir<S>({
           }
         }
         void acento
+      }
+
+      // superficie de nivel de φ por la primera sonda
+      const esc = s.modo === 'escalar' ? escalar(s.phi) : null
+      if (esc && !('error' in esc) && s.verNivel) {
+        const p0 = s.sonda[0]
+        const c0 = esc.f(p0[0], p0[1], p0[2])
+        if (Number.isFinite(c0)) {
+          const { pos, nor } = marching(construirRejilla((x, y, z) => {
+            const v = esc.f(x, y, z) - c0
+            return Number.isFinite(v) ? v : 1e6
+          }, 1.1, 44), 1, 0)
+          if (pos.length) e.malla(pos, nor, e.color('--pos'), { opacidad: 0.35 })
+        }
+      }
+      // dirección û en la primera sonda: derivada direccional o proyección de F
+      const nu = norma(s.dir)
+      if (s.verDir && nu > 1e-9) {
+        const p0 = s.sonda[0] as [number, number, number]
+        const u = s.dir.map((c) => c / nu)
+        e.flecha([u[0] * 0.45, u[1] * 0.45, u[2] * 0.45], e.color('--pos'), p0, 0.007)
+        e.rotulo('û', [p0[0] + u[0] * 0.52, p0[1] + u[1] * 0.52, p0[2] + u[2] * 0.52], 0.15)
+        const v = F(p0[0], p0[1], p0[2])
+        const m = norma(v)
+        if (m > 1e-9 && v.every(Number.isFinite)) {
+          const k = (v[0] * u[0] + v[1] * u[1] + v[2] * u[2]) / m
+          const pr: [number, number, number] = [u[0] * k * 0.4, u[1] * k * 0.4, u[2] * k * 0.4]
+          if (Math.abs(k) > 1e-3) e.flecha(pr, e.color('--aux'), p0, 0.009)
+          // la perpendicular, de la punta de F a la de su proyección
+          const tip: [number, number, number] = [p0[0] + (v[0] / m) * 0.4, p0[1] + (v[1] / m) * 0.4, p0[2] + (v[2] / m) * 0.4]
+          e.linea([tip, [p0[0] + pr[0], p0[1] + pr[1], p0[2] + pr[2]]], e.color('--aux'), 0.6)
+        }
       }
 
       s.sonda.forEach((p, i) => {

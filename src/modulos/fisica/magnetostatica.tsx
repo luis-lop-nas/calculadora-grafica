@@ -1,3 +1,4 @@
+import { divergencia, rotacional } from '../../lib/operadores'
 import { definir, type PropsPanel } from '../../nucleo/tipos'
 import { accion, capaFija, capaVer, casilla, coords } from '../../nucleo/menu'
 import { Atajos, Expresion, Grupo, Interruptor, Muestra, Rango, Resultado } from '../../nucleo/controles'
@@ -203,6 +204,9 @@ function lecturas(s: EstadoMagneto): Array<[string, string]> {
     ['B en P', `(${b.map((v) => v.toFixed(5)).join(', ')})`],
     ['|B| en P', Math.hypot(...b).toFixed(6)],
   ]
+  // ∇·B = 0 siempre; ∇×B = μ₀J, que es 0 fuera de los hilos
+  const Bf = (x: number, y: number, z: number) => B([x, y, z])
+  filas.push(['∇·B (siempre 0)', divergencia(Bf, P, 1e-3).toExponential(1)], ['|∇×B| (μ₀J: 0 fuera del hilo)', Math.hypot(...rotacional(Bf, P, 1e-3)).toExponential(1)])
   const circ = circulacion(B, P, s.rho, [0, 1, 0], 24)
   filas.push(['∮ B·dl (camino, sentido x → z)', circ.toFixed(6)])
   if (s.I !== 0) filas.push(['∮ B·dl / (μ₀I) = vueltas enlazadas', (circ / s.I).toFixed(6)])
