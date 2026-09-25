@@ -612,28 +612,33 @@ export function Lienzo3D({ vista, s, set, giro, enlace, transparente, secundario
             {modo === '3d' ? '3D' : modo.toUpperCase()}
           </button>
         ))}
-        <button
-          type="button"
-          className={prefs.planos ? 'activo' : undefined}
-          aria-pressed={prefs.planos}
-          title="Mostrar cuadrículas en XY, XZ e YZ"
-          onClick={() => cambiarPrefs({ planos: !prefs.planos })}
-        >
-          Planos
-        </button>
-        <button
-          type="button"
-          title="Descargar imagen PNG"
-          onClick={() => {
-            escena.current?.pintar()
-            if (ref.current) descargarCanvas(ref.current, 'calculadora-3d')
-          }}
-        >
-          PNG
-        </button>
-        <button type="button" className="ayuda-atajos" aria-label="Atajos de teclado" title={ATAJOS_3D}>
-          ?
-        </button>
+        {/* en la app de Mac están en el menú: Vista (planos), Archivo (PNG) y Ayuda (atajos) */}
+        {!escritorio && (
+          <>
+            <button
+              type="button"
+              className={prefs.planos ? 'activo' : undefined}
+              aria-pressed={prefs.planos}
+              title="Mostrar cuadrículas en XY, XZ e YZ"
+              onClick={() => cambiarPrefs({ planos: !prefs.planos })}
+            >
+              Planos
+            </button>
+            <button
+              type="button"
+              title="Descargar imagen PNG"
+              onClick={() => {
+                escena.current?.pintar()
+                if (ref.current) descargarCanvas(ref.current, 'calculadora-3d')
+              }}
+            >
+              PNG
+            </button>
+            <button type="button" className="ayuda-atajos" aria-label="Atajos de teclado" title={ATAJOS_3D}>
+              ?
+            </button>
+          </>
+        )}
       </div>}
     </>
   )
