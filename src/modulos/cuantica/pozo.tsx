@@ -264,7 +264,7 @@ export default definir<EstadoPozo>({
     { t: 'Pozo infinito: n = 3', e: { sistema: 'infinito', n: 3, a: 2 } },
     { t: 'Pozo finito', e: { sistema: 'finito', n: 1, V0: 8, a: 2 } },
     { t: 'Pozo finito poco profundo (un solo nivel)', e: { sistema: 'finito', n: 1, V0: 0.5, a: 1 } },
-    { t: 'Oscilador armónico: n = 0', e: { sistema: 'armonico', n: 0, omega: 1 } },
+    { t: 'Oscilador armónico: fundamental (E₀ = ħω/2)', e: { sistema: 'armonico', n: 1, omega: 1 } },
     { t: 'Barrera: efecto túnel (E < V₀)', e: { sistema: 'barrera', V0: 8, a: 1, E: 4, transmision: true } },
   ],
   Panel,
@@ -325,10 +325,13 @@ export default definir<EstadoPozo>({
       ]
     }
     const ns = niveles(s)
-    const E = ns[Math.min(s.n, ns.length) - 1] ?? 0
+    // s.n cuenta desde 1 (el fundamental); el oscilador se rotula desde 0, como en los libros
+    const k = Math.max(1, Math.min(s.n, ns.length))
+    const E = ns[k - 1]
+    const sub = s.sistema === 'armonico' ? k - 1 : k
     const filas: Array<[string, string]> = [
-      ['Estados ligados', `${ns.length}`],
-      [`E${s.n}`, E.toFixed(4)],
+      ['Estados ligados', s.sistema === 'finito' ? `${ns.length}` : `infinitos (se ven ${ns.length})`],
+      [`E${sub}`, s.sistema === 'armonico' ? `${E.toFixed(4)} = (${sub} + ½)ħω` : E.toFixed(4)],
     ]
     if (s.sistema === 'finito') {
       const q = Math.sqrt(2 * (s.V0 - E))
@@ -339,7 +342,7 @@ export default definir<EstadoPozo>({
       filas.push(['Predicción ⌈z₀/(π/2)⌉', `${Math.ceil(z0 / (Math.PI / 2))}`])
     }
     if (s.sistema === 'armonico') filas.push(['Separación ħω', s.omega.toFixed(2)])
-    if (ns.length > 1) filas.push(['E₂ − E₁', (ns[1] - ns[0]).toFixed(4)])
+    if (ns.length > 1) filas.push([s.sistema === 'armonico' ? 'E₁ − E₀' : 'E₂ − E₁', (ns[1] - ns[0]).toFixed(4)])
     return filas
   },
   leyenda: (s) =>

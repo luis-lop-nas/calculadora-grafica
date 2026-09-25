@@ -1726,6 +1726,17 @@ seccion('Ejemplos del armazón: todos dan fórmulas y lecturas finitas')
     }
   }
   cierto('hay ejemplos del armazón', n >= 40, String(n))
+  // lecturas concretas de ejemplos, contra la forma cerrada
+  const lectura = (id: string, t: string, clave: string) => {
+    const m = MODULOS.find((x) => x.id === id)!
+    const ej = m.ejemplos!.find((x) => x.t.startsWith(t))!
+    return m.lecturas!({ ...m.inicial, ...ej.e }).find(([a]) => a.startsWith(clave))?.[1] ?? ''
+  }
+  cierto('órbitas: v₀ = √(μ/r₀) es una circunferencia', lectura('orbitas', 'Órbita circular', 'Tipo').includes('circunferencia'))
+  cierto('órbitas: circunferencia sin precesión que medir', lectura('orbitas', 'Órbita circular', 'Precesión') === '')
+  cierto('órbitas: v₀ = √(2μ/r₀) es una parábola', lectura('orbitas', 'Velocidad de escape', 'Tipo').includes('parábola'))
+  cierto('pozo: oscilador, E₀ = ħω/2', lectura('pozo', 'Oscilador', 'E0').startsWith('0.5000'))
+  cierto('oscilaciones: cadena libre, ω₁ = 0 y T = ∞', lectura('oscilaciones', 'Cadena libre', 'ω1').includes('∞'))
 }
 
 /* ═══════════ resumen ═══════════ */

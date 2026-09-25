@@ -313,17 +313,23 @@ export default definir<EstadoOrbitas>({
       dE = Math.max(dE, Math.abs(iv.E - E))
       dL = Math.max(dL, Math.abs(iv.L - L))
     }
+    // la radial apenas se mueve: circunferencia (no hay pericentro ni precesión que medir)
+    const rs = tr.y.map((y) => Math.hypot(y[0], y[1]))
+    const circular = Math.max(...rs) - Math.min(...rs) < 1e-6 * Math.max(...rs)
+    // E = 0 exacto no sale nunca en coma flotante: tolerancia relativa a la escala μ/r₀
+    const cero = 1e-9 * (s.mu / s.r0)
+    const tipo = circular ? 'ligada (circunferencia)' : E < -cero ? 'ligada (elipse)' : Math.abs(E) <= cero ? 'parábola: escapa justo' : 'hipérbola: escapa'
     const filas: Array<[string, string]> = [
       ['Energía E', E.toFixed(6)],
       ['Momento angular L', L.toFixed(6)],
-      ['Tipo', E < 0 ? 'ligada (elipse)' : E === 0 ? 'parábola' : 'hipérbola: escapa'],
+      ['Tipo', tipo],
       ['Deriva de E y de L', `${dE.toExponential(1)} · ${dL.toExponential(1)}`],
     ]
     if (s.eps === 0) {
       filas.push(['Excentricidad e', el.e.toFixed(6)])
       if (E < 0) filas.push(['Semieje a', el.a.toFixed(6)], ['Periodo T = 2π√(a³/μ)', el.T.toFixed(6)])
     }
-    const ps = periapsides(tr)
+    const ps = circular ? [] : periapsides(tr)
     if (ps.length >= 2) {
       filas.push(['Periodo radial medido', ((ps[ps.length - 1].t - ps[0].t) / (ps.length - 1)).toFixed(6)])
       let d = ps[1].ang - ps[0].ang

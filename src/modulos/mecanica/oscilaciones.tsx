@@ -320,7 +320,9 @@ export default definir<EstadoOsc>({
     }
     const md = modos(s)
     if ('error' in md) return [['No se puede', md.error]]
-    return md.w.map((w, i) => [`ω${i + 1}`, `${w.toFixed(6)}   (T = ${w > 1e-12 ? ((2 * Math.PI) / w).toFixed(4) : '∞'})`] as [string, string])
+    // ω² sale de un problema de autovalores: el modo de traslación da ~1e-9, no 0 exacto
+    const cero = 1e-6 * Math.max(...md.w, 1e-300)
+    return md.w.map((w, i) => [`ω${i + 1}`, w < cero ? '0   (traslación rígida: T = ∞)' : `${w.toFixed(6)}   (T = ${((2 * Math.PI) / w).toFixed(4)})`] as [string, string])
   },
   leyenda: (s) =>
     s.modo === 'forzado' ? (
