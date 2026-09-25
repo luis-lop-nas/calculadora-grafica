@@ -110,6 +110,27 @@ function Cajon({
   onCerrar: () => void
 }) {
   const caja = useRef<HTMLElement>(null)
+  // Secciones plegadas: abiertas con clic (fijas) o al pasar el ratón. Las abiertas al pasar
+  // no se cierran hasta salir de la lista, para que nada salte bajo el cursor.
+  const [fijas, setFijas] = useState<ReadonlySet<Area>>(() => new Set(areas.filter(([, mods]) => mods.some((m) => m.id === id)).map(([a]) => a)))
+  const [pasadas, setPasadas] = useState<ReadonlySet<Area>>(new Set())
+  const espera = useRef<number>()
+  const abierta = (a: Area) => fijas.has(a) || pasadas.has(a)
+  const alternar = (a: Area) => {
+    const abrir = !abierta(a)
+    setFijas((f) => {
+      const n = new Set(f)
+      if (abrir) n.add(a)
+      else n.delete(a)
+      return n
+    })
+    if (!abrir) setPasadas((p) => new Set([...p].filter((x) => x !== a)))
+  }
+  const entrar = (a: Area) => {
+    window.clearTimeout(espera.current)
+    espera.current = window.setTimeout(() => setPasadas((p) => (p.has(a) ? p : new Set(p).add(a))), 140)
+  }
+  useEffect(() => () => window.clearTimeout(espera.current), [])
   useEffect(() => {
     const previo = document.activeElement as HTMLElement | null
     const actual = caja.current?.querySelector<HTMLButtonElement>('[aria-current="true"]')
@@ -134,19 +155,34 @@ function Cajon({
             ×
           </button>
         </div>
-        <div className="cajon-lista">
+        <div
+          className="cajon-lista"
+          onMouseLeave={() => {
+            window.clearTimeout(espera.current)
+            setPasadas(new Set())
+          }}
+        >
           {areas.map(([a, mods]) => (
-            <section key={a}>
-              <h2 title={AREAS[a]}>{AREAS_CORTAS[a]}</h2>
-              <ul>
-                {mods.map((m) => (
-                  <li key={m.id}>
-                    <button type="button" aria-current={m.id === id} title={m.resumen} onClick={() => onElegir(m.id)}>
-                      {m.corto ?? m.resumen}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            <section key={a} onMouseEnter={() => entrar(a)} onMouseLeave={() => window.clearTimeout(espera.current)}>
+              <h2 title={AREAS[a]}>
+                <button type="button" className="cajon-seccion" aria-expanded={abierta(a)} onClick={() => alternar(a)}>
+                  {AREAS_CORTAS[a]}
+                  <span className="cajon-flecha" aria-hidden="true">
+                    ›
+                  </span>
+                </button>
+              </h2>
+              {abierta(a) && (
+                <ul>
+                  {mods.map((m) => (
+                    <li key={m.id}>
+                      <button type="button" aria-current={m.id === id} title={m.resumen} onClick={() => onElegir(m.id)}>
+                        {m.corto ?? m.resumen}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
           ))}
         </div>
