@@ -165,7 +165,7 @@ export default definir<S>({
       },
     },
     dibujar(g: Pintor2D, s) {
-      g.ejes({ etiquetaX: 'x', etiquetaY: 'y', paso: 0.5 })
+      g.ejes({ etiquetaX: 'x', etiquetaY: 'y' })
       const dibujaBola = (m: Metrica, color: string, discontinua = false) => {
         const pts: Array<[number, number]> = []
         for (let i = 0; i <= 360; i++) {

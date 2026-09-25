@@ -259,7 +259,7 @@ export default definir<EstadoFiltro>({
       g.finRegion()
 
       g.region(0.4, 0, 0.6, 0.55)
-      g.fondoRegion(g.color('--ground'))
+      g.panel()
       const ws = Array.from({ length: 800 }, (_, i) => (Math.PI * i) / 799)
       const H = ws.map((w) => respuestaFrecuencia(c, w))
       const mag = H.map((h) => Math.hypot(...h))

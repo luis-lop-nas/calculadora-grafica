@@ -149,7 +149,7 @@ function dibujarCiclo(g: Pintor2D, s: EstadoTermo) {
   const ds = smax - smin
   const Ttope = techo(1.12 * res.Tmax)
   g.ventana = { x: [smin - 0.2 * ds, smax + 0.12 * ds], y: [-0.07 * Ttope, 1.04 * Ttope] }
-  g.ejes({ etiquetaX: 'S − S₁ (J/K)', etiquetaY: 'T (K)', rejilla: true })
+  g.ejes({ etiquetaX: 'S − S₁ (J/K)', etiquetaY: 'T (K)' })
   // el rectángulo de Carnot entre las mismas temperaturas extremas y el mismo salto de entropía
   g.curva([[smin, res.Tmin], [smax, res.Tmin], [smax, res.Tmax], [smin, res.Tmax], [smin, res.Tmin]], g.color('--ink-soft'), 1, true)
   g.rellenar(S.flat(), g.color('--accent'), 0.14)
@@ -168,7 +168,7 @@ function dibujarCiclo(g: Pintor2D, s: EstadoTermo) {
   const Pmax = Math.max(...PV.flat().map((q) => q[1]))
   const [Vtope, Ptope] = [techo(1.08 * Vmax), techo(1.1 * Pmax)]
   g.ventana = { x: [-0.12 * Vtope, 1.04 * Vtope], y: [-0.07 * Ptope, 1.04 * Ptope] }
-  g.ejes({ etiquetaX: 'V (L)', etiquetaY: 'P (kPa)', rejilla: true })
+  g.ejes({ etiquetaX: 'V (L)', etiquetaY: 'P (kPa)' })
   const nR = gas.n * R
   for (const T of [res.Tmax, res.Tmin]) {
     const iso: Array<[number, number]> = []
@@ -269,7 +269,7 @@ function dibujarVdW(g: Pintor2D, s: EstadoTermo) {
   // p_sat(T) a la derecha
   g.region(0.64, 0.1, 0.35, 0.74)
   g.ventana = { x: [0.36, 1.42], y: [-0.12, 1.95] }
-  g.ejes({ etiquetaX: 'T / T_c', etiquetaY: 'p / p_c', rejilla: true })
+  g.ejes({ etiquetaX: 'T / T_c', etiquetaY: 'p / p_c' })
   const pst: Array<[number, number]> = []
   for (let i = 0; i <= 120; i++) {
     const T = 0.5 + (0.5 * i) / 120 - (i === 120 ? 1e-7 : 0)
@@ -287,7 +287,7 @@ function dibujarVdW(g: Pintor2D, s: EstadoTermo) {
 
   g.region(0.01, 0.04, 0.6, 0.84)
   g.ventana = { x: [...VENTANA_VDW.x], y: [...VENTANA_VDW.y] }
-  g.ejes({ etiquetaX: 'v / v_c', etiquetaY: 'p / p_c', rejilla: true })
+  g.ejes({ etiquetaX: 'v / v_c', etiquetaY: 'p / p_c' })
   const { binodal, espinodal: esp } = campana()
   g.rellenar(binodal, g.color('--accent'), 0.08)
   g.curva(binodal, g.color('--accent'), 1.6)

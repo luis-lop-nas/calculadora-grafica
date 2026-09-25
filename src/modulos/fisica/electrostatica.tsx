@@ -100,7 +100,7 @@ function lineas(s: EstadoElectro): Array<Array<[number, number]>> {
 function dibujar(g: Pintor2D, s: EstadoElectro) {
   g.ventana = { ...MARCO }
   g.igualarEscala()
-  g.ejes({ rejilla: true })
+  g.ejes()
   const { imgs, todas: ts } = todas(s)
   const fuera = (x: number, y: number) => !dentro(s.conductor, s.R, x, y)
   // conductor

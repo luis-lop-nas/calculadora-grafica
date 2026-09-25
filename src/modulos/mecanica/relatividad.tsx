@@ -74,7 +74,7 @@ function ejesPrima(g: Pintor2D, b: number, alcance: number, rejilla: boolean) {
 }
 
 function fondo(g: Pintor2D, alcance: number) {
-  g.ejes({ etiquetaX: 'x', etiquetaY: 't', rejilla: true, paso: 1 })
+  g.ejes({ etiquetaX: 'x', etiquetaY: 't' })
   // cono de luz e hipérbolas de calibración t² − x² = ±1
   g.curva([[-alcance, -alcance], [alcance, alcance]], g.color('--ocre'), 1.2, true)
   g.curva([[-alcance, alcance], [alcance, -alcance]], g.color('--ocre'), 1.2, true)

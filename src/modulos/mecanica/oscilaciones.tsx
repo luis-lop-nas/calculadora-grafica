@@ -179,7 +179,6 @@ function vistaModos(g: Pintor2D, s: EstadoOsc, md: Modos, reloj: number) {
   g.region(0, 0, 1, 0.5)
   const ancho = n + 1
   g.ventana = { x: [-0.3, ancho + 0.3], y: [-1, 1] }
-  g.ejes({ rejilla: false })
   const pos = x.map((d, i) => i + 1 + (0.35 * d) / amp)
   const muelle = (a: number, b: number) => {
     const pts: Array<[number, number]> = []
@@ -199,7 +198,7 @@ function vistaModos(g: Pintor2D, s: EstadoOsc, md: Modos, reloj: number) {
 
   // formas de los modos (desplazamiento de cada masa) y frecuencias
   g.region(0, 0.5, 0.6, 0.5)
-  g.fondoRegion(g.color('--ground'))
+  g.panel()
   const vmax = Math.max(1e-9, ...md.V.flat().map(Math.abs))
   // con extremos fijos las paredes son nodos: se dibujan para que se vea la forma sinusoidal
   const paredes = s.modo === 'cadena' && s.extremos === 'fijos'
@@ -253,7 +252,7 @@ function vistaForzado(g: Pintor2D, s: EstadoOsc) {
   const As = Ws.map((W) => amplitudForzada(s.mf, s.kf, s.c, s.F0, W))
   const top = Math.min(Math.max(...As.filter(Number.isFinite)), 50 * (s.F0 / s.kf || 1))
   g.region(0, 0.5, 0.55, 0.5)
-  g.fondoRegion(g.color('--ground'))
+  g.panel()
   g.ventana = { x: [0, Wmax], y: [0, 1.15 * top] }
   g.ejes({ etiquetaX: 'Ω', etiquetaY: 'A' })
   g.curva(Ws.map((W, i) => [W, Math.min(As[i], 2 * top)] as [number, number]), g.color('--accent'), 2)

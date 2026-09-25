@@ -206,7 +206,7 @@ function vistaAnimacion(g: Pintor2D, s: EstadoLagrangiano, c: Calculo, reloj: nu
   const todos = muestra.flatMap((y) => c.puntos.map((p) => p(y)))
   g.ventana = marcoDe(todos, true)
   g.igualarEscala()
-  g.ejes({ rejilla: true })
+  g.ejes()
   if (!c.puntos.length) {
     g.texto('escribe la posición de los cuerpos en «cuerpos» para verlos moverse', g.ventana.x[0] * 0.95, g.ventana.y[1] * 0.9, g.color('--ink-soft'))
     return

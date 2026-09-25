@@ -384,7 +384,7 @@ const vista1d: Vista<EstadoOnda> = {
   dibujar(g, s, pared) {
     const t = reloj.avanzar(pared, s.jugando)
     g.ventana = { x: [-0.08, 1.08], y: [-1.6, 1.6] }
-    g.ejes({ etiquetaX: 'x', etiquetaY: 'u', paso: 0.25 })
+    g.ejes({ etiquetaX: 'x', etiquetaY: 'u' })
     const suave = g.color('--ink-soft')
     const modos = modos1d(s)
     const { A, B } = coeficientes(s)

@@ -164,7 +164,7 @@ function vistaOrbita(g: Pintor2D, s: EstadoOrbitas, reloj: number) {
   g.region(0, 0, 0.62, 1)
   g.ventana = { x: [-R, R], y: [-R, R] }
   g.igualarEscala()
-  g.ejes({ rejilla: true })
+  g.ejes()
   const tEnd = tr.t[tr.t.length - 1]
   if (s.areas) {
     const { E, L } = invariantes(s.mu, s.eps, estadoInicial(s))
@@ -192,7 +192,7 @@ function vistaOrbita(g: Pintor2D, s: EstadoOrbitas, reloj: number) {
 
   // potencial efectivo U = L²/(2r²) − μ/r − ε/r³ y la energía
   g.region(0.62, 0, 0.38, 1)
-  g.fondoRegion(g.color('--ground'))
+  g.panel()
   const { E, L } = invariantes(s.mu, s.eps, estadoInicial(s))
   const U = (r: number) => (L * L) / (2 * r * r) - s.mu / r - s.eps / r ** 3
   const rMax = Math.max(3 * s.r0, (L * L) / s.mu * 3)
@@ -215,7 +215,7 @@ function vistaHohmann(g: Pintor2D, s: EstadoOrbitas, reloj: number) {
   const R = 1.2 * Math.max(s.r1, s.r2)
   g.ventana = { x: [-R, R], y: [-R, R] }
   g.igualarEscala()
-  g.ejes({ rejilla: true })
+  g.ejes()
   g.curva(circulo(s.r1), g.color('--pos'), 1.6)
   g.curva(circulo(s.r2), g.color('--ink-soft'), 1.6)
   // elipse de transferencia con foco en el origen, periapsis en (r₁, 0)

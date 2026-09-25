@@ -471,7 +471,7 @@ const vistaPlano: Vista<S> = {
       const per = p.cfg.contorno === 'periodica'
       const hx = sim.hx
       mapaDeCalor(g, (i, j) => arr[j * sim.n + i], sim.n, sim.ny, c.rango[k], signo, [a - (per ? 0 : hx / 2), per ? b : b + hx / 2, a - (per ? 0 : hx / 2), per ? b : b + hx / 2])
-      g.ejes({ etiquetaX: 'x', etiquetaY: 'y', rejilla: false })
+      g.ejesMapa({ etiquetaX: 'x', etiquetaY: 'y' })
       pie(g, sim, s)
       return
     }
@@ -523,7 +523,7 @@ const vistaPlano: Vista<S> = {
         g.ctx.drawImage(cimg, g.X(a), Math.min(y0, y1) - 0.5, g.X(per ? b : sim.xs[sim.n - 1]) - g.X(a), Math.abs(y1 - y0) + 1)
       }
     }
-    g.ejes({ etiquetaX: 'x', etiquetaY: 't', rejilla: false })
+    g.ejesMapa({ etiquetaX: 'x', etiquetaY: 't' })
     if (p.estacionaria) g.texto('estacionaria: no hay evolución en t', a, 0.5 * t1, g.color('--ink-soft'), { dx: 8 })
     g.finRegion()
   },

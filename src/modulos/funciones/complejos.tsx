@@ -302,7 +302,7 @@ export default definir<S>({
         return
       }
       if (s.modo === 'dominio') colorearDominio(g, s, f)
-      g.ejes({ etiquetaX: 'Re z', etiquetaY: 'Im z', rejilla: true, paso: 1 })
+      g.ejes({ etiquetaX: 'Re z', etiquetaY: 'Im z' })
       if (s.modo === 'rejilla') rejillaConforme(g, s, f)
       if (s.modo === 'polya') campoPolya(g, s, f)
 

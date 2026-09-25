@@ -179,7 +179,7 @@ function dibujarPlano(g: Pintor2D, s: EstadoTeoremas) {
   const m = 0.35 * Math.max(x1 - x0, y1 - y0)
   g.ventana = { x: [x0 - m, x1 + m], y: [y0 - m, y1 + m] }
   g.igualarEscala()
-  g.ejes({ rejilla: true })
+  g.ejes()
   const { x: [X0, X1], y: [Y0, Y1] } = g.ventana
   // mapa del integrando de la región (rotacional o divergencia) dentro de la curva
   const f = s.modo === 'green' ? F.rot : F.div

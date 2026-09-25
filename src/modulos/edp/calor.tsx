@@ -423,7 +423,7 @@ const vista1d: Vista<EstadoCalor> = {
   dibujar(g, s, pared) {
     const t = reloj.avanzar(pared, s.jugando)
     g.ventana = { x: [-0.08, 1.08], y: [-1.25, 1.35] }
-    g.ejes({ etiquetaX: 'x', etiquetaY: 'u', paso: 0.25 })
+    g.ejes({ etiquetaX: 'x', etiquetaY: 'u' })
     const u = solucion1d(s)
     const uS = estacionario(s)
     const curva = (tt: number, color: string, grosor: number, punteada = false) => {

@@ -92,7 +92,7 @@ function dibujarLentes(g: Pintor2D, s: EstadoGeometrica) {
   const H = Math.max(10, Math.abs(s.h) * 2.2)
   g.ventana = { x: [zmin, zmax], y: [-H, H] }
   g.igualarEscala()
-  g.ejes({ etiquetaX: 'z', rejilla: true })
+  g.ejes({ etiquetaX: 'z' })
   const ls = [...s.lentes].sort((a, b) => a.z - b.z)
   const hl = 0.8 * H
   for (const l of ls) {

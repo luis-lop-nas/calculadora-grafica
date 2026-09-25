@@ -299,7 +299,7 @@ export default definir<EstadoFourier>({
         return
       }
       g.region(0, REPARTO, 1, 1 - REPARTO)
-      g.fondoRegion(g.color('--ground'))
+      g.panel()
       dibujarEspectro(g, s, c)
       g.finRegion()
       g.region(0, 0, 1, REPARTO)

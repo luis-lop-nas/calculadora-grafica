@@ -165,7 +165,7 @@ function vistaTransitorio(g: Pintor2D, s: EstadoCircuito) {
     const hi = Math.max(0, ...ys)
     const pad = 0.12 * (hi - lo || 1)
     g.region(0, k * 0.5, 1, 0.5)
-    if (k) g.fondoRegion(g.color('--ground'))
+    if (k) g.panel()
     g.ventana = { x: [-0.02 * s.tMax, s.tMax], y: [lo - pad, hi + pad] }
     g.ejes({ etiquetaX: 't', etiquetaY: nombre })
     g.curva(ts.map((t, i) => [t, ys[i]] as [number, number]), g.color(col), 2.2)
@@ -198,7 +198,7 @@ function vistaAlterna(g: Pintor2D, s: EstadoCircuito, reloj: number) {
   g.finRegion()
 
   g.region(0.45, 0, 0.55, 0.5)
-  g.fondoRegion(g.color('--ground'))
+  g.panel()
   const T = (2 * Math.PI) / w
   const ts = Array.from({ length: 401 }, (_, i) => (2 * T * i) / 400)
   const re = (z: C, t: number) => z[0] * Math.cos(w * t) - z[1] * Math.sin(w * t)

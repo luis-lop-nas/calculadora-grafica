@@ -111,13 +111,26 @@ export class Pintor2D {
     this.ctx.clearRect(0, 0, this.ancho, this.alto)
   }
 
-  /** Rejilla y ejes con números. `paso` automático si no se da. */
-  ejes(opts: { etiquetaX?: string; etiquetaY?: string; rejilla?: boolean; paso?: number } = {}) {
+  /**
+   * Rejilla y ejes con números, iguales en todos los módulos 2D (el módulo solo nombra los ejes).
+   * Al estilo GeoGebra: la rejilla gruesa va a pasos bonitos (1, 2, 5…) de ~90 px, y la fina
+   * (cuartos o quintos) se enciende al acercarse y se apaga al alejarse, según su separación en px.
+   */
+  ejes(opts: { etiquetaX?: string; etiquetaY?: string } = {}) {
+    this.trazarEjes(opts, true)
+  }
+
+  /** Ejes y números sobre un mapa de color: el mapa ya es el fondo, así que sin rejilla. */
+  ejesMapa(opts: { etiquetaX?: string; etiquetaY?: string } = {}) {
+    this.trazarEjes(opts, false)
+  }
+
+  private trazarEjes(opts: { etiquetaX?: string; etiquetaY?: string }, conRejilla: boolean) {
     const { ctx } = this
-    const rejilla = (opts.rejilla ?? true) && this.mostrarRejilla
+    const rejilla = conRejilla && this.mostrarRejilla
     // un paso por eje: si no, una ventana alta y estrecha se llena de números
-    const pasoX = opts.paso ?? pasoBonito((this.ventana.x[1] - this.ventana.x[0]) / 8)
-    const pasoY = opts.paso ?? pasoBonito((this.ventana.y[1] - this.ventana.y[0]) / 6)
+    const pasoX = pasoBonito(90 / Math.abs(this.escalaX || 1))
+    const pasoY = pasoBonito(90 / Math.abs(this.escalaY || 1))
     ctx.save()
     ctx.lineWidth = 1
     ctx.font = `11px ${varCss('--mono') || 'monospace'}`
@@ -125,17 +138,36 @@ export class Pintor2D {
 
     if (rejilla) {
       ctx.strokeStyle = this.color('--grid')
-      ctx.globalAlpha = 0.5
-      ctx.beginPath()
-      for (let v = Math.ceil(this.ventana.x[0] / pasoX) * pasoX; v <= this.ventana.x[1]; v += pasoX) {
-        ctx.moveTo(Math.round(this.X(v)) + 0.5, this.vy)
-        ctx.lineTo(Math.round(this.X(v)) + 0.5, this.vy + this.vh)
+      const lineas = (paso: number, alfa: number, saltar: number) => {
+        if (alfa <= 0.01) return
+        ctx.globalAlpha = alfa
+        ctx.beginPath()
+        for (let k = Math.ceil(this.ventana.x[0] / paso); k * paso <= this.ventana.x[1]; k++) {
+          if (saltar && k % saltar === 0) continue
+          const px = Math.round(this.X(k * paso)) + 0.5
+          ctx.moveTo(px, this.vy)
+          ctx.lineTo(px, this.vy + this.vh)
+        }
+        ctx.stroke()
       }
-      for (let v = Math.ceil(this.ventana.y[0] / pasoY) * pasoY; v <= this.ventana.y[1]; v += pasoY) {
-        ctx.moveTo(this.vx, Math.round(this.Y(v)) + 0.5)
-        ctx.lineTo(this.vx + this.vw, Math.round(this.Y(v)) + 0.5)
+      const lineasY = (paso: number, alfa: number, saltar: number) => {
+        if (alfa <= 0.01) return
+        ctx.globalAlpha = alfa
+        ctx.beginPath()
+        for (let k = Math.ceil(this.ventana.y[0] / paso); k * paso <= this.ventana.y[1]; k++) {
+          if (saltar && k % saltar === 0) continue
+          const py = Math.round(this.Y(k * paso)) + 0.5
+          ctx.moveTo(this.vx, py)
+          ctx.lineTo(this.vx + this.vw, py)
+        }
+        ctx.stroke()
       }
-      ctx.stroke()
+      const nx = subdivisiones(pasoX)
+      const ny = subdivisiones(pasoY)
+      lineas(pasoX / nx, 0.5 * fundido((pasoX / nx) * Math.abs(this.escalaX)), nx)
+      lineasY(pasoY / ny, 0.5 * fundido((pasoY / ny) * Math.abs(this.escalaY)), ny)
+      lineas(pasoX, 0.75, 0)
+      lineasY(pasoY, 0.75, 0)
       ctx.globalAlpha = 1
     }
 
@@ -240,11 +272,14 @@ export class Pintor2D {
     ctx.restore()
   }
 
-  fondoRegion(color: string) {
-    this.ctx.save()
-    this.ctx.fillStyle = color
-    this.ctx.fillRect(this.vx, this.vy, this.vw, this.vh)
-    this.ctx.restore()
+  /** Marca un subpanel: el mismo fondo que el resto, separado por una línea fina. */
+  panel() {
+    const { ctx } = this
+    ctx.save()
+    ctx.strokeStyle = this.color('--line')
+    ctx.lineWidth = 1
+    ctx.strokeRect(Math.round(this.vx) + 0.5, Math.round(this.vy) + 0.5, Math.round(this.vw) - 1, Math.round(this.vh) - 1)
+    ctx.restore()
   }
 
   funcion(f: (x: number) => number, color: string, grosor = 2, muestras = 500) {
@@ -340,6 +375,18 @@ export class Pintor2D {
   }
 }
 
+/** La rejilla fina parte la gruesa en quintos (pasos 1 y 5) o en cuartos (paso 2). */
+function subdivisiones(paso: number) {
+  const m = Math.round(paso / Math.pow(10, Math.floor(Math.log10(paso) + 1e-9)))
+  return m === 2 ? 4 : 5
+}
+
+/** Visibilidad de la rejilla fina según la separación de sus líneas en píxeles. */
+function fundido(px: number) {
+  const t = Math.min(1, Math.max(0, (px - 7) / (18 - 7)))
+  return t * t * (3 - 2 * t)
+}
+
 function pasoBonito(bruto: number) {
   const e = Math.pow(10, Math.floor(Math.log10(Math.abs(bruto) || 1)))
   const m = bruto / e
@@ -348,5 +395,6 @@ function pasoBonito(bruto: number) {
 
 function rotula(v: number, paso: number) {
   const dec = Math.max(0, -Math.floor(Math.log10(paso)))
-  return v.toFixed(Math.min(4, dec))
+  // «1» y «1.5», no «1.0» y «1.5»
+  return v.toFixed(Math.min(4, dec)).replace(/\.?0+$/, (m) => (m.includes('.') || dec ? '' : m))
 }

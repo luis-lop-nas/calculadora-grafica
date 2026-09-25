@@ -161,7 +161,7 @@ export default definir<EstadoConvolucion>({
       g.finRegion()
 
       g.region(0, REPARTO, 1, 1 - REPARTO)
-      g.fondoRegion(g.color('--ground'))
+      g.panel()
       const ys = cache.y.filter((p) => p[0] >= -st.L && p[0] <= st.L)
       const yv = ys.map((p) => p[1])
       const ylo = Math.min(0, ...yv)

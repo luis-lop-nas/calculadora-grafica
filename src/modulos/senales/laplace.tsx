@@ -307,7 +307,7 @@ export default definir<EstadoLaplaceT>({
       dibujarTiempo(g, s, v)
       g.finRegion()
       g.region(REPARTO, 0, 1 - REPARTO, 1)
-      g.fondoRegion(g.color('--ground'))
+      g.panel()
       dibujarPlanoS(g, v)
       g.finRegion()
     },

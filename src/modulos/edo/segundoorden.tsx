@@ -343,7 +343,7 @@ export default definir<EstadoSegundo>({
 
       g.region(0, 0, anchoTiempo, 1)
       g.ventana = { x: [0, s.T], y: [-m, m] }
-      g.ejes({ etiquetaX: 't', etiquetaY: 'y', paso: Math.max(1, Math.round(s.T / 8)) })
+      g.ejes({ etiquetaX: 't', etiquetaY: 'y' })
       const suave = g.color('--ink-soft')
       // los tiros que fallan pueden dispararse órdenes de magnitud: se recortan
       // a la ventana en vez de dejar una banda vertical
@@ -372,7 +372,7 @@ export default definir<EstadoSegundo>({
 
       if (s.verFases) {
         g.region(anchoTiempo, 0, 1 - anchoTiempo, 1)
-        g.fondoRegion(g.color('--ground'))
+        g.panel()
         planoFases(g, principal, m)
         g.finRegion()
       }

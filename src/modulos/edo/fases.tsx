@@ -284,7 +284,7 @@ export default definir<S>({
 
       if (s.verTiempo) {
         g.region(anchoFase, 0, 1 - anchoFase, 1)
-        g.fondoRegion(g.color('--ground'))
+        g.panel()
         seriesTemporales(g, s, f, q, semillas)
         g.finRegion()
       }
@@ -468,7 +468,7 @@ function seriesTemporales(
   for (const p of tr) m = Math.max(m, Math.abs(p[0]), Math.abs(p[1]))
   m = Math.max(0.5, Math.min(50, m)) * 1.15
   g.ventana = { x: [0, s.T], y: [-m, m] }
-  g.ejes({ etiquetaX: 't', paso: Math.max(1, Math.round(s.T / 6)) })
+  g.ejes({ etiquetaX: 't' })
 
   const serie = (k: number, color: string) => {
     const pts: Array<[number, number]> = tr.map((p, i) => [i * h, p[k]] as [number, number])

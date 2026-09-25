@@ -381,7 +381,7 @@ export default definir<EstadoTransformada>({
       dibujarTiempo(g, s, x)
       g.finRegion()
       g.region(0, REPARTO, 1, 1 - REPARTO)
-      g.fondoRegion(g.color('--ground'))
+      g.panel()
       dibujarFrecuencia(g, s, x)
       g.finRegion()
     },

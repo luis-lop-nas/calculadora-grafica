@@ -168,7 +168,7 @@ function vistaEscalon(g: Pintor2D, s: EstadoControl, T: FT) {
   g.curva(y, g.color('--accent'), 2.2)
   g.finRegion()
   g.region(0.62, 0, 0.38, 1)
-  g.fondoRegion(g.color('--ground'))
+  g.panel()
   planoS(g, T)
   g.finRegion()
 }
@@ -194,7 +194,7 @@ function vistaBode(g: Pintor2D, L: FT) {
   g.finRegion()
   const fases = b.map((p) => p.fase)
   g.region(0, 0.52, 1, 0.48)
-  g.fondoRegion(g.color('--ground'))
+  g.panel()
   g.ventana = { x: [lg(w0), lg(w1)], y: [Math.min(-200, ...fases) - 15, Math.max(20, ...fases) + 15] }
   g.ejes({ etiquetaX: 'log₁₀ ω', etiquetaY: 'fase °' })
   g.curva([[lg(w0), -180], [lg(w1), -180]], g.color('--neg'), 1, true)
