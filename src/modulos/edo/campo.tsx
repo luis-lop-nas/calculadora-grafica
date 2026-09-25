@@ -231,21 +231,10 @@ export default definir<S>({
         g.texto('la expresión no es válida', g.ventana.x[0] + 0.3, g.ventana.y[1] - 0.4, g.color('--pos'))
         return
       }
-      const suave = g.color('--ink-soft')
       const [xa, xb] = g.ventana.x
       const [ya, yb] = g.ventana.y
 
-      if (s.verCampo) {
-        const paso = (xb - xa) / 26
-        const largo = paso * 0.42
-        for (let x = xa; x <= xb; x += paso)
-          for (let y = ya; y <= yb; y += paso) {
-            const m = f(x, y)
-            if (!Number.isFinite(m)) continue
-            const n = Math.hypot(1, m)
-            g.flecha(x - (largo / n) * 0.5, y - ((largo * m) / n) * 0.5, largo / n, (largo * m) / n, suave, 1.1, 4)
-          }
-      }
+      if (s.verCampo) g.campoFlechas((x, y) => [1, f(x, y)])
 
       if (s.verIsoclinas) {
         // curvas de nivel f(x, y) = c por marching squares: con varias ramas (y(1 − y) = c tiene dos) salen todas

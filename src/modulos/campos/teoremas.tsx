@@ -210,18 +210,7 @@ function dibujarPlano(g: Pintor2D, s: EstadoTeoremas) {
     if (Number.isFinite(q.v))
       g.rellenar([[q.x - hx / 2, q.y - hy / 2], [q.x + hx / 2, q.y - hy / 2], [q.x + hx / 2, q.y + hy / 2], [q.x - hx / 2, q.y + hy / 2]], g.color(q.v >= 0 ? '--pos' : '--neg'), 0.08 + 0.5 * (Math.abs(q.v) / vmax))
   // campo
-  const M = 16
-  for (let i = 0; i <= M; i++)
-    for (let j = 0; j <= M; j++) {
-      const x = X0 + ((X1 - X0) * i) / M
-      const y = Y0 + ((Y1 - Y0) * j) / M
-      const u = F.P(x, y)
-      const v = F.Q(x, y)
-      const r = Math.hypot(u, v)
-      if (!(r > 0) || !Number.isFinite(r)) continue
-      const l = (0.45 * (X1 - X0)) / M
-      g.flecha(x, y, (l * u) / r, (l * v) / r, g.color('--ink-soft'), 1, 4)
-    }
+  g.campoFlechas((x, y) => [F.P(x, y), F.Q(x, y)], { magnitud: true })
   g.curva(pts, g.color('--aux'), 2.2)
   for (let k = 0; k < 8; k++) {
     const t = C.t0 + ((C.t1 - C.t0) * (k + 0.25)) / 8

@@ -446,26 +446,10 @@ function rejillaConforme(g: Pintor2D, s: S, f: (z: K.C) => K.C) {
 }
 
 function campoPolya(g: Pintor2D, s: S, f: (z: K.C) => K.C) {
-  const [xa, xb] = g.ventana.x
-  const [ya, yb] = g.ventana.y
-  const n = 26
-  const paso = (xb - xa) / n
-  const suave = g.color('--ink-soft')
-  let mx = 0
-  const datos: Array<[number, number, number, number]> = []
-  for (let x = xa; x <= xb; x += paso)
-    for (let y = ya; y <= yb; y += paso) {
-      const w = f([x, y])
-      if (!Number.isFinite(w[0]) || !Number.isFinite(w[1])) continue
-      const m = Math.hypot(w[0], w[1])
-      if (m < 1e-12) continue
-      datos.push([x, y, w[0], -w[1]])
-      mx = Math.max(mx, m)
-    }
-  for (const [x, y, u, v] of datos) {
-    const m = Math.hypot(u, v)
-    const l = paso * 0.75 * Math.pow(m / mx, 0.3)
-    g.flecha(x - ((u / m) * l) / 2, y - ((v / m) * l) / 2, (u / m) * l, (v / m) * l, suave, 1.1, 4)
-  }
+  // campo de Pólya: el conjugado de f, con la longitud según |f|
+  g.campoFlechas((x, y) => {
+    const w = f([x, y])
+    return [w[0], -w[1]]
+  }, { magnitud: true })
   void s
 }

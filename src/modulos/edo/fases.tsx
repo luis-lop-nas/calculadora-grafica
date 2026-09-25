@@ -367,23 +367,11 @@ function planoDeFases(
   marco: { x: [number, number]; y: [number, number] },
 ) {
   g.ejes({ etiquetaX: 'x', etiquetaY: 'y' })
-  const suave = g.color('--ink-soft')
   const [xa, xb] = marco.x
   const [ya, yb] = marco.y
   const diag = Math.hypot(xb - xa, yb - ya)
 
-  if (s.verCampo) {
-    const paso = (xb - xa) / 24
-    for (let x = xa; x <= xb; x += paso)
-      for (let y = ya; y <= yb; y += paso) {
-        const u = f(x, y)
-        const v = q(x, y)
-        const n = Math.hypot(u, v)
-        if (!Number.isFinite(n) || n < 1e-9) continue
-        const l = paso * 0.42
-        g.flecha(x - ((u / n) * l) / 2, y - ((v / n) * l) / 2, (u / n) * l, (v / n) * l, suave, 1.1, 4)
-      }
-  }
+  if (s.verCampo) g.campoFlechas((x, y) => [f(x, y), q(x, y)])
 
   if (s.verNulclinas) {
     for (const [campo, color] of [

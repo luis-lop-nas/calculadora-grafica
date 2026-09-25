@@ -331,6 +331,66 @@ export class Pintor2D {
     ctx.restore()
   }
 
+  /**
+   * Campo de flechas común a todos los módulos. La malla está anclada a múltiplos de un paso del
+   * mundo (no «nada» al desplazar) con ~44 px entre flechas (a potencias de 2), y cada flecha mide lo mismo en pantalla
+   * a cualquier zoom; la dirección se calcula en píxeles, así no se deforma si x e y tienen escalas
+   * distintas. Sin `magnitud` es un campo de direcciones (todas iguales); con ella, un campo
+   * vectorial: la longitud crece, suavizada, con |F|.
+   */
+  campoFlechas(f: (x: number, y: number) => [number, number] | null, opts: { color?: string; magnitud?: boolean } = {}) {
+    const { ctx } = this
+    const ex = Math.abs(this.escalaX)
+    const ey = Math.abs(this.escalaY)
+    // potencias de 2: la separación se queda más cerca de la buscada que con pasos 1-2-5
+    const pasoX = 2 ** Math.round(Math.log2(44 / ex))
+    const pasoY = 2 ** Math.round(Math.log2(44 / ey))
+    const largo = Math.min(28, 0.72 * Math.min(pasoX * ex, pasoY * ey))
+    const puntos: Array<[number, number, number, number, number]> = []
+    for (let i = Math.floor(this.ventana.x[0] / pasoX); (i + 0.5) * pasoX <= this.ventana.x[1]; i++)
+      for (let j = Math.floor(this.ventana.y[0] / pasoY); (j + 0.5) * pasoY <= this.ventana.y[1]; j++) {
+        const x = (i + 0.5) * pasoX
+        const y = (j + 0.5) * pasoY
+        if (x < this.ventana.x[0] || y < this.ventana.y[0]) continue
+        const w = f(x, y)
+        if (!w || !Number.isFinite(w[0]) || !Number.isFinite(w[1])) continue
+        const m = Math.hypot(w[0], w[1])
+        if (m < 1e-12) continue
+        puntos.push([x, y, w[0] * ex, -w[1] * ey, m])
+      }
+    // referencia de |F|: el percentil 85, no el máximo (cerca de un polo el máximo lo aplasta todo)
+    const orden = puntos.map((q) => q[4]).sort((a, b) => a - b)
+    const ref = orden[Math.floor(0.85 * (orden.length - 1))] || 1
+    ctx.save()
+    ctx.strokeStyle = ctx.fillStyle = opts.color ?? this.color('--ink-soft')
+    ctx.globalAlpha = 0.85
+    ctx.lineWidth = 1.2
+    ctx.lineCap = 'round'
+    for (const [x, y, sx, sy, m] of puntos) {
+      const n = Math.hypot(sx, sy)
+      const l = opts.magnitud ? largo * Math.max(0.3, Math.min(1, Math.pow(m / ref, 0.5))) : largo
+      const dx = (sx / n) * l
+      const dy = (sy / n) * l
+      const cx = this.X(x)
+      const cy = this.Y(y)
+      const x2 = cx + dx / 2
+      const y2 = cy + dy / 2
+      ctx.beginPath()
+      ctx.moveTo(cx - dx / 2, cy - dy / 2)
+      ctx.lineTo(x2, y2)
+      ctx.stroke()
+      const cabeza = Math.min(5, l * 0.4)
+      const ang = Math.atan2(dy, dx)
+      ctx.beginPath()
+      ctx.moveTo(x2, y2)
+      ctx.lineTo(x2 - cabeza * Math.cos(ang - 0.45), y2 - cabeza * Math.sin(ang - 0.45))
+      ctx.lineTo(x2 - cabeza * Math.cos(ang + 0.45), y2 - cabeza * Math.sin(ang + 0.45))
+      ctx.closePath()
+      ctx.fill()
+    }
+    ctx.restore()
+  }
+
   /** Texto en coordenadas del mundo, con desplazamiento en píxeles. */
   /** Rejilla de píxeles nx×ny (fila 0 abajo) pintada en el rectángulo del mundo [xa, xb]×[ya, yb]. */
   mapa(nx: number, ny: number, rgb: (i: number, j: number) => [number, number, number], [xa, xb, ya, yb]: [number, number, number, number], suave = true) {
