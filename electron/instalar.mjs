@@ -49,4 +49,6 @@ execFileSync('ditto', [origen, destino], { stdio: 'inherit' })
 execFileSync('codesign', ['--force', '--deep', '--sign', '-', destino], { stdio: 'inherit' })
 execFileSync('xattr', ['-dr', 'com.apple.quarantine', destino], { stdio: 'ignore' })
 console.log(`\nInstalada en ${destino}\nÁbrela desde el Launchpad o con: open "${destino}"`)
-execFileSync('open', [destino])
+// VS Code exporta ELECTRON_RUN_AS_NODE y `open` la hereda: la app arrancaría como Node y se cerraría
+const { ELECTRON_RUN_AS_NODE, ...env } = process.env
+execFileSync('open', [destino], { env })
