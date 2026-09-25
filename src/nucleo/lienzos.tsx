@@ -977,7 +977,8 @@ export function Lienzo2D({ vista, s, set, enlace, secundario, lado }: { vista: V
   return (
     <>
       <canvas ref={ref} className={vista.navegable === false ? undefined : 'arrastrable'} />
-      {!secundario && (
+      {/* en la app de Mac, Archivo ▸ Exportar ▸ Imagen PNG (⌘E) */}
+      {!secundario && !escritorio && (
         <button className="exportar-lienzo" type="button" title="Descargar imagen PNG" onClick={() => ref.current && descargarCanvas(ref.current, 'calculadora-2d')}>
           PNG
         </button>

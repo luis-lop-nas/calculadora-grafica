@@ -446,9 +446,17 @@ export default function App() {
         setModificado(texto.current !== guardadoAhora)
       })
     } else if (orden === 'png') {
-      // el mismo botón PNG del lienzo que se está editando (el B superpuesto no tiene: cae al de A)
-      const boton = (sel: string) => document.querySelector<HTMLButtonElement>(`${sel} button[title="Descargar imagen PNG"]`)
-      ;(boton(`.lado-${cmp.activo ? cmp.editando : 'A'}`) ?? boton('.escenario'))?.click()
+      // se pide el lienzo que se está editando (la barra del lienzo no lleva botón PNG en la app)
+      ordenVista({
+        orden: 'captura',
+        lado: cmp.activo ? cmp.editando : 'A',
+        fn: (canvas) => {
+          const a = document.createElement('a')
+          a.href = canvas.toDataURL('image/png')
+          a.download = `calculadora-${id}.png`
+          a.click()
+        },
+      })
     } else if (orden === 'csv') descargarLecturas(id, lecturas)
     else if (orden === 'json') descargarEstado(estados, id)
     else if (orden === 'comparar') conmutarComparar()
